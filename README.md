@@ -723,6 +723,171 @@ adk quick "ajustar css" --no-test
 
 ---
 
+# Tecnicas de Prompt Engineering
+
+O ADK utiliza diversas tecnicas de engenharia de prompt para maximizar a eficacia do Claude Code.
+
+## 1. Phased Prompting
+
+Prompts estruturados em fases numeradas com objetivos claros.
+
+```
+PHASE 1: RESEARCH
+PHASE 2: DETAILED PLANNING
+PHASE 3: IMPLEMENTATION (TDD)
+```
+
+**Por que funciona**: Divide problemas complexos em etapas gerenciaveis, evitando sobrecarga cognitiva do modelo.
+
+## 2. Input/Output Specification
+
+Definicao explicita de arquivos de entrada e saida esperada.
+
+```
+Input: .claude/plans/features/auth/research.md
+Output: .claude/plans/features/auth/implementation-plan.md
+```
+
+**Por que funciona**: Remove ambiguidade sobre onde buscar contexto e onde salvar resultados.
+
+## 3. Structured Output Templates
+
+Templates com estrutura pre-definida para o output.
+
+```
+Estrutura do research.md:
+# Research: ${name}
+
+## Current State Analysis
+[Descreva estado atual]
+
+## Files to Create
+- [ ] file1.ts
+```
+
+**Por que funciona**: Garante consistencia e facilita parsing automatizado.
+
+## 4. Context Injection com XML Tags
+
+Uso de tags XML para delimitar contexto adicional.
+
+```
+<context>
+${contextContent}
+</context>
+```
+
+**Por que funciona**: Separa claramente o contexto injetado do resto do prompt.
+
+## 5. Explicit Constraints (IMPORTANTE)
+
+Destacar restricoes criticas em caixa alta.
+
+```
+IMPORTANTE: TDD - TESTES PRIMEIRO
+IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
+```
+
+**Por que funciona**: Previne comportamentos indesejados, especialmente em tarefas multi-step.
+
+## 6. Task Lists Numeradas
+
+Listas numeradas de tarefas especificas.
+
+```
+Tasks:
+1. Leia PRD completamente
+2. Analise codebase atual
+3. Identifique arquivos a criar
+```
+
+**Por que funciona**: Cria um checklist mental que o modelo segue sequencialmente.
+
+## 7. Verification Gates
+
+Validacoes que impedem avanco sem pre-requisitos.
+
+```typescript
+if (!(await fs.pathExists(researchPath))) {
+  spinner.fail(`Execute research primeiro: adk feature research ${name}`)
+  process.exit(1)
+}
+```
+
+**Por que funciona**: Garante qualidade e ordem no processo.
+
+## 8. Role-Implicit Prompting
+
+Definicao implicita de papel atraves das tarefas.
+
+```
+Analyze staged files:
+Check for:
+- console.log/debugger
+- TODO/FIXME críticos
+- Secrets hardcoded
+```
+
+**Por que funciona**: O modelo infere o papel (code reviewer) pelas tarefas, sem precisar de "Voce e um..."
+
+## 9. Conditional Output
+
+Instrucoes condicionais para diferentes cenarios.
+
+```
+If issues found: LIST them and STOP
+If clean: Say "✅ Pre-commit checks passed"
+```
+
+**Por que funciona**: Define comportamentos claros para cada cenario possivel.
+
+## 10. Emoji Signals
+
+Emojis como identificadores visuais de tipo de workflow.
+
+```
+🌅 Daily Workflow
+🔍 Pre-commit Review
+```
+
+**Por que funciona**: Cria associacoes visuais rapidas e melhora a scanability dos logs.
+
+## 11. Chain of Thought Estruturado
+
+Processo de pensamento guiado passo a passo.
+
+```
+Process:
+1. WRITE TESTS FIRST
+   - Escreva TODOS os testes da fase
+   - NÃO escreva implementação ainda
+   - Execute e confirme que falham
+
+2. IMPLEMENT
+   - Implemente código para testes passarem
+   - Teste após cada mudança
+```
+
+**Por que funciona**: Forca o modelo a seguir um processo mental especifico.
+
+## 12. Checklist-Driven Prompts
+
+Prompts baseados em checklists verificaveis.
+
+```
+## 1. Tests
+- [ ] Unit tests
+- [ ] Integration tests
+
+## 2. Code Quality
+- [ ] Lint
+- [ ] Format
+```
+
+**Por que funciona**: Facilita verificacao e garante cobertura completa.
+
+---
+
 # Desenvolvimento do ADK
 
 ```bash
