@@ -1,0 +1,62 @@
+{
+  "name": "agentic-development-kit",
+  "version": "1.0.0",
+  "description": "CLI toolkit para desenvolvimento agêntico com Claude Code usando framework CADD",
+  "main": "dist/index.js",
+  "bin": {
+    "adk": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/cli.ts",
+    "start": "node dist/cli.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "type-check": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
+    "link": "npm run build && npm link"
+  },
+  "keywords": [
+    "agentic",
+    "claude-code",
+    "cli",
+    "development",
+    "automation",
+    "cadd"
+  ],
+  "author": "Renan Oliveira",
+  "license": "MIT",
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.11",
+    "@types/fs-extra": "^11.0.4",
+    "@types/inquirer": "^9.0.7",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.0.7",
+    "@types/yargs": "^17.0.32",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.1.1",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "dotenv": "^17.2.3",
+    "fs-extra": "^11.3.3",
+    "fuse.js": "^7.1.0",
+    "inquirer": "^13.2.0",
+    "ora": "^9.0.0",
+    "simple-git": "^3.30.0",
+    "zod": "^3.25.76"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
