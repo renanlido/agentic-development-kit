@@ -27,7 +27,9 @@ program
 // Comando: adk feature
 const feature = program
   .command('feature')
-  .description('Gerencia features do projeto (new, research, plan, implement, list, autopilot)')
+  .description(
+    'Gerencia features do projeto (new, research, tasks, plan, implement, qa, docs, list, autopilot)'
+  )
 
 feature
   .command('new <name> [description]')
@@ -45,15 +47,32 @@ feature
   )
 
 feature
+  .command('tasks <name>')
+  .description('Cria breakdown de tasks a partir do PRD/research')
+  .action((name) => featureCommand.tasks(name))
+
+feature
   .command('plan <name>')
   .description('Cria plano de implementação detalhado')
-  .action((name) => featureCommand.plan(name))
+  .option('--skip-spec', 'Pula validação de spec (não recomendado)')
+  .action((name, options) => featureCommand.plan(name, options))
 
 feature
   .command('implement <name>')
   .description('Implementa feature seguindo TDD')
   .option('--phase <phase>', 'Fase específica para implementar')
+  .option('--skip-spec', 'Pula validação de spec (não recomendado)')
   .action((name, options) => featureCommand.implement(name, options))
+
+feature
+  .command('qa <name>')
+  .description('Executa revisão de qualidade (QA)')
+  .action((name) => featureCommand.qa(name))
+
+feature
+  .command('docs <name>')
+  .description('Gera/atualiza documentação da feature')
+  .action((name) => featureCommand.docs(name))
 
 feature
   .command('list')
@@ -63,7 +82,7 @@ feature
 feature
   .command('autopilot <name> [description]')
   .description(
-    'Executa fluxo completo automatizado: PRD → Tasks → Arquitetura → Implementação → Revisão → Documentação'
+    'Executa fluxo completo automatizado: PRD → Research → Tasks → Arquitetura → Implementação → QA → Documentação'
   )
   .option('-c, --context <file>', 'Arquivo de contexto adicional')
   .action((name, description, options) =>
@@ -84,7 +103,7 @@ program
 // Comando: adk workflow
 const workflow = program
   .command('workflow')
-  .description('Executa workflows automatizados (daily, pre-commit, pre-deploy, qa)')
+  .description('Executa workflows automatizados (daily, pre-commit, pre-deploy)')
 
 workflow
   .command('daily')
@@ -101,11 +120,6 @@ workflow
   .description('Checklist completo pré-deploy')
   .option('-f, --feature <feature>', 'Feature específica')
   .action((options) => workflowCommand.preDeploy(options))
-
-workflow
-  .command('qa <feature>')
-  .description('Executa QA completo da feature')
-  .action((feature) => workflowCommand.qa(feature))
 
 // Comando: adk agent
 const agent = program

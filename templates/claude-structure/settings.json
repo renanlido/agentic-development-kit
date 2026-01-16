@@ -49,17 +49,6 @@
           }
         ]
       }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/update-state.sh"
-          }
-        ]
-      }
     ]
   },
   "permissions": {

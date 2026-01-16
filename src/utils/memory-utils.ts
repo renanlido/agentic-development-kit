@@ -86,7 +86,7 @@ export function parseMemoryContent(content: string): MemoryContent {
   const phaseMatch = content.match(/\*\*Fase Atual\*\*:\s*(\w+)/m)
   if (phaseMatch) {
     const p = phaseMatch[1].toLowerCase()
-    if (['research', 'plan', 'implement', 'qa', 'deploy'].includes(p)) {
+    if (['research', 'tasks', 'plan', 'implement', 'qa', 'docs', 'deploy'].includes(p)) {
       phase = p as MemoryPhase
     }
   }

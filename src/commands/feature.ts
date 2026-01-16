@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process'
+import { execFileSync, execSync } from 'node:child_process'
 import path from 'node:path'
 import chalk from 'chalk'
 import fs from 'fs-extra'
@@ -6,8 +6,14 @@ import inquirer from 'inquirer'
 import ora from 'ora'
 import { executeClaudeCommand } from '../utils/claude'
 import { logger } from '../utils/logger'
-import { isStepCompleted, loadProgress, saveProgress, updateStepStatus } from '../utils/progress'
-import { generateSpecTemplate, parseSpecFromMarkdown, validateSpec } from '../utils/spec-utils'
+import {
+  type FeatureProgress,
+  isStepCompleted,
+  loadProgress,
+  saveProgress,
+  updateStepStatus,
+} from '../utils/progress'
+import { parseSpecFromMarkdown, validateSpec } from '../utils/spec-utils'
 import { loadTemplate } from '../utils/templates'
 import { memoryCommand } from './memory'
 
@@ -16,6 +22,7 @@ interface FeatureOptions {
   phase?: string
   context?: string
   description?: string
+  skipSpec?: boolean
 }
 
 interface QuickOptions {
@@ -30,8 +37,16 @@ interface FeatureState {
   hasTasks: boolean
   hasPlan: boolean
   hasResearch: boolean
+  hasQaReport: boolean
   currentStage: string
   featurePath: string
+}
+
+type PhaseAction = 'refine' | 'redo' | 'next'
+
+interface PhaseCheckResult {
+  action: PhaseAction
+  extraContext?: string
 }
 
 class FeatureCommand {
@@ -55,9 +70,12 @@ path: ${featurePath}
     const hasTasks = await fs.pathExists(path.join(featurePath, 'tasks.md'))
     const hasPlan = await fs.pathExists(path.join(featurePath, 'implementation-plan.md'))
     const hasResearch = await fs.pathExists(path.join(featurePath, 'research.md'))
+    const hasQaReport = await fs.pathExists(path.join(featurePath, 'qa-report.md'))
 
     let currentStage = 'não iniciada'
-    if (hasPlan) {
+    if (hasQaReport) {
+      currentStage = 'qa concluído'
+    } else if (hasPlan) {
       currentStage = 'arquitetura pronta'
     } else if (hasResearch) {
       currentStage = 'research feito'
@@ -69,7 +87,16 @@ path: ${featurePath}
       currentStage = 'estrutura criada'
     }
 
-    return { exists, hasPrd, hasTasks, hasPlan, hasResearch, currentStage, featurePath }
+    return {
+      exists,
+      hasPrd,
+      hasTasks,
+      hasPlan,
+      hasResearch,
+      hasQaReport,
+      currentStage,
+      featurePath,
+    }
   }
 
   private async askToResume(name: string, state: FeatureState): Promise<boolean> {
@@ -104,7 +131,23 @@ path: ${featurePath}
     if (options.context) {
       const contextPath = path.resolve(options.context)
       if (await fs.pathExists(contextPath)) {
-        context = await fs.readFile(contextPath, 'utf-8')
+        const stat = await fs.stat(contextPath)
+        if (stat.isDirectory()) {
+          const files = await fs.readdir(contextPath)
+          const textFiles = files.filter((f) => /\.(md|txt|json|yaml|yml)$/i.test(f))
+          const contents: string[] = []
+          for (const file of textFiles.sort()) {
+            const filePath = path.join(contextPath, file)
+            const fileStat = await fs.stat(filePath)
+            if (fileStat.isFile()) {
+              const content = await fs.readFile(filePath, 'utf-8')
+              contents.push(`# File: ${file}\n\n${content}`)
+            }
+          }
+          context = contents.join('\n\n---\n\n')
+        } else {
+          context = await fs.readFile(contextPath, 'utf-8')
+        }
       }
     }
 
@@ -113,6 +156,104 @@ path: ${featurePath}
     }
 
     return context
+  }
+
+  private async checkPhaseExists(
+    _phaseName: string,
+    phaseLabel: string,
+    outputPath: string,
+    nextPhaseName: string
+  ): Promise<PhaseCheckResult | null> {
+    if (!(await fs.pathExists(outputPath))) {
+      return null
+    }
+
+    console.log()
+    console.log(chalk.yellow(`${phaseLabel} já existe para esta feature.`))
+    console.log(chalk.gray(`  Arquivo: ${outputPath}`))
+    console.log()
+
+    const { action } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'action',
+        message: `O que deseja fazer com ${phaseLabel}?`,
+        choices: [
+          { name: `🔧 Refinar - Adicionar contexto e melhorar`, value: 'refine' },
+          { name: `🔄 Refazer - Começar do zero`, value: 'redo' },
+          { name: `⏭️  Próxima - Ir para ${nextPhaseName}`, value: 'next' },
+        ],
+      },
+    ])
+
+    if (action === 'refine') {
+      const { extraContext } = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'extraContext',
+          message: 'Adicione contexto extra (ou deixe vazio para manter):',
+        },
+      ])
+      return { action: 'refine', extraContext: extraContext || undefined }
+    }
+
+    return { action }
+  }
+
+  private async validateSpecGate(
+    name: string,
+    options: { skipSpec?: boolean } = {}
+  ): Promise<{ valid: boolean; specContent?: string }> {
+    if (options.skipSpec) {
+      console.log()
+      console.log(chalk.yellow('⚠️  Pulando validação de spec (--skip-spec)'))
+      console.log(chalk.yellow('   Isso pode levar a problemas de implementação.'))
+      console.log()
+      return { valid: true }
+    }
+
+    const specPath = path.join(process.cwd(), '.claude/specs', `${name}.md`)
+    const featureSpecPath = path.join(process.cwd(), '.claude/plans/features', name, 'spec.md')
+
+    let actualSpecPath: string | null = null
+    if (await fs.pathExists(specPath)) {
+      actualSpecPath = specPath
+    } else if (await fs.pathExists(featureSpecPath)) {
+      actualSpecPath = featureSpecPath
+    }
+
+    if (!actualSpecPath) {
+      return { valid: true }
+    }
+
+    const specContent = await fs.readFile(actualSpecPath, 'utf-8')
+    const parsedSpec = parseSpecFromMarkdown(specContent)
+    const validation = validateSpec(parsedSpec)
+
+    if (!validation.valid) {
+      console.log()
+      console.log(chalk.red('❌ Spec validation failed:'))
+      for (const error of validation.errors) {
+        console.log(chalk.red(`   - ${error.field}: ${error.message}`))
+      }
+      console.log()
+      console.log(chalk.yellow('Opções:'))
+      console.log(chalk.gray(`  1. Corrija a spec: adk spec validate --fix ${name}`))
+      console.log(chalk.gray('  2. Use --skip-spec para ignorar (não recomendado)'))
+      console.log()
+      return { valid: false }
+    }
+
+    if (validation.warnings.length > 0) {
+      console.log()
+      console.log(chalk.yellow('⚠️  Spec warnings:'))
+      for (const warning of validation.warnings) {
+        console.log(chalk.yellow(`   - ${warning}`))
+      }
+      console.log()
+    }
+
+    return { valid: true, specContent }
   }
 
   async create(name: string, options: FeatureOptions = {}): Promise<void> {
@@ -137,8 +278,6 @@ path: ${featurePath}
       const contextFromOptions = await this.loadContext(options)
 
       const prdTemplate = await loadTemplate('prd-template.md')
-      const taskTemplate = await loadTemplate('task-template.md')
-      const planTemplate = await loadTemplate('feature-plan.md')
 
       const date = new Date().toISOString().split('T')[0]
 
@@ -146,22 +285,9 @@ path: ${featurePath}
         .replace(/\[Nome da Feature\]/g, name)
         .replace(/YYYY-MM-DD/g, date)
 
-      const taskContent = taskTemplate
-        .replace(/\[Feature Name\]/g, name)
-        .replace(/YYYY-MM-DD/g, date)
-
-      const planContent = planTemplate
-        .replace(/\[Feature Name\]/g, name)
-        .replace(/\[feature-x\]/g, name)
-        .replace(/YYYY-MM-DD/g, date)
-
       if (!state.hasPrd) {
         await fs.writeFile(path.join(state.featurePath, 'prd.md'), prdContent)
       }
-      if (!state.hasTasks) {
-        await fs.writeFile(path.join(state.featurePath, 'tasks.md'), taskContent)
-      }
-      await fs.writeFile(path.join(state.featurePath, 'plan.md'), planContent)
 
       const featureContext = contextFromOptions || '[Adicione contexto específico desta feature]'
       const contextContent = `# ${name} Context
@@ -223,9 +349,12 @@ ${featureContext}
       console.log()
       console.log(chalk.cyan('Próximos passos:'))
       console.log(chalk.gray(`  1. Editar PRD: .claude/plans/features/${name}/prd.md`))
-      console.log(chalk.gray(`  2. Executar: adk feature research ${name}`))
-      console.log(chalk.gray(`  3. Executar: adk feature plan ${name}`))
-      console.log(chalk.gray(`  4. Executar: adk feature implement ${name}`))
+      console.log(chalk.gray(`  2. adk feature research ${name}`))
+      console.log(chalk.gray(`  3. adk feature tasks ${name}`))
+      console.log(chalk.gray(`  4. adk feature plan ${name}`))
+      console.log(chalk.gray(`  5. adk feature implement ${name}`))
+      console.log(chalk.gray(`  6. adk feature qa ${name}`))
+      console.log(chalk.gray(`  7. adk feature docs ${name}`))
     } catch (error) {
       spinner.fail('Erro ao criar feature')
       logger.error(error instanceof Error ? error.message : String(error))
@@ -238,13 +367,52 @@ ${featureContext}
 
     try {
       const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
+      const researchPath = path.join(featurePath, 'research.md')
 
       if (!(await fs.pathExists(featurePath))) {
         spinner.text = `Criando estrutura da feature ${name}...`
         await fs.ensureDir(featurePath)
       }
 
-      const contextContent = await this.loadContext(options)
+      spinner.stop()
+
+      const phaseCheck = await this.checkPhaseExists('research', 'Research', researchPath, 'Tasks')
+
+      if (phaseCheck) {
+        if (phaseCheck.action === 'next') {
+          let progress = await loadProgress(name)
+          progress = updateStepStatus(progress, 'research', 'completed')
+          await saveProgress(name, progress)
+          console.log(chalk.green('✓ Research marcado como concluído'))
+          console.log(chalk.yellow(`\nPróximo: adk feature tasks ${name}`))
+          return
+        }
+
+        if (phaseCheck.action === 'redo') {
+          await fs.remove(researchPath)
+        }
+
+        if (phaseCheck.extraContext) {
+          options.context = phaseCheck.extraContext
+        }
+      }
+
+      spinner.start('Executando research phase...')
+
+      let progress = await loadProgress(name)
+      progress = updateStepStatus(progress, 'research', 'in_progress')
+      await saveProgress(name, progress)
+
+      let contextContent = await this.loadContext(options)
+
+      if (phaseCheck?.action === 'refine' && (await fs.pathExists(researchPath))) {
+        const existingContent = await fs.readFile(researchPath, 'utf-8')
+        const refineContext = phaseCheck.extraContext
+          ? `\n\nContexto adicional do usuário: ${phaseCheck.extraContext}`
+          : ''
+        contextContent = `## Research Existente (refinar/melhorar):\n\n${existingContent}${refineContext}\n\n${contextContent || ''}`
+      }
+
       if (contextContent) {
         spinner.text = 'Research com contexto adicional...'
       }
@@ -326,6 +494,9 @@ Estrutura do research.md:
 
       spinner.succeed('Research concluído')
 
+      progress = updateStepStatus(progress, 'research', 'completed')
+      await saveProgress(name, progress)
+
       await this.setActiveFocus(name, 'research feito')
       await memoryCommand.save(name, { phase: 'research' })
 
@@ -333,19 +504,23 @@ Estrutura do research.md:
       logger.success(`Research salvo em: ${chalk.cyan(`${featurePath}/research.md`)}`)
       console.log()
       console.log(chalk.yellow('Próximo passo:'))
-      console.log(chalk.gray(`  adk feature plan ${name}`))
+      console.log(chalk.gray(`  adk feature tasks ${name}`))
     } catch (error) {
       spinner.fail('Erro no research')
+      const progress = await loadProgress(name)
+      updateStepStatus(progress, 'research', 'failed', String(error))
+      await saveProgress(name, progress)
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }
   }
 
-  async plan(name: string): Promise<void> {
+  async plan(name: string, options: FeatureOptions = {}): Promise<void> {
     const spinner = ora('Criando plano de implementação...').start()
 
     try {
       const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
+      const planPath = path.join(featurePath, 'implementation-plan.md')
 
       if (!(await fs.pathExists(featurePath))) {
         spinner.fail(`Feature ${name} não encontrada`)
@@ -353,17 +528,88 @@ Estrutura do research.md:
       }
 
       const researchPath = path.join(featurePath, 'research.md')
-      if (!(await fs.pathExists(researchPath))) {
+      const prdPath = path.join(featurePath, 'prd.md')
+      const hasResearch = await fs.pathExists(researchPath)
+      const hasPrd = await fs.pathExists(prdPath)
+
+      if (!hasResearch && !hasPrd) {
         spinner.fail(`Execute research primeiro: adk feature research ${name}`)
         process.exit(1)
       }
 
+      spinner.text = 'Validando spec...'
+      const specValidation = await this.validateSpecGate(name, { skipSpec: options.skipSpec })
+      if (!specValidation.valid) {
+        spinner.fail('Spec inválida. Corrija antes de continuar.')
+        process.exit(1)
+      }
+
+      spinner.stop()
+
+      const phaseCheck = await this.checkPhaseExists(
+        'arquitetura',
+        'Plano de Implementação',
+        planPath,
+        'Implementação'
+      )
+
+      if (phaseCheck) {
+        if (phaseCheck.action === 'next') {
+          let progress = await loadProgress(name)
+          progress = updateStepStatus(progress, 'arquitetura', 'completed')
+          await saveProgress(name, progress)
+          console.log(chalk.green('✓ Plano marcado como concluído'))
+          console.log(chalk.yellow(`\nPróximo: adk feature implement ${name}`))
+          return
+        }
+
+        if (phaseCheck.action === 'redo') {
+          await fs.remove(planPath)
+        }
+      }
+
+      spinner.start('Criando plano de implementação...')
+
+      let progress = await loadProgress(name)
+      progress = updateStepStatus(progress, 'arquitetura', 'in_progress')
+      await saveProgress(name, progress)
+
+      const inputFile = hasResearch ? 'research.md' : 'prd.md'
+
+      let existingPlanContext = ''
+      if (phaseCheck?.action === 'refine' && (await fs.pathExists(planPath))) {
+        const existingContent = await fs.readFile(planPath, 'utf-8')
+        const refineContext = phaseCheck.extraContext
+          ? `\n\nContexto adicional do usuário: ${phaseCheck.extraContext}`
+          : ''
+        existingPlanContext = `
+## Plano Existente (refinar/melhorar):
+
+<existing-plan>
+${existingContent}
+</existing-plan>
+${refineContext}
+`
+      }
+
+      const specSection = specValidation.specContent
+        ? `
+## Spec (Especificação Formal)
+
+<spec>
+${specValidation.specContent}
+</spec>
+
+IMPORTANTE: O plano DEVE seguir a spec acima. Todos os acceptance criteria da spec devem estar cobertos.
+`
+        : ''
+
       const prompt = `
 PHASE 2: DETAILED PLANNING
 
-Input: .claude/plans/features/${name}/research.md
+Input: .claude/plans/features/${name}/${inputFile}
 PRD: .claude/plans/features/${name}/prd.md
-
+${existingPlanContext}${specSection}
 Tasks:
 1. Crie breakdown detalhado em fases
 2. Para cada fase:
@@ -386,6 +632,9 @@ IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
 
       spinner.succeed('Plano criado')
 
+      progress = updateStepStatus(progress, 'arquitetura', 'completed')
+      await saveProgress(name, progress)
+
       await this.setActiveFocus(name, 'arquitetura pronta')
       await memoryCommand.save(name, { phase: 'plan' })
 
@@ -397,6 +646,138 @@ IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
       console.log(chalk.gray(`  adk feature implement ${name}`))
     } catch (error) {
       spinner.fail('Erro ao criar plano')
+      const progress = await loadProgress(name)
+      updateStepStatus(progress, 'arquitetura', 'failed', String(error))
+      await saveProgress(name, progress)
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async tasks(name: string): Promise<void> {
+    const spinner = ora('Criando breakdown de tasks...').start()
+
+    try {
+      const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
+      const tasksPath = path.join(featurePath, 'tasks.md')
+
+      if (!(await fs.pathExists(featurePath))) {
+        spinner.fail(`Feature ${name} não encontrada`)
+        process.exit(1)
+      }
+
+      const researchPath = path.join(featurePath, 'research.md')
+      const prdPath = path.join(featurePath, 'prd.md')
+      const hasResearch = await fs.pathExists(researchPath)
+      const hasPrd = await fs.pathExists(prdPath)
+
+      if (!hasResearch && !hasPrd) {
+        spinner.fail(`Execute research primeiro: adk feature research ${name}`)
+        process.exit(1)
+      }
+
+      spinner.stop()
+
+      const phaseCheck = await this.checkPhaseExists('tasks', 'Tasks', tasksPath, 'Plano')
+
+      if (phaseCheck) {
+        if (phaseCheck.action === 'next') {
+          let progress = await loadProgress(name)
+          progress = updateStepStatus(progress, 'tasks', 'completed')
+          await saveProgress(name, progress)
+          console.log(chalk.green('✓ Tasks marcadas como concluídas'))
+          console.log(chalk.yellow(`\nPróximo: adk feature plan ${name}`))
+          return
+        }
+
+        if (phaseCheck.action === 'redo') {
+          await fs.remove(tasksPath)
+        }
+      }
+
+      spinner.start('Criando breakdown de tasks...')
+
+      let progress = await loadProgress(name)
+      progress = updateStepStatus(progress, 'tasks', 'in_progress')
+      await saveProgress(name, progress)
+
+      const inputFile = hasResearch ? 'research.md' : 'prd.md'
+
+      let existingTasksContext = ''
+      if (phaseCheck?.action === 'refine' && (await fs.pathExists(tasksPath))) {
+        const existingContent = await fs.readFile(tasksPath, 'utf-8')
+        const refineContext = phaseCheck.extraContext
+          ? `\n\nContexto adicional do usuário: ${phaseCheck.extraContext}`
+          : ''
+        existingTasksContext = `
+## Tasks Existentes (refinar/melhorar):
+
+<existing-tasks>
+${existingContent}
+</existing-tasks>
+${refineContext}
+`
+      }
+
+      const prompt = `
+PHASE: TASK BREAKDOWN
+
+Feature: ${name}
+Input: .claude/plans/features/${name}/${inputFile}
+PRD: .claude/plans/features/${name}/prd.md
+${existingTasksContext}
+## Workflow
+
+1. Leia o PRD e research completamente
+2. Extraia requisitos funcionais
+3. Quebre em tasks atomicas e testaveis
+4. Ordene: testes ANTES de implementacao (TDD)
+5. Identifique dependencias entre tasks
+
+## Output: .claude/plans/features/${name}/tasks.md
+
+Estrutura:
+\`\`\`markdown
+# Tasks: ${name}
+
+## Task 1: [nome descritivo]
+- Tipo: Test | Implementation | Config
+- Prioridade: P0 | P1 | P2
+- Dependencias: [lista ou "nenhuma"]
+- Acceptance Criteria:
+  - [ ] Criterio 1
+  - [ ] Criterio 2
+
+## Task 2: [nome descritivo]
+...
+\`\`\`
+
+IMPORTANTE:
+- Testes SEMPRE vem antes da implementacao correspondente
+- Tasks devem ser atomicas (1-2 horas de trabalho max)
+- Cada task deve ter criterios de aceitacao claros
+`
+
+      await executeClaudeCommand(prompt)
+
+      spinner.succeed('Tasks criadas')
+
+      progress = updateStepStatus(progress, 'tasks', 'completed')
+      await saveProgress(name, progress)
+
+      await this.setActiveFocus(name, 'tasks definidas')
+      await memoryCommand.save(name, { phase: 'tasks' })
+
+      console.log()
+      logger.success(`Tasks salvas em: ${chalk.cyan(`${featurePath}/tasks.md`)}`)
+      console.log()
+      console.log(chalk.yellow('Próximo passo:'))
+      console.log(chalk.gray(`  adk feature plan ${name}`))
+    } catch (error) {
+      spinner.fail('Erro ao criar tasks')
+      const progress = await loadProgress(name)
+      updateStepStatus(progress, 'tasks', 'failed', String(error))
+      await saveProgress(name, progress)
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }
@@ -419,64 +800,52 @@ IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
         process.exit(1)
       }
 
-      spinner.text = 'Validando spec...'
+      let progress = await loadProgress(name)
 
-      const specPath = path.join(process.cwd(), '.claude/specs', `${name}.md`)
-      const hasSpec = await fs.pathExists(specPath)
-
-      if (!hasSpec) {
-        spinner.warn('Spec não encontrada. Gerando template...')
-
-        const specDir = path.join(process.cwd(), '.claude/specs')
-        await fs.ensureDir(specDir)
-
-        const specTemplate = generateSpecTemplate(name)
-        await fs.writeFile(specPath, specTemplate)
-
+      if (isStepCompleted(progress, 'implementacao')) {
+        spinner.stop()
         console.log()
-        console.log(chalk.yellow('Spec Gate: Uma spec é necessária antes da implementação.'))
-        console.log(chalk.gray(`  Template criado em: ${specPath}`))
-        console.log()
-        console.log(chalk.cyan('Próximos passos:'))
-        console.log(chalk.gray('  1. Preencha a spec com os detalhes da feature'))
-        console.log(chalk.gray(`  2. Execute: adk spec validate ${name}`))
-        console.log(chalk.gray(`  3. Execute: adk feature implement ${name}`))
-        process.exit(0)
+        console.log(chalk.yellow('Implementação já foi concluída para esta feature.'))
+
+        const { action } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'action',
+            message: 'O que deseja fazer?',
+            choices: [
+              { name: '🔄 Continuar implementando - Adicionar mais código', value: 'continue' },
+              { name: '⏭️  Próxima - Ir para QA', value: 'next' },
+            ],
+          },
+        ])
+
+        if (action === 'next') {
+          console.log(chalk.green('✓ Implementação mantida como concluída'))
+          console.log(chalk.yellow(`\nPróximo: adk feature qa ${name}`))
+          return
+        }
+
+        spinner.start('Continuando implementação...')
       }
 
-      const specContent = await fs.readFile(specPath, 'utf-8')
-      const parsedSpec = parseSpecFromMarkdown(specContent)
-      const validation = validateSpec(parsedSpec)
+      progress = updateStepStatus(progress, 'implementacao', 'in_progress')
+      await saveProgress(name, progress)
 
-      if (!validation.valid) {
-        spinner.fail('Spec inválida')
-        console.log()
-        console.log(chalk.red('Spec Gate: A spec precisa ser válida antes da implementação.'))
-        console.log()
-        console.log(chalk.yellow('Erros:'))
-        for (const error of validation.errors) {
-          console.log(chalk.red(`  - ${error.field}: ${error.message}`))
-        }
-        console.log()
-        console.log(chalk.gray(`Edite: ${specPath}`))
-        console.log(chalk.gray(`Valide: adk spec validate ${name}`))
+      spinner.text = 'Validando spec...'
+      const specValidation = await this.validateSpecGate(name, { skipSpec: options.skipSpec })
+      if (!specValidation.valid) {
+        spinner.fail('Spec inválida. Corrija antes de implementar.')
+        progress = updateStepStatus(progress, 'implementacao', 'pending')
+        await saveProgress(name, progress)
         process.exit(1)
       }
 
-      if (validation.warnings.length > 0) {
-        console.log()
-        console.log(chalk.yellow('Avisos da spec:'))
-        for (const warning of validation.warnings) {
-          console.log(chalk.yellow(`  - ${warning}`))
-        }
-        console.log()
-      }
-
-      spinner.text = 'Spec válida. Iniciando implementação...'
+      spinner.text = 'Iniciando implementação...'
 
       let phase = options.phase || 'all'
 
       if (phase === 'all') {
+        spinner.stop()
         const answers = await inquirer.prompt([
           {
             type: 'list',
@@ -486,7 +855,20 @@ IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
           },
         ])
         phase = answers.phase
+        spinner.start('Executando implementação...')
       }
+
+      const specSection = specValidation.specContent
+        ? `
+## Spec (Especificação Formal)
+
+<spec>
+${specValidation.specContent}
+</spec>
+
+IMPORTANTE: A implementação DEVE seguir a spec acima. Todos os acceptance criteria da spec devem ser cobertos pelos testes.
+`
+        : ''
 
       const prompt = `
 PHASE 3: IMPLEMENTATION (TDD)
@@ -494,7 +876,7 @@ PHASE 3: IMPLEMENTATION (TDD)
 Feature: ${name}
 Implementation Plan: .claude/plans/features/${name}/implementation-plan.md
 Target Phase: ${phase}
-
+${specSection}
 IMPORTANTE: TDD - TESTES PRIMEIRO
 
 Process:
@@ -525,13 +907,281 @@ Não avance para próxima fase até atual estar completa.
 
       spinner.succeed('Implementação concluída')
 
+      progress = updateStepStatus(progress, 'implementacao', 'completed')
+      await saveProgress(name, progress)
+
       await this.setActiveFocus(name, 'implementação em andamento')
       await memoryCommand.save(name, { phase: 'implement' })
 
       console.log()
       logger.success(`✨ ${phase} implementada!`)
+      console.log()
+      console.log(chalk.yellow('Próximo passo:'))
+      console.log(chalk.gray(`  adk feature qa ${name}`))
     } catch (error) {
       spinner.fail('Erro na implementação')
+      const progress = await loadProgress(name)
+      updateStepStatus(progress, 'implementacao', 'failed', String(error))
+      await saveProgress(name, progress)
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async qa(name: string): Promise<void> {
+    const spinner = ora('Executando revisão de qualidade...').start()
+
+    try {
+      const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
+      const qaReportPath = path.join(featurePath, 'qa-report.md')
+
+      if (!(await fs.pathExists(featurePath))) {
+        spinner.fail(`Feature ${name} não encontrada`)
+        process.exit(1)
+      }
+
+      const planPath = path.join(featurePath, 'implementation-plan.md')
+      if (!(await fs.pathExists(planPath))) {
+        spinner.fail(`Execute implement primeiro: adk feature implement ${name}`)
+        process.exit(1)
+      }
+
+      spinner.stop()
+
+      const phaseCheck = await this.checkPhaseExists(
+        'qa',
+        'QA Report',
+        qaReportPath,
+        'Documentação'
+      )
+
+      if (phaseCheck) {
+        if (phaseCheck.action === 'next') {
+          let progress = await loadProgress(name)
+          progress = updateStepStatus(progress, 'qa', 'completed')
+          await saveProgress(name, progress)
+          console.log(chalk.green('✓ QA marcado como concluído'))
+          console.log(chalk.yellow(`\nPróximo: adk feature docs ${name}`))
+          return
+        }
+
+        if (phaseCheck.action === 'redo') {
+          await fs.remove(qaReportPath)
+        }
+      }
+
+      spinner.start('Executando revisão de qualidade...')
+
+      let progress = await loadProgress(name)
+      progress = updateStepStatus(progress, 'qa', 'in_progress')
+      await saveProgress(name, progress)
+
+      let existingQaContext = ''
+      if (phaseCheck?.action === 'refine' && (await fs.pathExists(qaReportPath))) {
+        const existingContent = await fs.readFile(qaReportPath, 'utf-8')
+        const refineContext = phaseCheck.extraContext
+          ? `\n\nContexto adicional do usuário: ${phaseCheck.extraContext}`
+          : ''
+        existingQaContext = `
+## QA Report Existente (refinar/melhorar):
+
+<existing-qa>
+${existingContent}
+</existing-qa>
+${refineContext}
+`
+      }
+
+      const prompt = `
+PHASE: QA - REVISAO DE QUALIDADE
+
+Feature: ${name}
+Plan: .claude/plans/features/${name}/implementation-plan.md
+${existingQaContext}
+## Checklist de Revisao
+
+### Qualidade de Codigo
+- [ ] Codigo legivel e bem estruturado?
+- [ ] Sem codigo duplicado?
+- [ ] Tratamento de erros adequado?
+- [ ] Nomes descritivos para variaveis e funcoes?
+
+### Testes
+- [ ] Coverage >= 80%?
+- [ ] Happy path testado?
+- [ ] Edge cases cobertos?
+- [ ] Erros testados?
+- [ ] Testes sao independentes?
+
+### Seguranca
+- [ ] Input validado?
+- [ ] Sem SQL injection?
+- [ ] Sem XSS?
+- [ ] Secrets nao expostos?
+- [ ] Autenticacao/autorizacao OK?
+
+### Performance
+- [ ] Sem loops desnecessarios?
+- [ ] Queries otimizadas?
+- [ ] Sem memory leaks obvios?
+- [ ] Lazy loading onde apropriado?
+
+## Output: .claude/plans/features/${name}/qa-report.md
+
+Estrutura do report:
+\`\`\`markdown
+# QA Report: ${name}
+
+## Summary
+- Status: PASS | FAIL
+- Issues encontradas: N
+- Coverage: X%
+
+## Issues
+
+### [CRITICAL|HIGH|MEDIUM|LOW] Issue 1
+- Arquivo: path/to/file.ts:linha
+- Descricao: ...
+- Sugestao de fix: ...
+
+## Checklist Results
+[Checklist preenchido]
+
+## Recomendacoes
+[Lista de melhorias sugeridas]
+\`\`\`
+
+Se encontrar issues CRITICAL ou HIGH, o status deve ser FAIL.
+`
+
+      await executeClaudeCommand(prompt)
+
+      spinner.succeed('QA concluído')
+
+      progress = updateStepStatus(progress, 'qa', 'completed')
+      await saveProgress(name, progress)
+
+      await this.setActiveFocus(name, 'qa concluído')
+      await memoryCommand.save(name, { phase: 'qa' })
+
+      console.log()
+      logger.success(`QA Report salvo em: ${chalk.cyan(`${featurePath}/qa-report.md`)}`)
+      console.log()
+      console.log(chalk.yellow('Próximo passo:'))
+      console.log(chalk.gray(`  adk feature docs ${name}`))
+    } catch (error) {
+      spinner.fail('Erro no QA')
+      const progress = await loadProgress(name)
+      updateStepStatus(progress, 'qa', 'failed', String(error))
+      await saveProgress(name, progress)
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async docs(name: string): Promise<void> {
+    const spinner = ora('Gerando documentação...').start()
+
+    try {
+      const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
+
+      if (!(await fs.pathExists(featurePath))) {
+        spinner.fail(`Feature ${name} não encontrada`)
+        process.exit(1)
+      }
+
+      let progress = await loadProgress(name)
+
+      if (isStepCompleted(progress, 'docs')) {
+        spinner.stop()
+        console.log()
+        console.log(chalk.yellow('Documentação já foi concluída para esta feature.'))
+
+        const { action } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'action',
+            message: 'O que deseja fazer?',
+            choices: [
+              { name: '🔄 Atualizar - Melhorar documentação existente', value: 'update' },
+              { name: '✅ Finalizar - Feature completa', value: 'done' },
+            ],
+          },
+        ])
+
+        if (action === 'done') {
+          console.log(chalk.green('✓ Documentação mantida como concluída'))
+          console.log(chalk.bold.green('\n✨ Feature completa!'))
+          return
+        }
+
+        spinner.start('Atualizando documentação...')
+      }
+
+      progress = updateStepStatus(progress, 'docs', 'in_progress')
+      await saveProgress(name, progress)
+
+      const prompt = `
+PHASE: DOCUMENTACAO
+
+Feature: ${name}
+PRD: .claude/plans/features/${name}/prd.md
+Plan: .claude/plans/features/${name}/implementation-plan.md
+
+## Gere documentacao para:
+
+### 1. README da feature (se aplicavel)
+- O que faz
+- Como usar
+- Exemplos de uso
+- Configuracao necessaria
+
+### 2. Atualize documentacao existente
+- Se modificou APIs, atualize docs de API
+- Se adicionou comandos, documente
+- Se mudou configuracao, atualize
+
+### 3. Comentarios no codigo (minimos)
+- Apenas onde logica nao e obvia
+- JSDoc para funcoes publicas importantes
+- Explicacao de algoritmos complexos
+
+## Principios
+
+- Documentacao clara e util
+- Exemplos que funcionam
+- NAO documente codigo obvio
+- Mantenha docs atualizadas com codigo
+
+## Output
+
+- Atualize arquivos de documentacao relevantes
+- Adicione JSDoc onde necessario
+- NAO crie documentacao desnecessaria
+`
+
+      await executeClaudeCommand(prompt)
+
+      spinner.succeed('Documentação gerada')
+
+      progress = updateStepStatus(progress, 'docs', 'completed')
+      await saveProgress(name, progress)
+
+      await this.setActiveFocus(name, 'documentação concluída')
+      await memoryCommand.save(name, { phase: 'docs' })
+
+      console.log()
+      logger.success('✨ Feature completa!')
+      console.log()
+      console.log(chalk.cyan('Próximos passos sugeridos:'))
+      console.log(chalk.gray('  1. Revise as mudanças: git diff'))
+      console.log(chalk.gray('  2. Commit: git add . && git commit'))
+      console.log(chalk.gray('  3. Push e PR: git push && gh pr create'))
+    } catch (error) {
+      spinner.fail('Erro na documentação')
+      const progress = await loadProgress(name)
+      updateStepStatus(progress, 'docs', 'failed', String(error))
+      await saveProgress(name, progress)
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }
@@ -576,12 +1226,20 @@ Não avance para próxima fase até atual estar completa.
           const hasMemory = await fs.pathExists(memoryPath)
           const hasProgressFile = await fs.pathExists(progressPath)
 
+          const researchPath = path.join(featurePath, 'research.md')
+          const qaReportPath = path.join(featurePath, 'qa-report.md')
+          const hasResearch = await fs.pathExists(researchPath)
+          const hasQaReport = await fs.pathExists(qaReportPath)
+
           if (!hasProgressFile) {
             if (hasPrd) {
-              progress = updateStepStatus(progress, 'entendimento', 'completed')
+              progress = updateStepStatus(progress, 'prd', 'completed')
+            }
+            if (hasResearch) {
+              progress = updateStepStatus(progress, 'research', 'completed')
             }
             if (hasTasks) {
-              progress = updateStepStatus(progress, 'breakdown', 'completed')
+              progress = updateStepStatus(progress, 'tasks', 'completed')
             }
             if (hasPlan) {
               progress = updateStepStatus(progress, 'arquitetura', 'completed')
@@ -590,14 +1248,21 @@ Não avance para próxima fase até atual estar completa.
               const memContent = await fs.readFile(memoryPath, 'utf-8')
               if (memContent.includes('**Status**: completed')) {
                 progress = updateStepStatus(progress, 'implementacao', 'completed')
-                progress = updateStepStatus(progress, 'revisao', 'completed')
-                progress = updateStepStatus(progress, 'documentacao', 'completed')
+                progress = updateStepStatus(progress, 'qa', 'completed')
+                progress = updateStepStatus(progress, 'docs', 'completed')
               } else if (memContent.includes('**Fase Atual**: implement')) {
                 progress = updateStepStatus(progress, 'implementacao', 'completed')
               } else if (memContent.includes('**Fase Atual**: qa')) {
                 progress = updateStepStatus(progress, 'implementacao', 'completed')
-                progress = updateStepStatus(progress, 'revisao', 'in_progress')
+                progress = updateStepStatus(progress, 'qa', 'in_progress')
+              } else if (memContent.includes('**Fase Atual**: docs')) {
+                progress = updateStepStatus(progress, 'implementacao', 'completed')
+                progress = updateStepStatus(progress, 'qa', 'completed')
+                progress = updateStepStatus(progress, 'docs', 'in_progress')
               }
+            }
+            if (hasQaReport) {
+              progress = updateStepStatus(progress, 'qa', 'completed')
             }
           }
 
@@ -636,12 +1301,13 @@ Não avance para próxima fase até atual estar completa.
           }
 
           const stepLabels: Record<string, string> = {
-            entendimento: 'PRD',
-            breakdown: 'Tasks',
+            prd: 'PRD',
+            research: 'Research',
+            tasks: 'Tasks',
             arquitetura: 'Arquitetura',
-            implementacao: 'Implementacao',
-            revisao: 'Revisao',
-            documentacao: 'Docs',
+            implementacao: 'Impl',
+            qa: 'QA',
+            docs: 'Docs',
           }
 
           const stepsLine = progress.steps
@@ -679,8 +1345,9 @@ Não avance para próxima fase até atual estar completa.
 
   async autopilot(name: string, options: FeatureOptions = {}): Promise<void> {
     console.log()
-    console.log(chalk.bold.magenta('🚀 ADK Autopilot'))
+    console.log(chalk.bold.magenta('🚀 ADK Autopilot (Subprocess Mode)'))
     console.log(chalk.gray('━'.repeat(50)))
+    console.log(chalk.gray('Cada etapa roda em uma sessão separada do Claude'))
     console.log()
 
     const state = await this.getFeatureState(name)
@@ -699,23 +1366,72 @@ Não avance para próxima fase até atual estar completa.
     const prdPath = path.join(featurePath, 'prd.md')
     const planPath = path.join(featurePath, 'implementation-plan.md')
 
-    const contextContent = await this.loadContext(options)
+    await fs.ensureDir(featurePath)
 
     let progress = await loadProgress(name)
 
-    if (state.hasPrd && !isStepCompleted(progress, 'entendimento')) {
-      progress = updateStepStatus(progress, 'entendimento', 'completed')
+    if (state.hasPrd && !isStepCompleted(progress, 'prd')) {
+      progress = updateStepStatus(progress, 'prd', 'completed')
     }
-    if (state.hasTasks && !isStepCompleted(progress, 'breakdown')) {
-      progress = updateStepStatus(progress, 'breakdown', 'completed')
+    if (state.hasResearch && !isStepCompleted(progress, 'research')) {
+      progress = updateStepStatus(progress, 'research', 'completed')
+    }
+    if (state.hasTasks && !isStepCompleted(progress, 'tasks')) {
+      progress = updateStepStatus(progress, 'tasks', 'completed')
     }
     if (state.hasPlan && !isStepCompleted(progress, 'arquitetura')) {
       progress = updateStepStatus(progress, 'arquitetura', 'completed')
     }
+
+    const stepLabels: Record<string, string> = {
+      prd: 'PRD',
+      research: 'Research',
+      tasks: 'Tasks',
+      arquitetura: 'Arquitetura',
+      implementacao: 'Implementação',
+      qa: 'QA',
+      docs: 'Documentação',
+    }
+
+    const inProgressSteps = progress.steps.filter((s) => s.status === 'in_progress')
+    for (const step of inProgressSteps) {
+      const label = stepLabels[step.name] || step.name
+      console.log(
+        chalk.yellow(
+          `\n⚠️  A etapa "${label}" estava em andamento quando a sessão anterior foi interrompida.\n`
+        )
+      )
+
+      const { action } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'action',
+          message: `O que deseja fazer com a etapa "${label}"?`,
+          choices: [
+            { name: '✅ Já foi concluída - marcar como completa', value: 'complete' },
+            { name: '🔄 Precisa ser refeita - executar novamente', value: 'redo' },
+            { name: '⏭️  Pular esta etapa', value: 'skip' },
+          ],
+        },
+      ])
+
+      if (action === 'complete') {
+        progress = updateStepStatus(progress, step.name, 'completed')
+      } else if (action === 'redo') {
+        progress = updateStepStatus(progress, step.name, 'pending')
+      } else if (action === 'skip') {
+        progress = updateStepStatus(progress, step.name, 'completed')
+        const stepIndex = progress.steps.findIndex((s) => s.name === step.name)
+        if (stepIndex >= 0) {
+          progress.steps[stepIndex].notes = 'skipped'
+        }
+      }
+    }
+
     await saveProgress(name, progress)
 
-    const getStatusIcon = (stepName: string): string => {
-      const step = progress.steps.find((s) => s.name === stepName)
+    const getStatusIcon = (prog: FeatureProgress, stepName: string): string => {
+      const step = prog.steps.find((s) => s.name === stepName)
       if (!step) {
         return '⏳'
       }
@@ -731,95 +1447,104 @@ Não avance para próxima fase até atual estar completa.
       }
     }
 
-    const printProgress = () => {
+    const printProgress = (prog: FeatureProgress) => {
       console.log(chalk.gray('\n📋 Progresso:'))
       const stepNames = [
-        { key: 'entendimento', label: 'Entendimento' },
-        { key: 'breakdown', label: 'Breakdown' },
+        { key: 'prd', label: 'PRD' },
+        { key: 'research', label: 'Research' },
+        { key: 'tasks', label: 'Tasks' },
         { key: 'arquitetura', label: 'Arquitetura' },
         { key: 'implementacao', label: 'Implementação' },
-        { key: 'revisao', label: 'Revisão' },
-        { key: 'documentacao', label: 'Documentação' },
+        { key: 'qa', label: 'QA' },
+        { key: 'docs', label: 'Documentação' },
       ]
       for (const { key, label } of stepNames) {
-        console.log(`   ${getStatusIcon(key)} ${label}`)
+        console.log(`   ${getStatusIcon(prog, key)} ${label}`)
       }
       console.log()
     }
 
-    const contextSection = contextContent
-      ? `
-## Contexto Fornecido pelo Usuario
+    const executePhase = async (
+      args: string[],
+      stepName: string,
+      etapaNum: number,
+      etapaLabel: string
+    ): Promise<boolean> => {
+      console.log(chalk.bold.cyan(`\n═══════════════════════════════════════════════════`))
+      console.log(chalk.bold.cyan(`  ETAPA ${etapaNum}: ${etapaLabel}`))
+      console.log(chalk.bold.cyan(`═══════════════════════════════════════════════════\n`))
+      console.log(chalk.gray(`Executando: adk ${args.join(' ')}\n`))
 
-<context>
-${contextContent}
-</context>
+      let success = false
+      let attempts = 0
+      const maxAttempts = 3
 
-Use este contexto para entender melhor o que o usuario precisa. Ainda assim, faca perguntas para clarificar pontos importantes.
-`
-      : ''
+      while (!success && attempts < maxAttempts) {
+        try {
+          execFileSync('adk', args, { stdio: 'inherit' })
+          success = true
+        } catch {
+          attempts++
+          console.log()
+          console.log(chalk.red(`❌ Erro na etapa ${etapaLabel}`))
+
+          if (attempts >= maxAttempts) {
+            console.log(chalk.red(`Máximo de tentativas (${maxAttempts}) atingido.`))
+          }
+
+          const { errorAction } = await inquirer.prompt([
+            {
+              type: 'list',
+              name: 'errorAction',
+              message: 'O que deseja fazer?',
+              choices: [
+                { name: '🔄 Tentar novamente', value: 'retry' },
+                { name: '⏭️  Pular esta etapa', value: 'skip' },
+                { name: '🛑 Abortar autopilot', value: 'abort' },
+              ],
+            },
+          ])
+
+          if (errorAction === 'retry') {
+            console.log(chalk.yellow(`\nTentativa ${attempts + 1}/${maxAttempts}...`))
+          } else if (errorAction === 'skip') {
+            let prog = await loadProgress(name)
+            prog = updateStepStatus(prog, stepName, 'completed')
+            const stepIndex = prog.steps.findIndex((s) => s.name === stepName)
+            if (stepIndex >= 0) {
+              prog.steps[stepIndex].notes = 'skipped'
+            }
+            await saveProgress(name, prog)
+            return true
+          } else {
+            printProgress(await loadProgress(name))
+            console.log(chalk.yellow('\nAutopilot abortado. Continue com:'))
+            console.log(chalk.gray(`  adk feature autopilot ${name}`))
+            process.exit(1)
+          }
+        }
+      }
+
+      return success
+    }
 
     try {
-      await fs.ensureDir(featurePath)
+      printProgress(progress)
 
-      printProgress()
-
-      if (!isStepCompleted(progress, 'entendimento')) {
-        progress = updateStepStatus(progress, 'entendimento', 'in_progress')
-        await saveProgress(name, progress)
-
-        console.log(chalk.bold.cyan('\n═══════════════════════════════════════════════════'))
-        console.log(chalk.bold.cyan('  ETAPA 1: ENTENDIMENTO DA FEATURE'))
-        console.log(chalk.bold.cyan('═══════════════════════════════════════════════════\n'))
-
-        const prdPrompt = `
-AUTOPILOT - ETAPA 1: ENTENDIMENTO
-
-Voce e um Product Manager senior. Precisa entender completamente a feature "${name}".
-${contextSection}
-## OBRIGATORIO: Faca perguntas ANTES de criar o PRD
-
-Pergunte ao usuario:
-
-1. **Problema**: Qual problema esta feature resolve?
-2. **Usuarios**: Quem vai usar? (tipo de usuario, frequencia)
-3. **Requisitos criticos**: O que DEVE funcionar? (lista os must-haves)
-4. **Restricoes**: Ha limitacoes tecnicas, de tempo ou orcamento?
-5. **Sucesso**: Como saber se funcionou? (metricas)
-
-## Apos receber respostas, crie:
-
-Output: .claude/plans/features/${name}/prd.md
-
-Estrutura:
-- Contexto e Problema
-- Usuarios e Personas
-- Requisitos Funcionais (com Gherkin)
-- Requisitos Nao-Funcionais
-- Metricas de Sucesso
-- Non-Goals (o que NAO sera feito)
-- Riscos
-
-IMPORTANTE: NAO invente respostas. PERGUNTE ao usuario.
-`
-
-        await executeClaudeCommand(prdPrompt)
-
+      if (!isStepCompleted(progress, 'prd')) {
         if (!(await fs.pathExists(prdPath))) {
-          progress = updateStepStatus(progress, 'entendimento', 'failed', 'PRD não foi criado')
-          await saveProgress(name, progress)
-          logger.error('PRD não foi criado. Abortando.')
-          process.exit(1)
+          await this.create(name, options)
         }
 
-        progress = updateStepStatus(progress, 'entendimento', 'completed')
+        progress = await loadProgress(name)
+        progress = updateStepStatus(progress, 'prd', 'completed')
         await saveProgress(name, progress)
 
         const { continueFlow } = await inquirer.prompt([
           {
             type: 'confirm',
             name: 'continueFlow',
-            message: 'PRD criado. Revisar e continuar para breakdown?',
+            message: 'PRD criado. Revisar e continuar para research?',
             default: true,
           },
         ])
@@ -833,116 +1558,30 @@ IMPORTANTE: NAO invente respostas. PERGUNTE ao usuario.
         console.log(chalk.green('✓ PRD já existe, pulando etapa 1'))
       }
 
-      if (!isStepCompleted(progress, 'breakdown')) {
-        progress = updateStepStatus(progress, 'breakdown', 'in_progress')
-        await saveProgress(name, progress)
-
-        console.log(chalk.bold.cyan('\n═══════════════════════════════════════════════════'))
-        console.log(chalk.bold.cyan('  ETAPA 2: BREAKDOWN EM TASKS'))
-        console.log(chalk.bold.cyan('═══════════════════════════════════════════════════\n'))
-
-        const taskPrompt = `
-AUTOPILOT - ETAPA 2: TASK BREAKDOWN
-
-Feature: ${name}
-PRD: .claude/plans/features/${name}/prd.md
-
-## Workflow
-
-1. Leia o PRD completamente
-2. Extraia requisitos funcionais
-3. Quebre em tasks atomicas e testaveis
-4. Ordene: testes ANTES de implementacao (TDD)
-5. Identifique dependencias
-
-## Output: .claude/plans/features/${name}/tasks.md
-
-Estrutura:
-\`\`\`markdown
-# Tasks: ${name}
-
-## Task 1: [nome]
-- Tipo: Test | Implementation | Config
-- Prioridade: P0 | P1 | P2
-- Dependencias: [lista]
-- Acceptance Criteria:
-  - [ ] Criterio 1
-  - [ ] Criterio 2
-
-## Task 2: [nome]
-...
-\`\`\`
-
-IMPORTANTE: Testes SEMPRE vem antes da implementacao correspondente.
-`
-
-        await executeClaudeCommand(taskPrompt)
-        progress = updateStepStatus(progress, 'breakdown', 'completed')
-        await saveProgress(name, progress)
+      progress = await loadProgress(name)
+      if (!isStepCompleted(progress, 'research')) {
+        await executePhase(
+          ['feature', 'research', name],
+          'research',
+          2,
+          'RESEARCH - ANÁLISE DO CODEBASE'
+        )
       } else {
-        console.log(chalk.green('✓ Tasks já existem, pulando etapa 2'))
+        console.log(chalk.green('✓ Research já existe, pulando etapa 2'))
       }
 
-      if (!isStepCompleted(progress, 'arquitetura')) {
-        progress = updateStepStatus(progress, 'arquitetura', 'in_progress')
-        await saveProgress(name, progress)
-
-        console.log(chalk.bold.cyan('\n═══════════════════════════════════════════════════'))
-        console.log(chalk.bold.cyan('  ETAPA 3: ARQUITETURA'))
-        console.log(chalk.bold.cyan('═══════════════════════════════════════════════════\n'))
-
-        const architectPrompt = `
-AUTOPILOT - ETAPA 3: ARQUITETURA
-
-Feature: ${name}
-PRD: .claude/plans/features/${name}/prd.md
-Tasks: .claude/plans/features/${name}/tasks.md
-
-## Workflow
-
-1. Leia PRD e Tasks
-2. Analise arquitetura atual do projeto
-3. Identifique padroes existentes
-4. Projete a arquitetura da feature
-
-## OBRIGATORIO: Mostre a arquitetura visualmente
-
-Desenhe usando ASCII:
-
-\`\`\`
-┌─────────────────────────────────────────────────────┐
-│                   ARQUITETURA                       │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│   [Component A] ──────► [Component B]               │
-│        │                     │                      │
-│        ▼                     ▼                      │
-│   [Component C] ◄────── [Component D]               │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-\`\`\`
-
-## Output: .claude/plans/features/${name}/implementation-plan.md
-
-Inclua:
-1. Diagrama ASCII da arquitetura
-2. Camadas afetadas
-3. Arquivos a criar/modificar
-4. Padroes a seguir (com exemplos do codebase)
-5. Riscos e mitigacoes
-6. Ordem de implementacao
-
-IMPORTANTE:
-- Mostre o diagrama da arquitetura CLARAMENTE
-- Use caixas ASCII para visualizacao
-- Explique o fluxo de dados
-`
-
-        await executeClaudeCommand(architectPrompt)
-        progress = updateStepStatus(progress, 'arquitetura', 'completed')
-        await saveProgress(name, progress)
+      progress = await loadProgress(name)
+      if (!isStepCompleted(progress, 'tasks')) {
+        await executePhase(['feature', 'tasks', name], 'tasks', 3, 'BREAKDOWN EM TASKS')
       } else {
-        console.log(chalk.green('✓ Arquitetura já existe, pulando etapa 3'))
+        console.log(chalk.green('✓ Tasks já existem, pulando etapa 3'))
+      }
+
+      progress = await loadProgress(name)
+      if (!isStepCompleted(progress, 'arquitetura')) {
+        await executePhase(['feature', 'plan', name], 'arquitetura', 4, 'ARQUITETURA')
+      } else {
+        console.log(chalk.green('✓ Arquitetura já existe, pulando etapa 4'))
       }
 
       if (await fs.pathExists(planPath)) {
@@ -956,183 +1595,63 @@ IMPORTANTE:
         {
           type: 'confirm',
           name: 'continueImplement',
-          message: 'Arquitetura definida. Iniciar implementacao (TDD)?',
+          message: 'Arquitetura definida. Iniciar implementação (TDD)?',
           default: true,
         },
       ])
 
       if (!continueImplement) {
-        printProgress()
+        printProgress(await loadProgress(name))
         console.log(chalk.yellow('\nAutopilot pausado. Continue manualmente com:'))
         console.log(chalk.gray(`  adk feature implement ${name}`))
         return
       }
 
+      progress = await loadProgress(name)
       if (!isStepCompleted(progress, 'implementacao')) {
-        progress = updateStepStatus(progress, 'implementacao', 'in_progress')
-        await saveProgress(name, progress)
-
-        console.log(chalk.bold.cyan('\n═══════════════════════════════════════════════════'))
-        console.log(chalk.bold.cyan('  ETAPA 4: IMPLEMENTACAO (TDD)'))
-        console.log(chalk.bold.cyan('═══════════════════════════════════════════════════\n'))
-
-        const implementPrompt = `
-AUTOPILOT - ETAPA 4: IMPLEMENTACAO
-
-Feature: ${name}
-Plan: .claude/plans/features/${name}/implementation-plan.md
-Tasks: .claude/plans/features/${name}/tasks.md
-
-## Workflow TDD OBRIGATORIO
-
-Para CADA task:
-
-1. RED: Escreva o teste primeiro
-   - Teste deve falhar
-   - Commit: "test: add test for [funcionalidade]"
-
-2. GREEN: Implemente o minimo
-   - Faca o teste passar
-   - Commit: "feat: implement [funcionalidade]"
-
-3. REFACTOR: Melhore se necessario
-   - Mantenha testes passando
-   - Commit: "refactor: improve [o que melhorou]"
-
-## Verificacao apos cada task
-
-- [ ] Teste passa?
-- [ ] Sem erros de lint?
-- [ ] Codigo segue padroes do projeto?
-
-## Output
-
-- Arquivos de teste criados
-- Implementacao funcionando
-- Todos testes passando
-`
-
-        await executeClaudeCommand(implementPrompt)
-        progress = updateStepStatus(progress, 'implementacao', 'completed')
-        await saveProgress(name, progress)
+        await executePhase(
+          ['feature', 'implement', name, '--phase', 'All'],
+          'implementacao',
+          5,
+          'IMPLEMENTAÇÃO (TDD)'
+        )
       } else {
-        console.log(chalk.green('✓ Implementação já concluída, pulando etapa 4'))
+        console.log(chalk.green('✓ Implementação já concluída, pulando etapa 5'))
       }
 
-      if (!isStepCompleted(progress, 'revisao')) {
-        progress = updateStepStatus(progress, 'revisao', 'in_progress')
-        await saveProgress(name, progress)
-
-        console.log(chalk.bold.cyan('\n═══════════════════════════════════════════════════'))
-        console.log(chalk.bold.cyan('  ETAPA 5: REVISAO'))
-        console.log(chalk.bold.cyan('═══════════════════════════════════════════════════\n'))
-
-        const reviewPrompt = `
-AUTOPILOT - ETAPA 5: REVISAO
-
-Feature: ${name}
-
-## Checklist de Revisao
-
-### Qualidade
-- [ ] Codigo legivel e bem estruturado?
-- [ ] Sem codigo duplicado?
-- [ ] Tratamento de erros adequado?
-
-### Testes
-- [ ] Coverage >= 80%?
-- [ ] Happy path testado?
-- [ ] Edge cases cobertos?
-- [ ] Erros testados?
-
-### Seguranca
-- [ ] Input validado?
-- [ ] Sem SQL injection?
-- [ ] Sem XSS?
-- [ ] Secrets nao expostos?
-
-### Performance
-- [ ] Sem loops desnecessarios?
-- [ ] Queries otimizadas?
-- [ ] Sem memory leaks obvios?
-
-## Output
-
-Se encontrar problemas:
-- Liste cada issue com arquivo:linha
-- Classifique: CRITICAL | HIGH | MEDIUM | LOW
-- Sugira correcao
-
-Se OK:
-- Confirme que passou em todos os checks
-`
-
-        await executeClaudeCommand(reviewPrompt)
-        progress = updateStepStatus(progress, 'revisao', 'completed')
-        await saveProgress(name, progress)
+      progress = await loadProgress(name)
+      if (!isStepCompleted(progress, 'qa')) {
+        await executePhase(['feature', 'qa', name], 'qa', 6, 'QA - REVISÃO DE QUALIDADE')
       } else {
-        console.log(chalk.green('✓ Revisão já concluída, pulando etapa 5'))
+        console.log(chalk.green('✓ QA já concluído, pulando etapa 6'))
       }
 
-      if (!isStepCompleted(progress, 'documentacao')) {
-        progress = updateStepStatus(progress, 'documentacao', 'in_progress')
-        await saveProgress(name, progress)
-
-        console.log(chalk.bold.cyan('\n═══════════════════════════════════════════════════'))
-        console.log(chalk.bold.cyan('  ETAPA 6: DOCUMENTACAO'))
-        console.log(chalk.bold.cyan('═══════════════════════════════════════════════════\n'))
-
-        const docPrompt = `
-AUTOPILOT - ETAPA 6: DOCUMENTACAO
-
-Feature: ${name}
-
-## Gere documentacao para:
-
-### 1. README da feature (se aplicavel)
-- O que faz
-- Como usar
-- Exemplos
-
-### 2. Atualize documentacao existente
-- Se modificou APIs, atualize docs de API
-- Se adicionou comandos, documente
-
-### 3. Comentarios no codigo
-- Apenas onde logica nao e obvia
-- JSDoc para funcoes publicas importantes
-
-## Output
-
-- Documentacao clara e util
-- Exemplos que funcionam
-- Sem documentacao de codigo obvio
-`
-
-        await executeClaudeCommand(docPrompt)
-        progress = updateStepStatus(progress, 'documentacao', 'completed')
-        await saveProgress(name, progress)
+      progress = await loadProgress(name)
+      if (!isStepCompleted(progress, 'docs')) {
+        await executePhase(['feature', 'docs', name], 'docs', 7, 'DOCUMENTAÇÃO')
       } else {
-        console.log(chalk.green('✓ Documentação já concluída, pulando etapa 6'))
+        console.log(chalk.green('✓ Documentação já concluída, pulando etapa 7'))
       }
 
       console.log(chalk.bold.green('\n═══════════════════════════════════════════════════'))
       console.log(chalk.bold.green('  ✨ AUTOPILOT COMPLETO!'))
       console.log(chalk.bold.green('═══════════════════════════════════════════════════\n'))
 
-      await memoryCommand.save(name, { phase: 'implement' })
+      await memoryCommand.save(name, { phase: 'docs' })
 
-      printProgress()
+      printProgress(await loadProgress(name))
 
       console.log(chalk.cyan('Arquivos gerados:'))
       console.log(chalk.gray(`  📄 .claude/plans/features/${name}/prd.md`))
+      console.log(chalk.gray(`  📄 .claude/plans/features/${name}/research.md`))
       console.log(chalk.gray(`  📄 .claude/plans/features/${name}/tasks.md`))
       console.log(chalk.gray(`  📄 .claude/plans/features/${name}/implementation-plan.md`))
+      console.log(chalk.gray(`  📄 .claude/plans/features/${name}/qa-report.md`))
       console.log()
-      console.log(chalk.yellow('Proximos passos:'))
-      console.log(chalk.gray('  1. Revise os arquivos gerados'))
-      console.log(chalk.gray(`  2. Execute: adk workflow qa ${name}`))
-      console.log(chalk.gray(`  3. Execute: adk workflow pre-deploy -f ${name}`))
+      console.log(chalk.yellow('Proximos passos sugeridos:'))
+      console.log(chalk.gray('  1. Revise as mudanças: git diff'))
+      console.log(chalk.gray('  2. Commit: git add . && git commit'))
+      console.log(chalk.gray('  3. Push e PR: git push && gh pr create'))
       console.log()
 
       const branchName = `feature/${name.replace(/[^a-zA-Z0-9-]/g, '-')}`

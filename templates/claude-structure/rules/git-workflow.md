@@ -71,3 +71,4 @@ Refs: #123
 - Force push em branches compartilhadas
 - Commits com "WIP" ou mensagens vagas
 - Merge sem review
+- **Mencionar IA, Claude, assistente, ou geracao automatica em commits**

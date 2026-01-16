@@ -73,23 +73,36 @@ export async function copyClaudeStructure(targetDir: string): Promise<void> {
 
   const targetClaudeDir = path.join(targetDir, '.claude')
 
-  const itemsToCopy = [
-    'agents',
-    'skills',
-    'commands',
-    'rules',
-    'hooks',
-    'settings.json',
-    'README.md',
-    'active-focus.md',
-  ]
+  const directoriesToMerge = ['agents', 'skills', 'commands', 'rules', 'hooks']
 
-  for (const item of itemsToCopy) {
-    const srcPath = path.join(claudeStructureDir, item)
-    const destPath = path.join(targetClaudeDir, item)
+  const filesToCopy = ['settings.json', 'README.md', 'active-focus.md']
 
-    if (await fs.pathExists(srcPath)) {
-      await fs.copy(srcPath, destPath, { overwrite: false })
+  for (const dir of directoriesToMerge) {
+    const srcDir = path.join(claudeStructureDir, dir)
+    const destDir = path.join(targetClaudeDir, dir)
+
+    if (await fs.pathExists(srcDir)) {
+      await fs.ensureDir(destDir)
+
+      const files = await fs.readdir(srcDir)
+      for (const file of files) {
+        const srcFile = path.join(srcDir, file)
+        const destFile = path.join(destDir, file)
+
+        const stat = await fs.stat(srcFile)
+        if (stat.isFile() && !(await fs.pathExists(destFile))) {
+          await fs.copy(srcFile, destFile)
+        }
+      }
+    }
+  }
+
+  for (const file of filesToCopy) {
+    const srcPath = path.join(claudeStructureDir, file)
+    const destPath = path.join(targetClaudeDir, file)
+
+    if ((await fs.pathExists(srcPath)) && !(await fs.pathExists(destPath))) {
+      await fs.copy(srcPath, destPath)
     }
   }
 }

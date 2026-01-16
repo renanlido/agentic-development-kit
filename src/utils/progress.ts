@@ -18,12 +18,13 @@ export interface FeatureProgress {
 }
 
 const DEFAULT_STEPS: StepProgress[] = [
-  { name: 'entendimento', status: 'pending' },
-  { name: 'breakdown', status: 'pending' },
+  { name: 'prd', status: 'pending' },
+  { name: 'research', status: 'pending' },
+  { name: 'tasks', status: 'pending' },
   { name: 'arquitetura', status: 'pending' },
   { name: 'implementacao', status: 'pending' },
-  { name: 'revisao', status: 'pending' },
-  { name: 'documentacao', status: 'pending' },
+  { name: 'qa', status: 'pending' },
+  { name: 'docs', status: 'pending' },
 ]
 
 function getProgressPath(featureName: string): string {
