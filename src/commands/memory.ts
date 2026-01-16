@@ -200,7 +200,7 @@ class MemoryCommand {
         console.log()
         console.log(chalk.gray(`${countLines(content)} linhas | ${globalPath}`))
 
-        const featuresPath = path.join(process.cwd(), '.claude/plans/features')
+        const featuresPath = path.join(getMainRepoPath(), '.claude/plans/features')
         if (await fs.pathExists(featuresPath)) {
           const features = await fs.readdir(featuresPath)
           const memoriesExist: string[] = []
@@ -323,7 +323,7 @@ IMPORTANTE:
 
     try {
       const results: SearchMatch[] = []
-      const featuresPath = path.join(process.cwd(), '.claude/plans/features')
+      const featuresPath = path.join(getMainRepoPath(), '.claude/plans/features')
 
       if (!(await fs.pathExists(featuresPath))) {
         spinner.fail('Nenhuma feature encontrada')
@@ -458,7 +458,7 @@ IMPORTANTE:
         process.exit(1)
       }
 
-      const featurePath = path.join(process.cwd(), '.claude/plans/features', feature)
+      const featurePath = path.join(getMainRepoPath(), '.claude/plans/features', feature)
 
       if (!(await fs.pathExists(featurePath))) {
         spinner.fail(`Feature "${feature}" não encontrada`)

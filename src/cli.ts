@@ -101,10 +101,10 @@ feature
   .action(() => featureCommand.list())
 
 feature
-  .command('next')
+  .command('next [name]')
   .alias('n')
-  .description('Executa próxima etapa da feature ativa (sem confirmação)')
-  .action(() => featureCommand.next())
+  .description('Executa próxima etapa da feature (usa ativa se nome não informado)')
+  .action((name?: string) => featureCommand.next(name))
 
 feature
   .command('autopilot <name> [description]')

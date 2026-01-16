@@ -112,6 +112,14 @@ path: ${featurePath}
     }
   }
 
+  private getClaudePath(): string {
+    return path.join(this.getMainRepoPath(), '.claude')
+  }
+
+  private getFeaturePath(name: string): string {
+    return path.join(this.getClaudePath(), 'plans/features', name)
+  }
+
   private async getDefaultBranch(): Promise<string> {
     try {
       const remote = execFileSync('git', ['remote', 'show', 'origin'], { encoding: 'utf-8' })
@@ -159,12 +167,6 @@ path: ${featurePath}
 
       execFileSync('git', ['worktree', 'add', worktreeDir, branchName], { stdio: 'pipe' })
 
-      const claudeDir = path.join(worktreeDir, '.claude')
-      const srcClaudeDir = path.join(process.cwd(), '.claude')
-      if ((await fs.pathExists(srcClaudeDir)) && !(await fs.pathExists(claudeDir))) {
-        await fs.copy(srcClaudeDir, claudeDir)
-      }
-
       return { success: true, worktreePath: worktreeDir, branch: branchName }
     } catch (error) {
       return {
@@ -175,7 +177,7 @@ path: ${featurePath}
   }
 
   private async getFeatureState(name: string): Promise<FeatureState> {
-    const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
+    const featurePath = this.getFeaturePath(name)
     const exists = await fs.pathExists(featurePath)
 
     const hasPrd = await fs.pathExists(path.join(featurePath, 'prd.md'))
@@ -325,8 +327,8 @@ path: ${featurePath}
       return { valid: true }
     }
 
-    const specPath = path.join(process.cwd(), '.claude/specs', `${name}.md`)
-    const featureSpecPath = path.join(process.cwd(), '.claude/plans/features', name, 'spec.md')
+    const specPath = path.join(this.getClaudePath(), 'specs', `${name}.md`)
+    const featureSpecPath = path.join(this.getFeaturePath(name), 'spec.md')
 
     let actualSpecPath: string | null = null
     if (await fs.pathExists(specPath)) {
@@ -603,7 +605,7 @@ ${featureContext}
     const spinner = ora('Executando research phase...').start()
 
     try {
-      const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
+      const featurePath = this.getFeaturePath(name)
       const researchPath = path.join(featurePath, 'research.md')
 
       if (!(await fs.pathExists(featurePath))) {
@@ -756,7 +758,7 @@ Estrutura do research.md:
     const spinner = ora('Criando plano de implementação...').start()
 
     try {
-      const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
+      const featurePath = this.getFeaturePath(name)
       const planPath = path.join(featurePath, 'implementation-plan.md')
 
       if (!(await fs.pathExists(featurePath))) {
@@ -895,7 +897,7 @@ IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
     const spinner = ora('Criando breakdown de tasks...').start()
 
     try {
-      const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
+      const featurePath = this.getFeaturePath(name)
       const tasksPath = path.join(featurePath, 'tasks.md')
 
       if (!(await fs.pathExists(featurePath))) {
@@ -1024,7 +1026,7 @@ IMPORTANTE:
     const spinner = ora('Iniciando implementação...').start()
 
     try {
-      const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
+      const featurePath = this.getFeaturePath(name)
 
       if (!(await fs.pathExists(featurePath))) {
         spinner.fail(`Feature ${name} não encontrada`)
@@ -1247,7 +1249,7 @@ Não avance para próxima fase até atual estar completa.
 
       spinner.start('Executando revisão de qualidade...')
 
-      const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
+      const featurePath = this.getFeaturePath(name)
       const qaReportPath = path.join(featurePath, 'qa-report.md')
 
       if (!(await fs.pathExists(featurePath))) {
@@ -1442,7 +1444,7 @@ Se encontrar issues CRITICAL ou HIGH, o status deve ser FAIL.
 
       spinner.start('Gerando documentação...')
 
-      const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
+      const featurePath = this.getFeaturePath(name)
 
       if (!(await fs.pathExists(featurePath))) {
         spinner.fail(`Feature ${name} não encontrada`)
@@ -1548,7 +1550,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 
   async list(): Promise<void> {
     try {
-      const featuresPath = path.join(process.cwd(), '.claude/plans/features')
+      const featuresPath = path.join(this.getClaudePath(), 'plans/features')
 
       if (!(await fs.pathExists(featuresPath))) {
         logger.warn('Nenhuma feature encontrada')
@@ -1960,78 +1962,137 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
         )
       }
 
-      const { continueImplement } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'continueImplement',
-          message: 'Arquitetura definida. Iniciar implementação (TDD)?',
-          default: true,
-        },
-      ])
-
-      if (!continueImplement) {
-        printProgress(await loadProgress(name))
-        console.log(chalk.yellow('\nAutopilot pausado. Continue manualmente com:'))
-        console.log(chalk.gray(`  adk feature implement ${name}`))
-        return
-      }
-
-      let worktreePath: string | undefined
-      let worktreeBranch: string | undefined
-      const baseBranch = options.baseBranch || (await this.getDefaultBranch())
-      const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
-
-      if (this.isInWorktreeForFeature(name)) {
-        worktreePath = process.cwd()
-        worktreeBranch = `feature/${featureSlug}`
-        console.log(chalk.green(`✓ Já está no worktree da feature: ${worktreePath}`))
-        console.log()
-      } else {
-        console.log()
-        console.log(chalk.cyan('📂 Configurando Worktree'))
-        console.log(chalk.gray('━'.repeat(50)))
-
-        const result = await this.setupWorktree(name, baseBranch)
-
-        if (result.success && result.worktreePath) {
-          worktreePath = result.worktreePath
-          worktreeBranch = result.branch
-
-          console.log(chalk.green(`✓ Worktree criado: ${worktreePath}`))
-          console.log(chalk.gray(`  Branch: ${worktreeBranch}`))
-          console.log(chalk.gray(`  Base: ${baseBranch}`))
-          console.log()
-          console.log(chalk.yellow('As próximas etapas serão executadas no worktree.'))
-          console.log(chalk.yellow('Múltiplos agentes podem trabalhar em paralelo em worktrees diferentes.'))
-        } else {
-          console.log(chalk.red(`Erro ao criar worktree: ${result.error}`))
-          console.log(chalk.yellow('Não é possível continuar sem worktree para garantir isolamento.'))
-          process.exit(1)
-        }
-        console.log()
-      }
-
       progress = await loadProgress(name)
-      if (!isStepCompleted(progress, 'implementacao')) {
-        const implementArgs = ['feature', 'implement', name, '--phase', 'All']
+      const implementDone = isStepCompleted(progress, 'implementacao')
+      const qaDone = isStepCompleted(progress, 'qa')
+      const docsDone = isStepCompleted(progress, 'docs')
 
-        await executePhase(implementArgs, 'implementacao', 5, 'IMPLEMENTAÇÃO (TDD)', worktreePath)
-      } else {
+      if (implementDone && qaDone && docsDone) {
         console.log(chalk.green('✓ Implementação já concluída, pulando etapa 5'))
-      }
-
-      progress = await loadProgress(name)
-      if (!isStepCompleted(progress, 'qa')) {
-        await executePhase(['feature', 'qa', name], 'qa', 6, 'QA - REVISÃO DE QUALIDADE', worktreePath)
-      } else {
         console.log(chalk.green('✓ QA já concluído, pulando etapa 6'))
-      }
-
-      progress = await loadProgress(name)
-      if (!isStepCompleted(progress, 'docs')) {
-        await executePhase(['feature', 'docs', name], 'docs', 7, 'DOCUMENTAÇÃO', worktreePath)
-      } else {
         console.log(chalk.green('✓ Documentação já concluída, pulando etapa 7'))
+      } else {
+        const pendingSteps: string[] = []
+        if (!implementDone) pendingSteps.push('Implementação')
+        if (!qaDone) pendingSteps.push('QA')
+        if (!docsDone) pendingSteps.push('Documentação')
+
+        const { continueImplement } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'continueImplement',
+            message: `Continuar com: ${pendingSteps.join(' → ')}?`,
+            default: true,
+          },
+        ])
+
+        if (!continueImplement) {
+          printProgress(await loadProgress(name))
+          console.log(chalk.yellow('\nAutopilot pausado. Continue manualmente com:'))
+          if (!implementDone) {
+            console.log(chalk.gray(`  adk feature implement ${name}`))
+          } else if (!qaDone) {
+            console.log(chalk.gray(`  adk feature qa ${name}`))
+          } else {
+            console.log(chalk.gray(`  adk feature docs ${name}`))
+          }
+          return
+        }
+
+        let worktreePath: string | undefined
+        let worktreeBranch: string | undefined
+        const baseBranch = options.baseBranch || (await this.getDefaultBranch())
+        const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
+
+        if (this.isInWorktreeForFeature(name)) {
+          worktreePath = process.cwd()
+          worktreeBranch = `feature/${featureSlug}`
+          console.log(chalk.green(`✓ Já está no worktree da feature: ${worktreePath}`))
+          console.log()
+        } else {
+          console.log()
+          console.log(chalk.cyan('📂 Configurando Worktree'))
+          console.log(chalk.gray('━'.repeat(50)))
+
+          const result = await this.setupWorktree(name, baseBranch)
+
+          if (result.success && result.worktreePath) {
+            worktreePath = result.worktreePath
+            worktreeBranch = result.branch
+
+            console.log(chalk.green(`✓ Worktree criado: ${worktreePath}`))
+            console.log(chalk.gray(`  Branch: ${worktreeBranch}`))
+            console.log(chalk.gray(`  Base: ${baseBranch}`))
+            console.log()
+            console.log(chalk.yellow('As próximas etapas serão executadas no worktree.'))
+            console.log(chalk.yellow('Múltiplos agentes podem trabalhar em paralelo em worktrees diferentes.'))
+          } else {
+            console.log(chalk.red(`Erro ao criar worktree: ${result.error}`))
+            console.log(chalk.yellow('Não é possível continuar sem worktree para garantir isolamento.'))
+            process.exit(1)
+          }
+          console.log()
+        }
+
+        if (!implementDone) {
+          const implementArgs = ['feature', 'implement', name, '--phase', 'All']
+          await executePhase(implementArgs, 'implementacao', 5, 'IMPLEMENTAÇÃO (TDD)', worktreePath)
+        } else {
+          console.log(chalk.green('✓ Implementação já concluída, pulando etapa 5'))
+        }
+
+        progress = await loadProgress(name)
+        if (!isStepCompleted(progress, 'qa')) {
+          await executePhase(['feature', 'qa', name], 'qa', 6, 'QA - REVISÃO DE QUALIDADE', worktreePath)
+        } else {
+          console.log(chalk.green('✓ QA já concluído, pulando etapa 6'))
+        }
+
+        progress = await loadProgress(name)
+        if (!isStepCompleted(progress, 'docs')) {
+          await executePhase(['feature', 'docs', name], 'docs', 7, 'DOCUMENTAÇÃO', worktreePath)
+        } else {
+          console.log(chalk.green('✓ Documentação já concluída, pulando etapa 7'))
+        }
+
+        if (worktreePath && worktreeBranch) {
+          const hasRemote = this.hasRemote()
+          const mainRepoPath = this.getMainRepoPath()
+
+          console.log()
+          console.log(chalk.yellow('Próximos passos:'))
+          console.log()
+          console.log(chalk.cyan(`📂 Worktree: ${worktreePath}`))
+          console.log(chalk.cyan(`🌿 Branch: ${worktreeBranch}`))
+          console.log()
+
+          console.log(chalk.gray('  1. Revise as mudanças:'))
+          console.log(chalk.white(`     git diff`))
+          console.log()
+          console.log(chalk.gray('  2. Commit final (se houver mudanças pendentes):'))
+          console.log(chalk.white(`     git add . && git commit -m "feat(${name}): complete implementation"`))
+          console.log()
+
+          if (hasRemote) {
+            console.log(chalk.gray('  3. Push e abra PR:'))
+            console.log(chalk.white(`     git push -u origin ${worktreeBranch}`))
+            console.log(chalk.white(`     gh pr create --base ${baseBranch} --title "feat: ${name}"`))
+            console.log()
+            console.log(chalk.gray('  4. Após merge do PR, limpe o worktree:'))
+            console.log(chalk.white(`     cd ${mainRepoPath}`))
+            console.log(chalk.white(`     git worktree remove ${worktreePath}`))
+            console.log(chalk.white(`     git branch -d ${worktreeBranch}`))
+          } else {
+            console.log(chalk.gray('  3. Volte ao repo principal e faça merge:'))
+            console.log(chalk.white(`     cd ${mainRepoPath}`))
+            console.log(chalk.white(`     git checkout ${baseBranch}`))
+            console.log(chalk.white(`     git merge ${worktreeBranch}`))
+            console.log()
+            console.log(chalk.gray('  4. Limpe o worktree:'))
+            console.log(chalk.white(`     git worktree remove ${worktreePath}`))
+            console.log(chalk.white(`     git branch -d ${worktreeBranch}`))
+          }
+        }
       }
 
       console.log(chalk.bold.green('\n═══════════════════════════════════════════════════'))
@@ -2048,44 +2109,6 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
       console.log(chalk.gray(`  📄 .claude/plans/features/${name}/tasks.md`))
       console.log(chalk.gray(`  📄 .claude/plans/features/${name}/implementation-plan.md`))
       console.log(chalk.gray(`  📄 .claude/plans/features/${name}/qa-report.md`))
-      console.log()
-
-      const hasRemote = this.hasRemote()
-      const mainRepoPath = worktreePath !== process.cwd() ? process.cwd() : path.dirname(worktreePath || '')
-
-      console.log(chalk.yellow('Próximos passos:'))
-      console.log()
-      console.log(chalk.cyan(`📂 Worktree: ${worktreePath}`))
-      console.log(chalk.cyan(`🌿 Branch: ${worktreeBranch}`))
-      console.log()
-
-      console.log(chalk.gray('  1. Revise as mudanças:'))
-      console.log(chalk.white(`     git diff`))
-      console.log()
-      console.log(chalk.gray('  2. Commit final (se houver mudanças pendentes):'))
-      console.log(chalk.white(`     git add . && git commit -m "feat(${name}): complete implementation"`))
-      console.log()
-
-      if (hasRemote) {
-        console.log(chalk.gray('  3. Push e abra PR:'))
-        console.log(chalk.white(`     git push -u origin ${worktreeBranch}`))
-        console.log(chalk.white(`     gh pr create --base ${baseBranch} --title "feat: ${name}"`))
-        console.log()
-        console.log(chalk.gray('  4. Após merge do PR, limpe o worktree:'))
-        console.log(chalk.white(`     cd ${mainRepoPath}`))
-        console.log(chalk.white(`     git worktree remove ${worktreePath}`))
-        console.log(chalk.white(`     git branch -d ${worktreeBranch}`))
-      } else {
-        console.log(chalk.gray('  3. Volte ao repo principal e faça merge:'))
-        console.log(chalk.white(`     cd ${mainRepoPath}`))
-        console.log(chalk.white(`     git checkout ${baseBranch}`))
-        console.log(chalk.white(`     git merge ${worktreeBranch}`))
-        console.log()
-        console.log(chalk.gray('  4. Limpe o worktree:'))
-        console.log(chalk.white(`     git worktree remove ${worktreePath}`))
-        console.log(chalk.white(`     git branch -d ${worktreeBranch}`))
-      }
-
       console.log()
     } catch (error) {
       logger.error(error instanceof Error ? error.message : String(error))
@@ -2202,7 +2225,7 @@ NAO crie PRD, tasks, ou documentacao formal. Isso e uma tarefa rapida.
   }
 
   private async getActiveFocus(): Promise<string | null> {
-    const focusPath = path.join(process.cwd(), '.claude/active-focus.md')
+    const focusPath = path.join(this.getClaudePath(), 'active-focus.md')
     try {
       const content = await fs.readFile(focusPath, 'utf-8')
       const match = content.match(/feature:\s*(.+)/i)
@@ -2212,22 +2235,31 @@ NAO crie PRD, tasks, ou documentacao formal. Isso e uma tarefa rapida.
     }
   }
 
-  async next(): Promise<void> {
+  async next(name?: string): Promise<void> {
     console.log()
     console.log(chalk.bold.cyan('⏭️  ADK Next Step'))
     console.log(chalk.gray('━'.repeat(50)))
 
-    const featureName = await this.getActiveFocus()
+    let featureName: string | null = name ?? null
+
+    if (!featureName) {
+      featureName = await this.getActiveFocus()
+    }
 
     if (!featureName) {
       console.log()
       logger.error('Nenhuma feature ativa encontrada.')
-      console.log(chalk.gray('  Use: adk feature new <nome> ou adk feature autopilot <nome>'))
+      console.log(chalk.gray('  Use: adk feature next <nome>'))
+      console.log(chalk.gray('  Ou: adk feature new <nome> para criar uma nova'))
       console.log()
       process.exit(1)
     }
 
-    console.log(chalk.gray(`Feature ativa: ${featureName}`))
+    if (name) {
+      await this.setActiveFocus(name, 'em andamento')
+    }
+
+    console.log(chalk.gray(`Feature: ${featureName}`))
     console.log()
 
     const progress = await loadProgress(featureName)

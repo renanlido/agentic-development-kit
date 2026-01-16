@@ -4,6 +4,7 @@ import fs from 'fs-extra'
 import ora from 'ora'
 import { executeClaudeCommand } from '../utils/claude.js'
 import { logger } from '../utils/logger.js'
+import { getClaudePath } from '../utils/paths.js'
 import {
   DEFAULT_PARALLEL_CONFIG,
   executeParallel,
@@ -24,7 +25,7 @@ class AgentCommand {
     const spinner = ora('Criando agent...').start()
 
     try {
-      const agentsPath = path.join(process.cwd(), '.claude/agents')
+      const agentsPath = path.join(getClaudePath(), 'agents')
       const agentPath = path.join(agentsPath, `${name}.md`)
 
       if (await fs.pathExists(agentPath)) {
@@ -55,7 +56,7 @@ class AgentCommand {
     const spinner = ora(`Executando agent ${name}...`).start()
 
     try {
-      const agentPath = path.join(process.cwd(), '.claude/agents', `${name}.md`)
+      const agentPath = path.join(getClaudePath(), 'agents', `${name}.md`)
 
       if (!(await fs.pathExists(agentPath))) {
         spinner.fail(`Agent ${name} não encontrado`)
@@ -96,7 +97,7 @@ Execute the agent tasks and report results.
       for (const agent of agents) {
         spinner.text = `Executando agent: ${agent}`
 
-        const agentPath = path.join(process.cwd(), '.claude/agents', `${agent}.md`)
+        const agentPath = path.join(getClaudePath(), 'agents', `${agent}.md`)
 
         if (await fs.pathExists(agentPath)) {
           await this.run(agent, { context: feature })
@@ -120,7 +121,7 @@ Execute the agent tasks and report results.
     const spinner = ora('Preparando execução paralela...').start()
 
     try {
-      const agentsPath = path.join(process.cwd(), '.claude/agents')
+      const agentsPath = path.join(getClaudePath(), 'agents')
       const agents: string[] = []
 
       if (await fs.pathExists(agentsPath)) {
@@ -167,7 +168,7 @@ Execute the agent tasks and report results.
   }
 
   async status(options: AgentOptions): Promise<void> {
-    const statusPath = path.join(process.cwd(), '.claude/agent-status.json')
+    const statusPath = path.join(getClaudePath(), 'agent-status.json')
 
     const displayStatus = async (): Promise<void> => {
       if (!(await fs.pathExists(statusPath))) {
