@@ -2,9 +2,51 @@
 description: Executa validacao completa de qualidade em uma feature
 ---
 
-# QA: $ARGUMENTS
+# QA - Validação de Qualidade
 
-Voce vai validar a qualidade da feature "$ARGUMENTS".
+## Argumento Recebido
+
+O argumento passado foi: `$ARGUMENTS`
+
+## Validar Argumento
+
+Se `$ARGUMENTS` estiver vazio ou for literalmente "$ARGUMENTS":
+
+```
+Erro: Nome da feature é obrigatório.
+
+Uso: /qa <nome-da-feature>
+
+Exemplo: /qa user-authentication
+
+Para ver features disponíveis:
+  adk feature list
+```
+
+## Pre-requisitos
+
+Verifique se existe:
+- `.claude/plans/features/$ARGUMENTS/`
+
+Se NAO existir:
+```
+Erro: Feature "$ARGUMENTS" não encontrada.
+Verifique o nome e tente novamente.
+
+Features disponíveis:
+  adk feature list
+```
+
+## Atualizar Focus
+
+Atualize `.claude/active-focus.md`:
+```
+# Foco Ativo
+
+feature: $ARGUMENTS
+status: validando QA
+path: .claude/plans/features/$ARGUMENTS/
+```
 
 ## Checklist de Validacao
 
@@ -103,7 +145,26 @@ Gere relatorio em `.claude/plans/features/$ARGUMENTS/qa-report.md`:
 - [Lista de acoes]
 ```
 
+## Atualizar Progress
+
+Atualize `.claude/plans/features/$ARGUMENTS/progress.md`:
+- Marque `qa` como `completed`
+
+## Reportar
+
+```
+✅ QA de "$ARGUMENTS" concluído!
+
+Status: [APROVADO/REPROVADO]
+Relatório: .claude/plans/features/$ARGUMENTS/qa-report.md
+
+Próximo passo:
+  /next-step $ARGUMENTS
+  ou
+  adk feature docs $ARGUMENTS
+```
+
 ## Decisao
 
-- **Se APROVADO**: Feature pronta para deploy
+- **Se APROVADO**: Feature pronta para docs e deploy
 - **Se REPROVADO**: Liste issues e sugira correcoes

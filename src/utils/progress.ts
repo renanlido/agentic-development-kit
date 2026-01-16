@@ -1,5 +1,22 @@
+import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import fs from 'fs-extra'
+
+function getMainRepoPath(): string {
+  try {
+    const gitCommonDir = execFileSync('git', ['rev-parse', '--git-common-dir'], {
+      encoding: 'utf-8',
+    }).trim()
+
+    if (gitCommonDir === '.git' || gitCommonDir.endsWith('/.git')) {
+      return process.cwd()
+    }
+
+    return path.dirname(gitCommonDir)
+  } catch {
+    return process.cwd()
+  }
+}
 
 export interface StepProgress {
   name: string
@@ -28,7 +45,7 @@ const DEFAULT_STEPS: StepProgress[] = [
 ]
 
 function getProgressPath(featureName: string): string {
-  return path.join(process.cwd(), '.claude/plans/features', featureName, 'progress.md')
+  return path.join(getMainRepoPath(), '.claude/plans/features', featureName, 'progress.md')
 }
 
 function parseProgressFile(content: string): FeatureProgress | null {

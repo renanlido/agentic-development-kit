@@ -54,10 +54,14 @@ export async function initCommand(options: InitOptions): Promise<void> {
     await copyClaudeStructure(projectPath)
     spinner.succeed('Estrutura ADK copiada')
 
-    // 3. Create initial memory
-    spinner.start('Criando project memory...')
-    await createInitialMemory(projectPath, projectName)
-    spinner.succeed('Memory criado')
+    // 3. Create initial memory (only if none exists)
+    spinner.start('Verificando project memory...')
+    const memoryCreated = await createInitialMemory(projectPath, projectName)
+    if (memoryCreated) {
+      spinner.succeed('Memory criado')
+    } else {
+      spinner.info('Memory já existe - mantido')
+    }
 
     // 4. Create CLAUDE.md if not exists
     spinner.start('Criando CLAUDE.md...')
@@ -113,7 +117,22 @@ async function createCADDStructure(projectPath: string): Promise<void> {
   }
 }
 
-async function createInitialMemory(projectPath: string, projectName: string): Promise<void> {
+async function createInitialMemory(projectPath: string, projectName: string): Promise<boolean> {
+  const memoryDir = path.join(projectPath, '.claude/memory')
+  const memoryPath = path.join(memoryDir, 'project-context.md')
+
+  if (await fs.pathExists(memoryDir)) {
+    const existingFiles = await fs.readdir(memoryDir)
+    const hasMemoryFiles = existingFiles.some((f) => f.endsWith('.md'))
+    if (hasMemoryFiles) {
+      return false
+    }
+  }
+
+  if (await fs.pathExists(memoryPath)) {
+    return false
+  }
+
   const memoryContent = `# Project: ${projectName}
 
 **Created:** ${new Date().toISOString().split('T')[0]}
@@ -142,11 +161,8 @@ async function createInitialMemory(projectPath: string, projectName: string): Pr
 [Será atualizado conforme necessário]
 `
 
-  const memoryPath = path.join(projectPath, '.claude/memory/project-context.md')
-
-  if (!(await fs.pathExists(memoryPath))) {
-    await fs.writeFile(memoryPath, memoryContent)
-  }
+  await fs.writeFile(memoryPath, memoryContent)
+  return true
 }
 
 async function createClaudeMd(projectPath: string, projectName: string): Promise<boolean> {

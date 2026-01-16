@@ -1,9 +1,26 @@
+import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import type { MemoryContent, MemoryLimitResult, MemoryPhase } from '../types/memory'
 import { MEMORY_LINE_LIMIT, MEMORY_WARNING_THRESHOLD } from '../types/memory'
 
+function getMainRepoPath(): string {
+  try {
+    const gitCommonDir = execFileSync('git', ['rev-parse', '--git-common-dir'], {
+      encoding: 'utf-8',
+    }).trim()
+
+    if (gitCommonDir === '.git' || gitCommonDir.endsWith('/.git')) {
+      return process.cwd()
+    }
+
+    return path.dirname(gitCommonDir)
+  } catch {
+    return process.cwd()
+  }
+}
+
 export function getMemoryPath(feature?: string): string {
-  const basePath = process.cwd()
+  const basePath = getMainRepoPath()
 
   if (feature) {
     const safeName = feature.replace(/[^a-zA-Z0-9-_]/g, '-')
@@ -14,7 +31,7 @@ export function getMemoryPath(feature?: string): string {
 }
 
 export function getMemoryArchivePath(feature: string): string {
-  const basePath = process.cwd()
+  const basePath = getMainRepoPath()
   const safeName = feature.replace(/[^a-zA-Z0-9-_]/g, '-')
   const date = new Date().toISOString().split('T')[0]
   return path.join(

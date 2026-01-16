@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import chalk from 'chalk'
 import fs from 'fs-extra'
@@ -20,12 +21,29 @@ import {
   serializeMemoryContent,
 } from '../utils/memory-utils.js'
 
+function getMainRepoPath(): string {
+  try {
+    const gitCommonDir = execFileSync('git', ['rev-parse', '--git-common-dir'], {
+      encoding: 'utf-8',
+    }).trim()
+
+    if (gitCommonDir === '.git' || gitCommonDir.endsWith('/.git')) {
+      return process.cwd()
+    }
+
+    return path.dirname(gitCommonDir)
+  } catch {
+    return process.cwd()
+  }
+}
+
 class MemoryCommand {
   async save(feature: string, options: MemoryOptions = {}): Promise<void> {
     const spinner = ora('Salvando memoria...').start()
 
     try {
-      const featurePath = path.join(process.cwd(), '.claude/plans/features', feature)
+      const mainRepoPath = getMainRepoPath()
+      const featurePath = path.join(mainRepoPath, '.claude/plans/features', feature)
 
       if (!(await fs.pathExists(featurePath))) {
         spinner.fail(`Feature ${feature} nao encontrada`)

@@ -23,6 +23,7 @@ interface FeatureOptions {
   context?: string
   description?: string
   skipSpec?: boolean
+  baseBranch?: string
 }
 
 interface QuickOptions {
@@ -51,7 +52,8 @@ interface PhaseCheckResult {
 
 class FeatureCommand {
   private async setActiveFocus(name: string, status: string): Promise<void> {
-    const focusPath = path.join(process.cwd(), '.claude/active-focus.md')
+    const mainRepoPath = this.getMainRepoPath()
+    const focusPath = path.join(mainRepoPath, '.claude/active-focus.md')
     const featurePath = `.claude/plans/features/${name}/`
     const content = `# Foco Ativo
 
@@ -60,6 +62,116 @@ status: ${status}
 path: ${featurePath}
 `
     await fs.writeFile(focusPath, content)
+  }
+
+  private hasRemote(): boolean {
+    try {
+      const remotes = execFileSync('git', ['remote'], { encoding: 'utf-8' }).trim()
+      return remotes.length > 0
+    } catch {
+      return false
+    }
+  }
+
+  private isInWorktreeForFeature(name: string): boolean {
+    try {
+      const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
+      const expectedBranch = `feature/${featureSlug}`
+
+      const currentBranch = execFileSync('git', ['branch', '--show-current'], {
+        encoding: 'utf-8',
+      }).trim()
+
+      if (currentBranch !== expectedBranch) {
+        return false
+      }
+
+      const gitDir = execFileSync('git', ['rev-parse', '--git-dir'], {
+        encoding: 'utf-8',
+      }).trim()
+
+      return gitDir.includes('.git/worktrees') || gitDir.endsWith('.git/worktrees/' + featureSlug)
+    } catch {
+      return false
+    }
+  }
+
+  private getMainRepoPath(): string {
+    try {
+      const gitCommonDir = execFileSync('git', ['rev-parse', '--git-common-dir'], {
+        encoding: 'utf-8',
+      }).trim()
+
+      if (gitCommonDir === '.git' || gitCommonDir.endsWith('/.git')) {
+        return process.cwd()
+      }
+
+      return path.dirname(gitCommonDir)
+    } catch {
+      return process.cwd()
+    }
+  }
+
+  private async getDefaultBranch(): Promise<string> {
+    try {
+      const remote = execFileSync('git', ['remote', 'show', 'origin'], { encoding: 'utf-8' })
+      const match = remote.match(/HEAD branch: (.+)/)
+      return match ? match[1].trim() : 'main'
+    } catch {
+      return 'main'
+    }
+  }
+
+  private async setupWorktree(
+    name: string,
+    baseBranch: string = 'main'
+  ): Promise<{ success: boolean; worktreePath?: string; branch?: string; error?: string }> {
+    const branchName = `feature/${name.replace(/[^a-zA-Z0-9-]/g, '-')}`
+    const worktreeDir = path.join(process.cwd(), '.worktrees', name.replace(/[^a-zA-Z0-9-]/g, '-'))
+
+    try {
+      if (await fs.pathExists(worktreeDir)) {
+        return { success: true, worktreePath: worktreeDir, branch: branchName }
+      }
+
+      await fs.ensureDir(path.dirname(worktreeDir))
+
+      try {
+        execFileSync('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branchName}`], {
+          stdio: 'ignore',
+        })
+      } catch {
+        const hasRemote = this.hasRemote()
+        if (hasRemote) {
+          try {
+            execFileSync('git', ['fetch', 'origin', baseBranch], { stdio: 'pipe' })
+          } catch {
+            // Ignore fetch errors
+          }
+        }
+
+        try {
+          execFileSync('git', ['branch', branchName, baseBranch], { stdio: 'pipe' })
+        } catch {
+          execFileSync('git', ['branch', branchName], { stdio: 'pipe' })
+        }
+      }
+
+      execFileSync('git', ['worktree', 'add', worktreeDir, branchName], { stdio: 'pipe' })
+
+      const claudeDir = path.join(worktreeDir, '.claude')
+      const srcClaudeDir = path.join(process.cwd(), '.claude')
+      if ((await fs.pathExists(srcClaudeDir)) && !(await fs.pathExists(claudeDir))) {
+        await fs.copy(srcClaudeDir, claudeDir)
+      }
+
+      return { success: true, worktreePath: worktreeDir, branch: branchName }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
   }
 
   private async getFeatureState(name: string): Promise<FeatureState> {
@@ -100,7 +212,8 @@ path: ${featurePath}
   }
 
   private async askToResume(name: string, state: FeatureState): Promise<boolean> {
-    if (!state.exists) {
+    const hasContent = state.hasPrd || state.hasResearch || state.hasTasks || state.hasPlan
+    if (!state.exists || !hasContent) {
       return true
     }
 
@@ -276,18 +389,132 @@ path: ${featurePath}
       await fs.ensureDir(state.featurePath)
 
       const contextFromOptions = await this.loadContext(options)
+      const hasContext = contextFromOptions && contextFromOptions.trim().length > 0
 
-      const prdTemplate = await loadTemplate('prd-template.md')
-
-      const date = new Date().toISOString().split('T')[0]
-
-      const prdContent = prdTemplate
-        .replace(/\[Nome da Feature\]/g, name)
-        .replace(/YYYY-MM-DD/g, date)
+      const prdPath = path.join(state.featurePath, 'prd.md')
 
       if (!state.hasPrd) {
-        await fs.writeFile(path.join(state.featurePath, 'prd.md'), prdContent)
+        if (hasContext) {
+          spinner.text = 'Gerando PRD a partir do contexto...'
+
+          const descriptionSection = options.description
+            ? `
+
+## Descrição da Feature
+
+${options.description}
+`
+            : ''
+
+          const prdPrompt = `
+TASK: Gerar PRD (Product Requirements Document) completo
+
+## Contexto Fornecido
+
+<context>
+${contextFromOptions}
+</context>
+
+## Instruções
+
+Com base no contexto acima, crie um PRD completo e detalhado para a feature "${name}".${descriptionSection}
+
+O PRD DEVE seguir esta estrutura:
+
+# PRD: ${name}
+
+**Data:** ${new Date().toISOString().split('T')[0]}
+**Status:** Draft
+**Autor:** [Auto-generated]
+
+## 1. Problema
+
+[Descreva o problema que esta feature resolve, baseado no contexto]
+
+## 2. Solução Proposta
+
+[Descreva a solução de forma clara e objetiva]
+
+## 3. Requisitos Funcionais
+
+- RF01: [Requisito 1]
+- RF02: [Requisito 2]
+...
+
+## 4. Requisitos Não-Funcionais
+
+- RNF01: Performance - [especificar]
+- RNF02: Segurança - [especificar]
+...
+
+## 5. User Stories
+
+### US01: [Título]
+**Como** [persona]
+**Quero** [ação]
+**Para** [benefício]
+
+**Critérios de Aceitação:**
+- [ ] Critério 1
+- [ ] Critério 2
+
+## 6. Escopo
+
+### Incluído
+- Item 1
+- Item 2
+
+### Excluído (Out of Scope)
+- Item 1
+- Item 2
+
+## 7. Riscos e Mitigações
+
+| Risco | Impacto | Mitigação |
+|-------|---------|-----------|
+| Risco 1 | Alto/Médio/Baixo | Como mitigar |
+
+## 8. Métricas de Sucesso
+
+- Métrica 1: [como medir]
+- Métrica 2: [como medir]
+
+## 9. Dependências
+
+- Dependência 1
+- Dependência 2
+
+## 10. Timeline (Sugestão)
+
+- Fase 1: [descrição]
+- Fase 2: [descrição]
+
+---
+
+IMPORTANTE:
+- Extraia TODAS as informações relevantes do contexto
+- Seja específico e detalhado
+- Não deixe placeholders genéricos - preencha com informações reais do contexto
+- Se alguma informação não estiver no contexto, faça inferências razoáveis ou marque como [A DEFINIR]
+
+Output: Salve o PRD em ${prdPath}
+`
+
+          await executeClaudeCommand(prdPrompt)
+          spinner.succeed('PRD gerado a partir do contexto')
+        } else {
+          const prdTemplate = await loadTemplate('prd-template.md')
+          const date = new Date().toISOString().split('T')[0]
+          const prdContent = prdTemplate
+            .replace(/\[Nome da Feature\]/g, name)
+            .replace(/YYYY-MM-DD/g, date)
+          await fs.writeFile(prdPath, prdContent)
+          spinner.succeed('PRD template criado')
+          console.log(chalk.yellow('  Dica: Edite o PRD ou use -c para passar contexto'))
+        }
       }
+
+      spinner.start('Criando arquivos de contexto...')
 
       const featureContext = contextFromOptions || '[Adicione contexto específico desta feature]'
       const contextContent = `# ${name} Context
@@ -335,21 +562,31 @@ ${featureContext}
 
       // Create git branch
       try {
-        execSync(`git checkout -b feature/${name}`, { stdio: 'ignore' })
+        execFileSync('git', ['checkout', '-b', `feature/${name}`], { stdio: 'ignore' })
       } catch {
         // Git not available or already on branch
       }
 
-      spinner.succeed('Feature criada')
+      spinner.succeed('Estrutura criada')
 
       await this.setActiveFocus(name, state.currentStage)
 
       console.log()
       logger.success(`✨ Feature ${name} criada!`)
       console.log()
-      console.log(chalk.cyan('Próximos passos:'))
-      console.log(chalk.gray(`  1. Editar PRD: .claude/plans/features/${name}/prd.md`))
-      console.log(chalk.gray(`  2. adk feature research ${name}`))
+
+      if (hasContext) {
+        console.log(chalk.green('PRD gerado automaticamente a partir do contexto fornecido.'))
+        console.log(chalk.gray(`  Revise: .claude/plans/features/${name}/prd.md`))
+        console.log()
+        console.log(chalk.cyan('Próximos passos:'))
+        console.log(chalk.gray(`  1. Revisar PRD gerado`))
+        console.log(chalk.gray(`  2. adk feature research ${name}`))
+      } else {
+        console.log(chalk.cyan('Próximos passos:'))
+        console.log(chalk.gray(`  1. Editar PRD: .claude/plans/features/${name}/prd.md`))
+        console.log(chalk.gray(`  2. adk feature research ${name}`))
+      }
       console.log(chalk.gray(`  3. adk feature tasks ${name}`))
       console.log(chalk.gray(`  4. adk feature plan ${name}`))
       console.log(chalk.gray(`  5. adk feature implement ${name}`))
@@ -828,6 +1065,40 @@ IMPORTANTE:
         spinner.start('Continuando implementação...')
       }
 
+      if (!this.isInWorktreeForFeature(name)) {
+        spinner.stop()
+
+        const baseBranch = options.baseBranch || (await this.getDefaultBranch())
+        const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
+        const worktreeDir = path.join(process.cwd(), '.worktrees', featureSlug)
+
+        console.log()
+        console.log(chalk.cyan('📂 Configuração de Worktree'))
+        console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
+        console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
+        console.log(chalk.gray(`   Base: ${baseBranch}`))
+        console.log()
+
+        spinner.start('Criando worktree...')
+
+        const result = await this.setupWorktree(name, baseBranch)
+
+        if (result.success && result.worktreePath) {
+          spinner.succeed(`Worktree criado: ${result.worktreePath}`)
+          console.log()
+          console.log(chalk.yellow('Execute a implementação no worktree:'))
+          console.log(chalk.white(`  cd ${result.worktreePath}`))
+          console.log(chalk.white(`  adk feature implement ${name}`))
+          console.log()
+          return
+        } else {
+          spinner.fail(`Erro ao criar worktree: ${result.error}`)
+          process.exit(1)
+        }
+      }
+
+      spinner.start('Iniciando implementação...')
+
       progress = updateStepStatus(progress, 'implementacao', 'in_progress')
       await saveProgress(name, progress)
 
@@ -928,10 +1199,54 @@ Não avance para próxima fase até atual estar completa.
     }
   }
 
-  async qa(name: string): Promise<void> {
+  async qa(name: string, options: FeatureOptions = {}): Promise<void> {
     const spinner = ora('Executando revisão de qualidade...').start()
 
     try {
+      if (!this.isInWorktreeForFeature(name)) {
+        spinner.stop()
+
+        const baseBranch = options.baseBranch || (await this.getDefaultBranch())
+        const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
+        const worktreeDir = path.join(process.cwd(), '.worktrees', featureSlug)
+
+        if (await fs.pathExists(worktreeDir)) {
+          console.log()
+          console.log(chalk.yellow('⚠️  QA deve ser executado no worktree da feature.'))
+          console.log()
+          console.log(chalk.white(`  cd ${worktreeDir}`))
+          console.log(chalk.white(`  adk feature qa ${name}`))
+          console.log()
+          return
+        }
+
+        console.log()
+        console.log(chalk.cyan('📂 Configuração de Worktree'))
+        console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
+        console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
+        console.log(chalk.gray(`   Base: ${baseBranch}`))
+        console.log()
+
+        spinner.start('Criando worktree...')
+
+        const result = await this.setupWorktree(name, baseBranch)
+
+        if (result.success && result.worktreePath) {
+          spinner.succeed(`Worktree criado: ${result.worktreePath}`)
+          console.log()
+          console.log(chalk.yellow('Execute o QA no worktree:'))
+          console.log(chalk.white(`  cd ${result.worktreePath}`))
+          console.log(chalk.white(`  adk feature qa ${name}`))
+          console.log()
+          return
+        } else {
+          spinner.fail(`Erro ao criar worktree: ${result.error}`)
+          process.exit(1)
+        }
+      }
+
+      spinner.start('Executando revisão de qualidade...')
+
       const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
       const qaReportPath = path.join(featurePath, 'qa-report.md')
 
@@ -1079,10 +1394,54 @@ Se encontrar issues CRITICAL ou HIGH, o status deve ser FAIL.
     }
   }
 
-  async docs(name: string): Promise<void> {
+  async docs(name: string, options: FeatureOptions = {}): Promise<void> {
     const spinner = ora('Gerando documentação...').start()
 
     try {
+      if (!this.isInWorktreeForFeature(name)) {
+        spinner.stop()
+
+        const baseBranch = options.baseBranch || (await this.getDefaultBranch())
+        const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
+        const worktreeDir = path.join(process.cwd(), '.worktrees', featureSlug)
+
+        if (await fs.pathExists(worktreeDir)) {
+          console.log()
+          console.log(chalk.yellow('⚠️  Docs deve ser executado no worktree da feature.'))
+          console.log()
+          console.log(chalk.white(`  cd ${worktreeDir}`))
+          console.log(chalk.white(`  adk feature docs ${name}`))
+          console.log()
+          return
+        }
+
+        console.log()
+        console.log(chalk.cyan('📂 Configuração de Worktree'))
+        console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
+        console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
+        console.log(chalk.gray(`   Base: ${baseBranch}`))
+        console.log()
+
+        spinner.start('Criando worktree...')
+
+        const result = await this.setupWorktree(name, baseBranch)
+
+        if (result.success && result.worktreePath) {
+          spinner.succeed(`Worktree criado: ${result.worktreePath}`)
+          console.log()
+          console.log(chalk.yellow('Execute docs no worktree:'))
+          console.log(chalk.white(`  cd ${result.worktreePath}`))
+          console.log(chalk.white(`  adk feature docs ${name}`))
+          console.log()
+          return
+        } else {
+          spinner.fail(`Erro ao criar worktree: ${result.error}`)
+          process.exit(1)
+        }
+      }
+
+      spinner.start('Gerando documentação...')
+
       const featurePath = path.join(process.cwd(), '.claude/plans/features', name)
 
       if (!(await fs.pathExists(featurePath))) {
@@ -1468,20 +1827,30 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
       args: string[],
       stepName: string,
       etapaNum: number,
-      etapaLabel: string
+      etapaLabel: string,
+      cwd?: string
     ): Promise<boolean> => {
       console.log(chalk.bold.cyan(`\n═══════════════════════════════════════════════════`))
       console.log(chalk.bold.cyan(`  ETAPA ${etapaNum}: ${etapaLabel}`))
       console.log(chalk.bold.cyan(`═══════════════════════════════════════════════════\n`))
+
+      if (cwd) {
+        console.log(chalk.gray(`Worktree: ${cwd}`))
+      }
       console.log(chalk.gray(`Executando: adk ${args.join(' ')}\n`))
 
       let success = false
       let attempts = 0
       const maxAttempts = 3
 
+      const execOptions: { stdio: 'inherit'; cwd?: string } = { stdio: 'inherit' }
+      if (cwd) {
+        execOptions.cwd = cwd
+      }
+
       while (!success && attempts < maxAttempts) {
         try {
-          execFileSync('adk', args, { stdio: 'inherit' })
+          execFileSync('adk', args, execOptions)
           success = true
         } catch {
           attempts++
@@ -1607,28 +1976,60 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
         return
       }
 
+      let worktreePath: string | undefined
+      let worktreeBranch: string | undefined
+      const baseBranch = options.baseBranch || (await this.getDefaultBranch())
+      const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
+
+      if (this.isInWorktreeForFeature(name)) {
+        worktreePath = process.cwd()
+        worktreeBranch = `feature/${featureSlug}`
+        console.log(chalk.green(`✓ Já está no worktree da feature: ${worktreePath}`))
+        console.log()
+      } else {
+        console.log()
+        console.log(chalk.cyan('📂 Configurando Worktree'))
+        console.log(chalk.gray('━'.repeat(50)))
+
+        const result = await this.setupWorktree(name, baseBranch)
+
+        if (result.success && result.worktreePath) {
+          worktreePath = result.worktreePath
+          worktreeBranch = result.branch
+
+          console.log(chalk.green(`✓ Worktree criado: ${worktreePath}`))
+          console.log(chalk.gray(`  Branch: ${worktreeBranch}`))
+          console.log(chalk.gray(`  Base: ${baseBranch}`))
+          console.log()
+          console.log(chalk.yellow('As próximas etapas serão executadas no worktree.'))
+          console.log(chalk.yellow('Múltiplos agentes podem trabalhar em paralelo em worktrees diferentes.'))
+        } else {
+          console.log(chalk.red(`Erro ao criar worktree: ${result.error}`))
+          console.log(chalk.yellow('Não é possível continuar sem worktree para garantir isolamento.'))
+          process.exit(1)
+        }
+        console.log()
+      }
+
       progress = await loadProgress(name)
       if (!isStepCompleted(progress, 'implementacao')) {
-        await executePhase(
-          ['feature', 'implement', name, '--phase', 'All'],
-          'implementacao',
-          5,
-          'IMPLEMENTAÇÃO (TDD)'
-        )
+        const implementArgs = ['feature', 'implement', name, '--phase', 'All']
+
+        await executePhase(implementArgs, 'implementacao', 5, 'IMPLEMENTAÇÃO (TDD)', worktreePath)
       } else {
         console.log(chalk.green('✓ Implementação já concluída, pulando etapa 5'))
       }
 
       progress = await loadProgress(name)
       if (!isStepCompleted(progress, 'qa')) {
-        await executePhase(['feature', 'qa', name], 'qa', 6, 'QA - REVISÃO DE QUALIDADE')
+        await executePhase(['feature', 'qa', name], 'qa', 6, 'QA - REVISÃO DE QUALIDADE', worktreePath)
       } else {
         console.log(chalk.green('✓ QA já concluído, pulando etapa 6'))
       }
 
       progress = await loadProgress(name)
       if (!isStepCompleted(progress, 'docs')) {
-        await executePhase(['feature', 'docs', name], 'docs', 7, 'DOCUMENTAÇÃO')
+        await executePhase(['feature', 'docs', name], 'docs', 7, 'DOCUMENTAÇÃO', worktreePath)
       } else {
         console.log(chalk.green('✓ Documentação já concluída, pulando etapa 7'))
       }
@@ -1648,19 +2049,44 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
       console.log(chalk.gray(`  📄 .claude/plans/features/${name}/implementation-plan.md`))
       console.log(chalk.gray(`  📄 .claude/plans/features/${name}/qa-report.md`))
       console.log()
-      console.log(chalk.yellow('Proximos passos sugeridos:'))
-      console.log(chalk.gray('  1. Revise as mudanças: git diff'))
-      console.log(chalk.gray('  2. Commit: git add . && git commit'))
-      console.log(chalk.gray('  3. Push e PR: git push && gh pr create'))
+
+      const hasRemote = this.hasRemote()
+      const mainRepoPath = worktreePath !== process.cwd() ? process.cwd() : path.dirname(worktreePath || '')
+
+      console.log(chalk.yellow('Próximos passos:'))
+      console.log()
+      console.log(chalk.cyan(`📂 Worktree: ${worktreePath}`))
+      console.log(chalk.cyan(`🌿 Branch: ${worktreeBranch}`))
       console.log()
 
-      const branchName = `feature/${name.replace(/[^a-zA-Z0-9-]/g, '-')}`
-      try {
-        execSync(`git checkout -b ${branchName}`, { stdio: 'ignore' })
-        console.log(chalk.green(`Branch ${branchName} criada`))
-      } catch {
-        // Already on branch or git not available
+      console.log(chalk.gray('  1. Revise as mudanças:'))
+      console.log(chalk.white(`     git diff`))
+      console.log()
+      console.log(chalk.gray('  2. Commit final (se houver mudanças pendentes):'))
+      console.log(chalk.white(`     git add . && git commit -m "feat(${name}): complete implementation"`))
+      console.log()
+
+      if (hasRemote) {
+        console.log(chalk.gray('  3. Push e abra PR:'))
+        console.log(chalk.white(`     git push -u origin ${worktreeBranch}`))
+        console.log(chalk.white(`     gh pr create --base ${baseBranch} --title "feat: ${name}"`))
+        console.log()
+        console.log(chalk.gray('  4. Após merge do PR, limpe o worktree:'))
+        console.log(chalk.white(`     cd ${mainRepoPath}`))
+        console.log(chalk.white(`     git worktree remove ${worktreePath}`))
+        console.log(chalk.white(`     git branch -d ${worktreeBranch}`))
+      } else {
+        console.log(chalk.gray('  3. Volte ao repo principal e faça merge:'))
+        console.log(chalk.white(`     cd ${mainRepoPath}`))
+        console.log(chalk.white(`     git checkout ${baseBranch}`))
+        console.log(chalk.white(`     git merge ${worktreeBranch}`))
+        console.log()
+        console.log(chalk.gray('  4. Limpe o worktree:'))
+        console.log(chalk.white(`     git worktree remove ${worktreePath}`))
+        console.log(chalk.white(`     git branch -d ${worktreeBranch}`))
       }
+
+      console.log()
     } catch (error) {
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
@@ -1773,6 +2199,106 @@ NAO crie PRD, tasks, ou documentacao formal. Isso e uma tarefa rapida.
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }
+  }
+
+  private async getActiveFocus(): Promise<string | null> {
+    const focusPath = path.join(process.cwd(), '.claude/active-focus.md')
+    try {
+      const content = await fs.readFile(focusPath, 'utf-8')
+      const match = content.match(/feature:\s*(.+)/i)
+      return match ? match[1].trim() : null
+    } catch {
+      return null
+    }
+  }
+
+  async next(): Promise<void> {
+    console.log()
+    console.log(chalk.bold.cyan('⏭️  ADK Next Step'))
+    console.log(chalk.gray('━'.repeat(50)))
+
+    const featureName = await this.getActiveFocus()
+
+    if (!featureName) {
+      console.log()
+      logger.error('Nenhuma feature ativa encontrada.')
+      console.log(chalk.gray('  Use: adk feature new <nome> ou adk feature autopilot <nome>'))
+      console.log()
+      process.exit(1)
+    }
+
+    console.log(chalk.gray(`Feature ativa: ${featureName}`))
+    console.log()
+
+    const progress = await loadProgress(featureName)
+
+    const stepOrder = [
+      { name: 'prd', label: 'PRD', method: () => this.create(featureName) },
+      { name: 'research', label: 'Research', method: () => this.research(featureName) },
+      { name: 'tasks', label: 'Tasks', method: () => this.tasks(featureName) },
+      { name: 'arquitetura', label: 'Plan', method: () => this.plan(featureName) },
+      {
+        name: 'implementacao',
+        label: 'Implement',
+        method: () => this.implement(featureName, { phase: 'All' }),
+      },
+      { name: 'qa', label: 'QA', method: () => this.qa(featureName) },
+      { name: 'docs', label: 'Docs', method: () => this.docs(featureName) },
+    ]
+
+    const state = await this.getFeatureState(featureName)
+    if (state.hasPrd && !isStepCompleted(progress, 'prd')) {
+      progress.steps = progress.steps.map((s) =>
+        s.name === 'prd' ? { ...s, status: 'completed' as const } : s
+      )
+    }
+
+    let nextStep = null
+    for (const step of stepOrder) {
+      const stepProgress = progress.steps.find((s) => s.name === step.name)
+      if (
+        !stepProgress ||
+        stepProgress.status === 'pending' ||
+        stepProgress.status === 'in_progress'
+      ) {
+        nextStep = step
+        break
+      }
+    }
+
+    if (!nextStep) {
+      console.log(chalk.green('✨ Feature completa! Todas as etapas foram concluídas.'))
+      console.log()
+      console.log(chalk.cyan('Próximos passos sugeridos:'))
+      console.log(chalk.gray('  git diff'))
+      console.log(chalk.gray('  git add . && git commit'))
+      console.log(chalk.gray('  git push && gh pr create'))
+      console.log()
+      return
+    }
+
+    console.log(chalk.yellow(`Próxima etapa: ${nextStep.label}`))
+    console.log()
+
+    const completedSteps = stepOrder
+      .filter((s) => {
+        const sp = progress.steps.find((p) => p.name === s.name)
+        return sp && sp.status === 'completed'
+      })
+      .map((s) => s.label)
+
+    if (completedSteps.length > 0) {
+      console.log(chalk.gray(`Etapas concluídas: ${completedSteps.join(' → ')}`))
+      console.log()
+    }
+
+    console.log(
+      chalk.bold(`Executando: adk feature ${nextStep.label.toLowerCase()} ${featureName}`)
+    )
+    console.log(chalk.gray('━'.repeat(50)))
+    console.log()
+
+    await nextStep.method()
   }
 }
 

@@ -2,9 +2,26 @@
 description: Implementa uma feature existente seguindo TDD
 ---
 
-# Implementar: $ARGUMENTS
+# Implementar Feature
 
-Voce vai implementar a feature "$ARGUMENTS".
+## Argumento Recebido
+
+O argumento passado foi: `$ARGUMENTS`
+
+## Validar Argumento
+
+Se `$ARGUMENTS` estiver vazio ou for literalmente "$ARGUMENTS":
+
+```
+Erro: Nome da feature é obrigatório.
+
+Uso: /implement <nome-da-feature>
+
+Exemplo: /implement user-authentication
+
+Para ver features disponíveis:
+  adk feature list
+```
 
 ## Pre-requisitos
 
@@ -16,6 +33,17 @@ Se NAO existirem:
 ```
 Erro: Feature "$ARGUMENTS" nao tem PRD/Tasks definidos.
 Execute primeiro: /new-feature $ARGUMENTS
+```
+
+## Atualizar Focus
+
+Atualize `.claude/active-focus.md`:
+```
+# Foco Ativo
+
+feature: $ARGUMENTS
+status: implementando
+path: .claude/plans/features/$ARGUMENTS/
 ```
 
 ## Processo
@@ -55,16 +83,30 @@ Use o Task tool para delegar ao agent `reviewer`:
 - Use skill `code-review`
 - Reporte issues encontradas
 
-### 4. Reportar
+### 4. Atualizar Progress
+
+Atualize `.claude/plans/features/$ARGUMENTS/progress.md`:
+- Marque `implementacao` como `completed`
+
+### 5. Reportar
 
 Informe ao usuario:
+```
+✅ Implementação de "$ARGUMENTS" concluída!
+
 - Tasks completadas: X de Y
 - Coverage: Z%
 - Issues encontradas: N
-- Proximo passo: `/qa $ARGUMENTS` ou continuar implementacao
+
+Próximo passo:
+  /qa $ARGUMENTS
+  ou
+  adk feature qa $ARGUMENTS
+```
 
 ## Importante
 
 - NUNCA pule o teste (TDD e obrigatorio)
 - Commits pequenos e frequentes
 - Pare se encontrar bloqueio e pergunte
+- SEMPRE use o nome da feature passado: $ARGUMENTS

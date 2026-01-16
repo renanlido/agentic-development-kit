@@ -8,6 +8,7 @@ import { initCommand } from './commands/init.js'
 import { memoryCommand } from './commands/memory.js'
 import { specCommand } from './commands/spec.js'
 import { toolCommand } from './commands/tool.js'
+import { updateCommand } from './commands/update.js'
 import { workflowCommand } from './commands/workflow.js'
 
 const program = new Command()
@@ -24,6 +25,20 @@ program
   .option('-n, --name <name>', 'Nome do projeto')
   .action(initCommand)
 
+// Comando: adk update
+program
+  .command('update')
+  .description('Atualiza templates ADK (commands, hooks, agents, rules, skills) sem perder dados')
+  .option('--commands', 'Atualiza apenas comandos slash')
+  .option('--hooks', 'Atualiza apenas hooks')
+  .option('--agents', 'Atualiza apenas agents')
+  .option('--rules', 'Atualiza apenas rules')
+  .option('--skills', 'Atualiza apenas skills')
+  .option('--all', 'Atualiza todos os templates')
+  .option('--force', 'Força atualização sem confirmação')
+  .option('--no-backup', 'Não cria backup dos arquivos existentes')
+  .action(updateCommand)
+
 // Comando: adk feature
 const feature = program
   .command('feature')
@@ -36,7 +51,10 @@ feature
   .description('Cria nova feature com PRD e tasks')
   .option('-p, --priority <priority>', 'Prioridade (P0-P4)', 'P1')
   .option('-c, --context <file>', 'Arquivo de contexto adicional')
-  .action((name, description, options) => featureCommand.create(name, { ...options, description }))
+  .option('-d, --desc <description>', 'Descrição da feature (alternativa ao argumento posicional)')
+  .action((name, description, options) =>
+    featureCommand.create(name, { ...options, description: options.desc || description })
+  )
 
 feature
   .command('research <name> [description]')
@@ -59,20 +77,23 @@ feature
 
 feature
   .command('implement <name>')
-  .description('Implementa feature seguindo TDD')
+  .description('Implementa feature seguindo TDD (sempre em worktree isolado)')
   .option('--phase <phase>', 'Fase específica para implementar')
   .option('--skip-spec', 'Pula validação de spec (não recomendado)')
-  .action((name, options) => featureCommand.implement(name, options))
+  .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
+  .action((name, options) => featureCommand.implement(name, { ...options, baseBranch: options.baseBranch }))
 
 feature
   .command('qa <name>')
-  .description('Executa revisão de qualidade (QA)')
-  .action((name) => featureCommand.qa(name))
+  .description('Executa revisão de qualidade (QA) - requer worktree')
+  .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
+  .action((name, options) => featureCommand.qa(name, { baseBranch: options.baseBranch }))
 
 feature
   .command('docs <name>')
-  .description('Gera/atualiza documentação da feature')
-  .action((name) => featureCommand.docs(name))
+  .description('Gera/atualiza documentação da feature - requer worktree')
+  .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
+  .action((name, options) => featureCommand.docs(name, { baseBranch: options.baseBranch }))
 
 feature
   .command('list')
@@ -80,13 +101,25 @@ feature
   .action(() => featureCommand.list())
 
 feature
+  .command('next')
+  .alias('n')
+  .description('Executa próxima etapa da feature ativa (sem confirmação)')
+  .action(() => featureCommand.next())
+
+feature
   .command('autopilot <name> [description]')
   .description(
-    'Executa fluxo completo automatizado: PRD → Research → Tasks → Arquitetura → Implementação → QA → Documentação'
+    'Executa fluxo completo automatizado em worktree isolado: PRD → Research → Tasks → Arquitetura → Implementação → QA → Documentação'
   )
   .option('-c, --context <file>', 'Arquivo de contexto adicional')
+  .option('-d, --desc <description>', 'Descrição da feature (alternativa ao argumento posicional)')
+  .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
   .action((name, description, options) =>
-    featureCommand.autopilot(name, { ...options, description })
+    featureCommand.autopilot(name, {
+      ...options,
+      description: options.desc || description,
+      baseBranch: options.baseBranch,
+    })
   )
 
 // Comando: adk quick - tarefas rápidas sem processo formal
