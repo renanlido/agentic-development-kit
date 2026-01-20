@@ -76,11 +76,11 @@ export async function initCommand(options: InitOptions): Promise<void> {
     logger.success(`Projeto ${projectName} inicializado com sucesso!`)
     console.log()
     console.log(chalk.cyan('Estrutura ADK incluida:'))
-    console.log(chalk.gray('  - 7 agentes especializados'))
+    console.log(chalk.gray('  - 9 agentes especializados'))
     console.log(chalk.gray('  - 4 skills com templates'))
-    console.log(chalk.gray('  - 6 slash commands'))
+    console.log(chalk.gray('  - 9 slash commands'))
     console.log(chalk.gray('  - 4 rules de qualidade'))
-    console.log(chalk.gray('  - 5 hooks (foco, escopo, validacao, format, estado)'))
+    console.log(chalk.gray('  - 6 hooks (foco, escopo, validacao, format, estado, session)'))
     console.log()
     console.log(chalk.cyan('Proximos passos:'))
     console.log(chalk.gray('  claude              # Abrir Claude Code'))
@@ -103,6 +103,8 @@ async function createCADDStructure(projectPath: string): Promise<void> {
     '.claude/agents',
     '.claude/skills',
     '.claude/commands',
+    '.claude/hooks',
+    '.claude/rules',
     '.claude/decisions',
     '.claude/incidents/post-mortems',
     '.claude/templates',
