@@ -9,6 +9,10 @@ import type {
 } from './types.js'
 import { CLICKUP_API_BASE_URL } from './types.js'
 
+/**
+ * Error thrown when ClickUp API requests fail.
+ * Includes HTTP status code and optional ClickUp error code (ECODE).
+ */
 export class ClickUpApiError extends Error {
   constructor(
     message: string,
@@ -20,6 +24,11 @@ export class ClickUpApiError extends Error {
   }
 }
 
+/**
+ * HTTP client for ClickUp API v2.
+ * Handles authentication, rate limiting, and request/response handling.
+ * Rate limit: 100 requests/minute per token.
+ */
 export class ClickUpClient {
   private readonly baseUrl = CLICKUP_API_BASE_URL
   private readonly token: string

@@ -19,6 +19,11 @@ interface QueueFile {
 
 const QUEUE_VERSION = '1.0.0'
 
+/**
+ * Queue for offline sync operations.
+ * Persists to .adk/sync-queue.json, survives across sessions.
+ * Operations are processed FIFO with retry support (max 3 retries).
+ */
 export interface SyncQueue {
   enqueue(operation: QueuedOperation): Promise<QueuedOperation>
   dequeue(): Promise<QueuedOperation | null>

@@ -19,6 +19,11 @@ export interface ConflictResolution {
   unresolvedConflicts: SyncConflict[]
 }
 
+/**
+ * Detects conflicts between local and remote feature state.
+ * Compares name, phase, and progress fields, returning an array of conflicts.
+ * Empty array means no conflicts - safe to sync.
+ */
 export async function detectConflicts(
   local: LocalFeature,
   remote: RemoteFeature
@@ -65,6 +70,11 @@ function parseTimestamp(timestamp: string): number {
   return Number.isNaN(parsed) ? 0 : parsed
 }
 
+/**
+ * Resolves conflicts using the specified strategy.
+ * Returns a ConflictResolution with resolved data and metadata.
+ * For 'manual' strategy, returns requiresManualResolution=true without resolving.
+ */
 export async function resolveConflicts(
   conflicts: SyncConflict[],
   strategy: ConflictStrategy

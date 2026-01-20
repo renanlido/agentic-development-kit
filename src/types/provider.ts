@@ -104,6 +104,17 @@ export interface SyncMetadata {
   pendingChanges: string[]
 }
 
+/**
+ * Interface for project management platform integrations.
+ * Implement this to add support for new platforms (ClickUp, Jira, Linear, etc).
+ *
+ * @example
+ * class MyProvider implements ProjectProvider {
+ *   readonly name = 'myprovider'
+ *   readonly displayName = 'My Provider'
+ *   // ... implement all methods
+ * }
+ */
 export interface ProjectProvider {
   readonly name: string
   readonly displayName: string
@@ -123,6 +134,10 @@ export interface ProjectProvider {
   getFeature(remoteId: string): Promise<RemoteFeature | null>
   deleteFeature(remoteId: string): Promise<void>
 
+  /**
+   * Smart sync: creates if no remoteId, updates if remoteId exists.
+   * This is the primary method called during feature lifecycle operations.
+   */
   syncFeature(feature: LocalFeature, remoteId?: string): Promise<SyncResult>
   getRemoteChanges(since: Date): Promise<RemoteFeature[]>
 }

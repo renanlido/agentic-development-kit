@@ -2,10 +2,18 @@ import type { LocalFeature, RemoteFeature } from '../../types/provider.js'
 import type { ClickUpTask, CreateTaskPayload, UpdateTaskPayload } from './types.js'
 import { ADK_PHASE_TO_CLICKUP_STATUS, CLICKUP_STATUS_TO_ADK_PHASE } from './types.js'
 
+/**
+ * Converts ADK feature phase to ClickUp task status.
+ * @example phaseToStatus('implement') // Returns 'in progress'
+ */
 export function phaseToStatus(phase: string): string {
   return ADK_PHASE_TO_CLICKUP_STATUS[phase.toLowerCase()] || 'to do'
 }
 
+/**
+ * Converts ClickUp task status to ADK feature phase.
+ * @example statusToPhase('in progress') // Returns 'implement'
+ */
 export function statusToPhase(status: string): string {
   const normalizedStatus = status.toLowerCase()
   return CLICKUP_STATUS_TO_ADK_PHASE[normalizedStatus] || 'prd'
@@ -16,6 +24,10 @@ export function progressToCustomField(progress: number): { value: number } {
   return { value: clampedValue }
 }
 
+/**
+ * Transforms a LocalFeature into a ClickUp CreateTaskPayload.
+ * Maps phase to status and builds a markdown description with feature metadata.
+ */
 export function featureToTask(feature: LocalFeature): CreateTaskPayload {
   const status = phaseToStatus(feature.phase)
 
@@ -58,6 +70,10 @@ export function featureToUpdatePayload(feature: Partial<LocalFeature>): UpdateTa
   return payload
 }
 
+/**
+ * Transforms a ClickUp task into a RemoteFeature.
+ * Extracts progress from custom fields and maps status to ADK phase.
+ */
 export function taskToFeature(task: ClickUpTask): RemoteFeature {
   const phase = statusToPhase(task.status.status)
 
