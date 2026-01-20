@@ -23,6 +23,8 @@ import {
   saveProgress,
   updateStepStatus,
 } from '../utils/progress'
+import { SyncEngine } from '../utils/sync-engine'
+import { HistoryTracker } from '../utils/history-tracker'
 import { parseSpecFromMarkdown, validateSpec } from '../utils/spec-utils'
 import { loadTemplate } from '../utils/templates'
 import { memoryCommand } from './memory'
@@ -203,6 +205,27 @@ path: ${featurePath}
       }
     } catch (error) {
       logger.warn(`Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  private async syncProgressState(
+    name: string,
+    fromPhase: string,
+    toPhase: string,
+    trigger: string
+  ): Promise<void> {
+    try {
+      const syncEngine = new SyncEngine({ strategy: 'merge' })
+      await syncEngine.sync(name)
+
+      const historyTracker = new HistoryTracker()
+      await historyTracker.recordTransition(name, {
+        timestamp: new Date().toISOString(),
+        fromPhase,
+        toPhase,
+        trigger,
+      })
+    } catch {
     }
   }
 
@@ -886,6 +909,7 @@ Estrutura do research.md:
 
       progress = updateStepStatus(progress, 'research', 'completed')
       await saveProgress(name, progress)
+      await this.syncProgressState(name, 'prd', 'research', 'adk feature research')
 
       await this.setActiveFocus(name, 'research feito')
       await memoryCommand.save(name, { phase: 'research' })
@@ -1026,6 +1050,7 @@ IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
 
       progress = updateStepStatus(progress, 'arquitetura', 'completed')
       await saveProgress(name, progress)
+      await this.syncProgressState(name, 'tasks', 'arquitetura', 'adk feature plan')
 
       await this.setActiveFocus(name, 'arquitetura pronta')
       await memoryCommand.save(name, { phase: 'plan' })
@@ -1158,6 +1183,7 @@ IMPORTANTE:
 
       progress = updateStepStatus(progress, 'tasks', 'completed')
       await saveProgress(name, progress)
+      await this.syncProgressState(name, 'research', 'tasks', 'adk feature tasks')
 
       await this.setActiveFocus(name, 'tasks definidas')
       await memoryCommand.save(name, { phase: 'tasks' })
@@ -1339,6 +1365,7 @@ Não avance para próxima fase até atual estar completa.
 
       progress = updateStepStatus(progress, 'implementacao', 'completed')
       await saveProgress(name, progress)
+      await this.syncProgressState(name, 'arquitetura', 'implementacao', 'adk feature implement')
 
       await this.setActiveFocus(name, 'implementação em andamento')
       await memoryCommand.save(name, { phase: 'implement' })
@@ -1537,6 +1564,7 @@ Se encontrar issues CRITICAL ou HIGH, o status deve ser FAIL.
 
       progress = updateStepStatus(progress, 'qa', 'completed')
       await saveProgress(name, progress)
+      await this.syncProgressState(name, 'implementacao', 'qa', 'adk feature qa')
 
       await this.setActiveFocus(name, 'qa concluído')
       await memoryCommand.save(name, { phase: 'qa' })
@@ -1689,6 +1717,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 
       progress = updateStepStatus(progress, 'docs', 'completed')
       await saveProgress(name, progress)
+      await this.syncProgressState(name, 'qa', 'docs', 'adk feature docs')
 
       await this.setActiveFocus(name, 'documentação concluída')
       await memoryCommand.save(name, { phase: 'docs' })
@@ -1827,6 +1856,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 
       progress = updateStepStatus(progress, 'finish', 'completed')
       await saveProgress(name, progress)
+      await this.syncProgressState(name, 'docs', 'finish', 'adk feature finish')
 
       await this.setActiveFocus(name, 'finalizada')
       await memoryCommand.save(name, { phase: 'finish' })

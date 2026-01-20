@@ -275,7 +275,7 @@ describe('ProgressConflict', () => {
       }
 
       const inconsistencies = detectInconsistencies(state)
-      const result = resolveInconsistencies(state, inconsistencies, 'merge')
+      resolveInconsistencies(state, inconsistencies, 'merge')
 
       // Original data should be preserved
       expect(state.tasks[0].notes).toBe('Important note')

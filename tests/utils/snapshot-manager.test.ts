@@ -37,7 +37,7 @@ describe('SnapshotManager', () => {
       await fs.ensureDir(path.dirname(progressPath))
       await fs.writeFile(progressPath, '# Progress content')
 
-      const snapshotId = await manager.createSnapshot(featureName, 'test')
+      await manager.createSnapshot(featureName, 'test')
 
       const snapshots = await manager.listSnapshots(featureName)
       expect(snapshots[0].files).toContain('progress.md')
@@ -51,7 +51,7 @@ describe('SnapshotManager', () => {
       await fs.ensureDir(path.dirname(tasksPath))
       await fs.writeFile(tasksPath, '# Tasks content')
 
-      const snapshotId = await manager.createSnapshot(featureName, 'test')
+      await manager.createSnapshot(featureName, 'test')
 
       const snapshots = await manager.listSnapshots(featureName)
       expect(snapshots[0].files).toContain('tasks.md')
@@ -65,7 +65,7 @@ describe('SnapshotManager', () => {
       await fs.ensureDir(path.dirname(statePath))
       await fs.writeJSON(statePath, { feature: featureName })
 
-      const snapshotId = await manager.createSnapshot(featureName, 'test')
+      await manager.createSnapshot(featureName, 'test')
 
       const snapshots = await manager.listSnapshots(featureName)
       expect(snapshots[0].files).toContain('state.json')
@@ -92,8 +92,6 @@ describe('SnapshotManager', () => {
 
       await manager.createSnapshot(featureName, 'test')
 
-      const snapshotPath = manager.getSnapshotPath(featureName)
-      const files = await fs.readdir(snapshotPath)
       const snapshots = await manager.listSnapshots(featureName)
 
       expect(snapshots[0].files).not.toContain('.env')

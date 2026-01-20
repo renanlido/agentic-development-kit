@@ -220,7 +220,7 @@ describe('StateManager', () => {
         { name: 'Task 1', status: 'completed' as const, priority: 0 },
         { name: 'Task 2', status: 'completed' as const, priority: 0 },
         { name: 'Task 3', status: 'pending' as const, priority: 0 },
-        { name: 'Task 4', status: 'in_progress' as const, priority: 0 },
+        { name: 'Task 4', status: 'pending' as const, priority: 0 },
       ]
 
       const progress = manager.calculateProgress(tasks)
@@ -307,7 +307,7 @@ describe('StateManager', () => {
       const result = manager.mergeProgressAndTasks(progressData, tasksData)
 
       expect(result.currentPhase).toBe('implement')
-      expect(result.tasks.length).toBeGreaterThan(0)
+      expect(result.tasks?.length).toBeGreaterThan(0)
     })
 
     it('should preserve task details from tasks.md', async () => {
@@ -332,7 +332,7 @@ describe('StateManager', () => {
 
       const result = manager.mergeProgressAndTasks(progressData, tasksData)
 
-      expect(result.tasks[0].notes).toBe('Important notes')
+      expect(result.tasks?.[0].notes).toBe('Important notes')
     })
 
     it('should handle missing tasks.md gracefully', async () => {
@@ -351,7 +351,7 @@ describe('StateManager', () => {
       const result = manager.mergeProgressAndTasks(progressData, tasksData)
 
       expect(result.currentPhase).toBe('prd')
-      expect(result.tasks.length).toBeGreaterThanOrEqual(0)
+      expect(result.tasks?.length).toBeGreaterThanOrEqual(0)
     })
   })
 

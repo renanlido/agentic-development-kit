@@ -112,7 +112,7 @@ describe('SyncEngine', () => {
 - [ ] Task 2
 `)
 
-      const result = await engine.sync(featureName)
+      await engine.sync(featureName)
 
       const progressExists = await fs.pathExists(path.join(featurePath, 'progress.md'))
       const tasksExists = await fs.pathExists(path.join(featurePath, 'tasks.md'))

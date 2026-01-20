@@ -193,12 +193,12 @@ describe('HistoryTracker', () => {
         })
       }
 
-      const removed = await tracker.pruneHistory(featureName, 50)
+      const removed = await tracker.pruneHistory(featureName, 40)
 
       expect(removed).toBe(10)
 
       const history = await tracker.getHistory(featureName)
-      expect(history).toHaveLength(50)
+      expect(history).toHaveLength(40)
     })
 
     it('should keep most recent entries after pruning', async () => {

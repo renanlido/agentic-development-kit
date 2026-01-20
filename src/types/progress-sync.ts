@@ -3,7 +3,7 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked'
 export interface TaskState {
   name: string
   status: TaskStatus
-  priority: number
+  priority?: number
   phase?: string
   notes?: string
   startedAt?: string
@@ -114,8 +114,11 @@ export interface SnapshotMeta {
 
 // Simple validators for testing
 function validateTaskState(data: any): TaskState {
-  if (!data.name || !data.status || typeof data.priority !== 'number') {
+  if (!data.name || !data.status) {
     throw new Error('Invalid TaskState')
+  }
+  if (data.priority !== undefined && typeof data.priority !== 'number') {
+    throw new Error('Invalid TaskState: priority must be a number')
   }
   const validStatuses = ['pending', 'in_progress', 'completed', 'blocked']
   if (!validStatuses.includes(data.status)) {
