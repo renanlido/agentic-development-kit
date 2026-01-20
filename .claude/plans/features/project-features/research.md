@@ -592,3 +592,76 @@ IMPORTANT: <critical constraints>
 2. Definir interface TypeScript para novos tipos
 3. Criar stubs dos novos arquivos
 4. Implementar em ordem de menor para maior risco
+
+---
+
+## Descobertas Adicionais (2026-01-20)
+
+### Contexto do Refinamento
+
+Avaliacao solicitada: verificar se o comando `adk feature refine` esta bem implementado e funcional, e se permite refinamento seletivo de artefatos individuais.
+
+### Novos Insights
+
+**1. Arquitetura do Comando Refine**
+
+O comando `refine` foi implementado com uma arquitetura bem estruturada:
+
+| Componente | Arquivo | Funcao |
+|------------|---------|--------|
+| Tipos | `src/types/refine.ts` | RefineOptions, RefinableArtifact, RefineResult, TaskRefineResult |
+| Utilitarios | `src/utils/task-refiner.ts` | analyzeTasksForRefinement, loadTasksForFeature, buildRefineTasksPrompt |
+| Comando | `src/commands/feature.ts` | Metodo `refine()` com logica principal |
+| CLI | `src/cli.ts` | Registro com opcoes --prd, --research, --tasks, --all, --cascade |
+| Slash Command | `.claude/commands/refine.md` | Template interativo |
+
+**2. Capacidade de Refinamento Seletivo**
+
+O sistema suporta refinamento granular atraves de flags:
+
+```bash
+adk feature refine <nome> --prd       # Apenas PRD
+adk feature refine <nome> --research  # Apenas Research
+adk feature refine <nome> --tasks     # Apenas Tasks pendentes
+adk feature refine <nome> --all       # Todos elegiveis
+adk feature refine <nome>             # Modo interativo (pergunta ao usuario)
+```
+
+**3. Mecanismos de Seguranca Identificados**
+
+- **Snapshot pre-refine**: Cria backup antes de qualquer modificacao via SnapshotManager
+- **Preservacao de tasks**: Tasks com status `completed` ou `in_progress` sao automaticamente protegidas
+- **Cascata opcional**: Propagacao de mudancas do PRD para Tasks e configuravel
+
+**4. Pattern de Analise de Artefatos**
+
+```typescript
+async analyzeRefinableArtifacts(name: string, state: FeatureState): Promise<RefinableArtifact[]>
+```
+
+O sistema analisa cada artefato antes de permitir refinamento, verificando:
+- Existencia do arquivo
+- Status das tasks (completed/in_progress vs pending)
+- Elegibilidade para modificacao
+
+### Riscos Atualizados
+
+| Risco | Status | Observacao |
+|-------|--------|------------|
+| Comando refine nao funcional | ❌ Mitigado | Implementacao completa e funcional |
+| Refinamento destrutivo | ❌ Mitigado | Snapshot + preservacao de tasks |
+| Falta de granularidade | ❌ Mitigado | Flags permitem selecao individual |
+
+### Recomendacoes Futuras
+
+1. **--dry-run**: Adicionar flag para preview de mudancas antes de aplicar
+2. **--force**: Flag para sobrescrever protecoes em casos especiais
+3. **Historico de refinamentos**: Log de todas as operacoes de refinamento em history.json
+
+### Status de Implementacao
+
+Com base na avaliacao, o sistema de refinamento esta:
+- ✅ Funcional
+- ✅ Bem arquitetado
+- ✅ Com mecanismos de seguranca
+- ✅ Granular (permite selecao individual)

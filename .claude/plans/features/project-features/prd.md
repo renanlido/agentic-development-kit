@@ -603,3 +603,71 @@ O improvement report final deve conter:
 - Qodo: "How AI Code Assistants Are Revolutionizing TDD"
 - Cloud Security Alliance: "Cognitive Degradation Resilience Framework"
 - IBM: "The 2026 Guide to Prompt Engineering"
+
+---
+
+## Refinamento (2026-01-20)
+
+### Contexto Adicional
+
+Avaliacao solicitada: verificar se `adk feature refine <feature> --context` esta bem implementado e funcional, e se e possivel refinar apenas uma etapa ao inves de todas.
+
+### Analise Realizada
+
+**Implementacao Existente:**
+
+A funcionalidade de refinamento esta bem implementada com a seguinte arquitetura:
+
+| Arquivo | Responsabilidade |
+|---------|------------------|
+| `src/types/refine.ts` | Tipos TypeScript (RefineOptions, RefinableArtifact, RefineResult) |
+| `src/utils/task-refiner.ts` | Funcoes utilitarias para refinamento de tasks |
+| `src/commands/feature.ts` | Metodo `refine()` com logica principal |
+| `.claude/commands/refine.md` | Slash command para uso interativo |
+| `src/cli.ts` | Registro do comando com opcoes |
+
+**Opcoes Disponiveis:**
+
+```bash
+adk feature refine <name> [opcoes]
+
+Opcoes:
+  --prd           Refinar apenas PRD
+  --research      Refinar apenas Research
+  --tasks         Refinar apenas Tasks pendentes
+  --all           Refinar todos os artefatos elegiveis
+  --cascade       Propagar mudancas para fases seguintes
+  --no-cascade    Nao propagar mudancas
+  -c, --context   Contexto adicional inline
+  -m, --model     Modelo a usar (opus, sonnet, haiku)
+```
+
+**Resposta a Pergunta do Usuario:**
+
+✅ **SIM**, e possivel refinar apenas uma etapa ao inves de todas:
+- `adk feature refine <nome> --prd` → refina apenas o PRD
+- `adk feature refine <nome> --research` → refina apenas o Research
+- `adk feature refine <nome> --tasks` → refina apenas as Tasks pendentes
+- `adk feature refine <nome> --all` → refina todos os artefatos elegiveis
+- Sem flags → modo interativo pergunta quais artefatos refinar
+
+**Mecanismos de Seguranca:**
+
+1. **Snapshot pre-refine**: Cria snapshot antes de qualquer modificacao
+2. **Preservacao de tasks**: Tasks com status `completed` ou `in_progress` sao preservadas automaticamente
+3. **Cascata opcional**: Propagacao de mudancas e configuravel (default pergunta ao usuario)
+
+### Mudancas Aplicadas
+
+Nenhuma mudanca de codigo necessaria - a implementacao atende aos requisitos.
+
+### Impacto em Outras Fases
+
+- **Tasks**: Adicionar documentacao de uso do comando `refine` no guia do usuario
+- **QA**: Incluir testes de refinamento seletivo no checklist de validacao
+
+### Recomendacoes Futuras
+
+1. Adicionar flag `--dry-run` para preview das mudancas antes de aplicar
+2. Considerar `--interactive` explicito para forcar modo interativo mesmo com flags
+3. Documentar exemplos de uso no README ou help do comando

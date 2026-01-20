@@ -4,7 +4,7 @@
 **Status:** In Progress
 **Total Tasks:** 52
 **Fases:** 7
-**Progresso:** 48/52 tasks (92%)
+**Progresso:** 29/52 tasks (56%)
 
 ---
 
@@ -316,214 +316,214 @@
 
 ---
 
-## Fase 5: CDR - Resiliencia (Alto Risco) ✅ COMPLETA
+## Fase 5: CDR - Resiliencia (Alto Risco)
 
-### Task 5.1: Definir tipos para CDR ✅
+### Task 5.1: Definir tipos para CDR
 - Tipo: Implementation
 - Prioridade: P0
 - Dependencias: nenhuma
 - Acceptance Criteria:
-  - [x] Criar `src/types/cdr.ts`
-  - [x] Interface `HealthProbe` (phase, status, metrics)
-  - [x] Interface `RecoveryCheckpoint` (phase, state, timestamp)
-  - [x] Interface `RetryConfig` (maxRetries, backoffMs, maxBackoffMs)
+  - [ ] Criar `src/types/cdr.ts`
+  - [ ] Interface `HealthProbe` (phase, status, metrics)
+  - [ ] Interface `RecoveryCheckpoint` (phase, state, timestamp)
+  - [ ] Interface `RetryConfig` (maxRetries, backoffMs, maxBackoffMs)
 
-### Task 5.2: Testes para health probes ✅
+### Task 5.2: Testes para health probes
 - Tipo: Test
 - Prioridade: P0
 - Dependencias: Task 5.1
 - Acceptance Criteria:
-  - [x] Testes para `startHealthProbe(phase)` em `tests/utils/health-probes.test.ts`
-  - [x] Teste de monitoramento de tempo por fase
-  - [x] Teste de callback em anomalia
-  - [x] Teste de token pressure warning (80%)
-  - [x] Mock de timers (jest.useFakeTimers)
-  - [x] 33 testes passando
+  - [ ] Testes para `startHealthProbe(phase)` em `src/utils/__tests__/health-probes.test.ts`
+  - [ ] Teste de monitoramento de tempo por fase
+  - [ ] Teste de callback em anomalia
+  - [ ] Teste de token pressure warning (80%)
+  - [ ] Mock de timers (jest.useFakeTimers)
 
-### Task 5.3: Implementar health probes ✅
+### Task 5.3: Implementar health probes
 - Tipo: Implementation
 - Prioridade: P0
 - Dependencias: Task 5.2
 - Acceptance Criteria:
-  - [x] Criar `src/utils/health-probes.ts`
-  - [x] Funcao `startHealthProbe(phase, callback)` inicia monitoramento
-  - [x] Funcao `stopHealthProbe(probeId)` para parada
-  - [x] Metricas: duration, tokenEstimate, errorCount
-  - [x] Intervalo: 30s (configuravel)
-  - [x] Todos testes passando
+  - [ ] Criar `src/utils/health-probes.ts`
+  - [ ] Funcao `startHealthProbe(phase, callback)` inicia monitoramento
+  - [ ] Funcao `stopHealthProbe(probeId)` para parada
+  - [ ] Metricas: duration, tokenEstimate, errorCount
+  - [ ] Intervalo: 30s (configuravel)
+  - [ ] Todos testes passando
 
-### Task 5.4: Testes para retry com backoff ✅
+### Task 5.4: Testes para retry com backoff
 - Tipo: Test
 - Prioridade: P0
 - Dependencias: Task 5.1
 - Acceptance Criteria:
-  - [x] Testes para `retryWithBackoff(fn, config)`
-  - [x] Teste de retry ate 3x
-  - [x] Teste de backoff exponencial (1s, 2s, 4s)
-  - [x] Teste de sucesso na N-esima tentativa
-  - [x] Teste de falha apos max retries
+  - [ ] Testes para `retryWithBackoff(fn, config)`
+  - [ ] Teste de retry ate 3x
+  - [ ] Teste de backoff exponencial (1s, 2s, 4s)
+  - [ ] Teste de sucesso na N-esima tentativa
+  - [ ] Teste de falha apos max retries
 
-### Task 5.5: Implementar retry com backoff ✅
+### Task 5.5: Implementar retry com backoff
 - Tipo: Implementation
 - Prioridade: P0
 - Dependencias: Task 5.4
 - Acceptance Criteria:
-  - [x] Adicionar em `src/utils/recovery.ts`
-  - [x] Funcao `retryWithBackoff<T>(fn, config)` generica
-  - [x] Backoff exponencial: baseMs * 2^attempt
-  - [x] Max retries: 3 (default)
-  - [x] Todos testes passando
+  - [ ] Adicionar em `src/utils/recovery.ts`
+  - [ ] Funcao `retryWithBackoff<T>(fn, config)` generica
+  - [ ] Backoff exponencial: baseMs * 2^attempt
+  - [ ] Max retries: 3 (default)
+  - [ ] Todos testes passando
 
-### Task 5.6: Testes para recovery checkpoints ✅
+### Task 5.6: Testes para recovery checkpoints
 - Tipo: Test
 - Prioridade: P1
 - Dependencias: Task 5.1
 - Acceptance Criteria:
-  - [x] Teste de criar checkpoint
-  - [x] Teste de restaurar checkpoint
-  - [x] Teste de limite de 5 checkpoints
-  - [x] Teste de auto-cleanup de antigos
-  - [x] Usando filesystem real em diretorio de teste
+  - [ ] Teste de criar checkpoint
+  - [ ] Teste de restaurar checkpoint
+  - [ ] Teste de limite de 5 checkpoints
+  - [ ] Teste de auto-cleanup de antigos
+  - [ ] Mock de filesystem
 
-### Task 5.7: Implementar recovery checkpoints ✅
+### Task 5.7: Implementar recovery checkpoints
 - Tipo: Implementation
 - Prioridade: P1
 - Dependencias: Task 5.6
 - Acceptance Criteria:
-  - [x] Criar `src/utils/recovery.ts`
-  - [x] Funcao `createCheckpoint(feature, phase, state)`
-  - [x] Funcao `restoreCheckpoint(feature, phase)`
-  - [x] Persistir em `.claude/plans/features/<feature>/checkpoints/`
-  - [x] Limite de 5 checkpoints por feature
-  - [x] 33 testes passando
+  - [ ] Criar `src/utils/recovery.ts`
+  - [ ] Funcao `createCheckpoint(feature, phase, state)`
+  - [ ] Funcao `restoreCheckpoint(feature, phase)`
+  - [ ] Persistir em `.claude/plans/features/<feature>/checkpoints/`
+  - [ ] Limite de 5 checkpoints por feature
+  - [ ] Todos testes passando
 
-### Task 5.8: Testes para fallback templates ✅
+### Task 5.8: Testes para fallback templates
 - Tipo: Test
 - Prioridade: P1
 - Dependencias: nenhuma
 - Acceptance Criteria:
-  - [x] Teste de carregamento de template fallback
-  - [x] Teste de validacao read-only
-  - [x] Teste de uso quando agent falha 3x
-  - [x] 25 testes passando
+  - [ ] Teste de carregamento de template fallback
+  - [ ] Teste de validacao read-only
+  - [ ] Teste de uso quando agent falha 3x
 
-### Task 5.9: Implementar fallback templates ✅
+### Task 5.9: Implementar fallback templates
 - Tipo: Implementation
 - Prioridade: P1
 - Dependencias: Task 5.8
 - Acceptance Criteria:
-  - [x] Templates em `templates/fallback/`
-  - [x] Templates para cada fase (prd, research, planning, implement, qa, validation, docs)
-  - [x] Funcao `loadFallbackTemplate(phase)`
-  - [x] Validacao de integridade do template
-  - [x] Todos testes passando
+  - [ ] Templates em `templates/fallback/`
+  - [ ] Templates para cada fase (prd, research, plan, implement)
+  - [ ] Funcao `loadFallbackTemplate(phase)`
+  - [ ] Validacao de integridade do template
+  - [ ] Todos testes passando
 
-### Task 5.10: Integrar CDR em feature command ✅
+### Task 5.10: Integrar CDR em feature command
 - Tipo: Implementation
 - Prioridade: P1
 - Dependencias: Task 5.5, Task 5.7, Task 5.9
 - Acceptance Criteria:
-  - [x] Criar `src/utils/cdr-integration.ts` com wrapper unificado
-  - [x] Funcao `executeWithCDR(fn, options)` com retry, checkpoint e fallback
-  - [x] Funcao `recoverPhase(feature, phase, resumeFn)` para recuperacao
-  - [x] Funcao `validatePhaseHealth(feature, phase)` para validacao
-  - [x] 13 testes passando
+  - [ ] Modificar `src/commands/feature.ts`
+  - [ ] Wrap de cada fase com retry
+  - [ ] Criar checkpoint antes de cada fase
+  - [ ] Fallback para template se falhar 3x
+  - [ ] Todos testes passando
 
 ---
 
-## Fase 6: Quality Gates (Medio Risco) ✅ COMPLETA
+## Fase 6: Quality Gates (Medio Risco)
 
-### Task 6.1: Definir tipos para Quality Scoring ✅
+### Task 6.1: Definir tipos para Quality Scoring
 - Tipo: Implementation
 - Prioridade: P0
 - Dependencias: nenhuma
 - Acceptance Criteria:
-  - [x] Tipos em `src/utils/quality-gates.ts` (DebtItem, RiskFactors, ConfidenceFactors)
-  - [x] Tipos em `src/utils/ai-review.ts` (ReviewFinding, Severity, Agreement, Disagreement)
-  - [x] Interface `QualityGateResult` (passed, riskScore, threshold, recommendation)
+  - [ ] Criar `src/types/quality.ts`
+  - [ ] Interface `QualityScore` (risk, confidence, debt)
+  - [ ] Interface `ReviewFinding` (severity, category, message)
+  - [ ] Interface `DebtItem` (type, description, createdAt)
 
-### Task 6.2: Testes para quality scorer ✅
+### Task 6.2: Testes para quality scorer
 - Tipo: Test
 - Prioridade: P0
 - Dependencias: Task 6.1
 - Acceptance Criteria:
-  - [x] Testes em `tests/utils/quality-gates.test.ts`
-  - [x] Teste de weighted sum com pesos configurados
-  - [x] Teste de range 0-100
-  - [x] Teste de threshold (> 70 falha gate)
-  - [x] 20 testes passando
+  - [ ] Testes para `calculateRiskScore()` em `src/utils/__tests__/quality-scorer.test.ts`
+  - [ ] Teste de weighted sum (coverage 30%, lint 20%, security 30%, complexity 20%)
+  - [ ] Teste de range 0-100
+  - [ ] Teste de threshold (> 70 falha gate)
 
-### Task 6.3: Implementar quality scorer ✅
+### Task 6.3: Implementar quality scorer
 - Tipo: Implementation
 - Prioridade: P0
 - Dependencias: Task 6.2
 - Acceptance Criteria:
-  - [x] Criar `src/utils/quality-gates.ts`
-  - [x] Funcao `calculateOverallRiskScore(factors)` retorna 0-100
-  - [x] Funcao `calculateConfidenceScore(factors)` retorna 0-100
-  - [x] Classe `QualityGate` com metodo `evaluate()`
-  - [x] Todos testes passando
+  - [ ] Criar `src/utils/quality-scorer.ts`
+  - [ ] Funcao `calculateRiskScore(metrics)` retorna 0-100
+  - [ ] Funcao `calculateConfidenceScore(factors)` retorna 0-100
+  - [ ] Risk score baseado em coverage, lint, security, complexity
+  - [ ] Todos testes passando
 
-### Task 6.4: Testes para debt tracking ✅
+### Task 6.4: Testes para debt tracking
 - Tipo: Test
 - Prioridade: P2
 - Dependencias: Task 6.1
 - Acceptance Criteria:
-  - [x] Testes incluidos em quality-gates.test.ts
-  - [x] Teste de DebtItem com tipos (shortcut, hack, todo, workaround)
-  - [x] Teste de severity (low, medium, high)
+  - [ ] Teste de adicionar debt item
+  - [ ] Teste de listar debt por feature
+  - [ ] Teste de tipos de debt (TODO, skipped_test, workaround)
+  - [ ] Mock de filesystem
 
-### Task 6.5: Implementar debt tracking ✅
+### Task 6.5: Implementar debt tracking
 - Tipo: Implementation
 - Prioridade: P2
 - Dependencias: Task 6.4
 - Acceptance Criteria:
-  - [x] Interface `DebtItem` em quality-gates.ts
-  - [x] Tipos de debt: shortcut, hack, todo, workaround
-  - [x] Severidade: low, medium, high
-  - [x] Todos testes passando
+  - [ ] Funcao `trackDebt(feature, item)`
+  - [ ] Funcao `getDebt(feature)` retorna lista
+  - [ ] Persistir em `progress.json` ou arquivo separado
+  - [ ] Detectar TODOs automaticamente no codigo
+  - [ ] Todos testes passando
 
-### Task 6.6: Criar agent reviewer-secondary ✅
+### Task 6.6: Criar agent reviewer-secondary
 - Tipo: Implementation
 - Prioridade: P1
 - Dependencias: nenhuma
 - Acceptance Criteria:
-  - [x] Criar `templates/claude-structure/agents/reviewer-secondary.md`
-  - [x] Frontmatter com name, description, context: fork
-  - [x] Instructions para revisao cruzada
-  - [x] Foco em: bugs, security, performance, maintainability
+  - [ ] Criar `templates/claude-structure/agents/reviewer-secondary.md`
+  - [ ] Frontmatter com name, description, context: fork
+  - [ ] Instructions para revisao cruzada
+  - [ ] Foco em: bugs, security, performance, maintainability
 
-### Task 6.7: Testes para AI-on-AI review integration ✅
+### Task 6.7: Testes para AI-on-AI review integration
 - Tipo: Test
 - Prioridade: P1
 - Dependencias: Task 6.6
 - Acceptance Criteria:
-  - [x] Testes em `tests/utils/ai-review.test.ts`
-  - [x] Teste de consolidateReviews()
-  - [x] Teste de merge de findings
-  - [x] Teste de agreements e disagreements
-  - [x] 15 testes passando
+  - [ ] Teste de invocacao de secondary reviewer apos QA
+  - [ ] Teste de merge de findings
+  - [ ] Teste de diff entre revisores
+  - [ ] Mock de agent execution
 
-### Task 6.8: Integrar AI-on-AI review ✅
+### Task 6.8: Integrar AI-on-AI review no QA workflow
 - Tipo: Implementation
 - Prioridade: P1
 - Dependencias: Task 6.7
 - Acceptance Criteria:
-  - [x] Criar `src/utils/ai-review.ts`
-  - [x] Funcao `consolidateReviews(primary, secondary)`
-  - [x] Funcao `calculateAiReviewRisk(consolidated)`
-  - [x] Deteccao de agreements e disagreements
-  - [x] Todos testes passando
+  - [ ] Modificar `src/commands/workflow.ts`
+  - [ ] Invocar `reviewer-secondary` apos QA primario
+  - [ ] Consolidar findings em report unico
+  - [ ] Destacar conflitos entre revisores
+  - [ ] Todos testes passando
 
-### Task 6.9: Integrar scores no QA output ✅
+### Task 6.9: Integrar scores no QA output
 - Tipo: Implementation
 - Prioridade: P1
 - Dependencias: Task 6.3, Task 6.8
 - Acceptance Criteria:
-  - [x] Funcao `evaluateQualityGate()` em quality-gates.ts
-  - [x] Retorna recommendation: APPROVE, REVIEW, BLOCK
-  - [x] Gate falha automaticamente se risk > threshold (default 70)
-  - [x] Todos testes passando
+  - [ ] QA report inclui risk score
+  - [ ] QA report inclui confidence score
+  - [ ] Gate falha automaticamente se risk > 70
+  - [ ] Historico de scores em `progress.json`
+  - [ ] Todos testes passando
 
 ---
 

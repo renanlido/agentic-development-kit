@@ -2781,6 +2781,422 @@ NAO crie PRD, tasks, ou documentacao formal. Isso e uma tarefa rapida.
 
     await nextStep.method()
   }
+
+  async refine(name: string, options: RefineOptions = {}): Promise<void> {
+    const { analyzeTasksForRefinement, loadTasksForFeature } = await import('../utils/task-refiner.js')
+    const { SnapshotManager } = await import('../utils/snapshot-manager.js')
+
+    console.log()
+    console.log(chalk.bold.cyan('🔧 ADK Feature Refine'))
+    console.log(chalk.gray('━'.repeat(50)))
+
+    const spinner = ora('Analisando estado da feature...').start()
+
+    try {
+      const featurePath = this.getFeaturePath(name)
+      const state = await this.getFeatureState(name)
+
+      if (!state.exists) {
+        spinner.fail(`Feature "${name}" não encontrada`)
+        console.log(chalk.gray(`  Caminho esperado: ${featurePath}`))
+        process.exit(1)
+      }
+
+      const snapshotManager = new SnapshotManager()
+      await snapshotManager.createSnapshot(name, 'pre-refine')
+
+      const refinable = await this.analyzeRefinableArtifacts(name, state)
+      spinner.succeed('Análise concluída')
+
+      console.log()
+      console.log(chalk.cyan('📋 Artefatos que podem ser refinados:'))
+      console.log()
+
+      for (const artifact of refinable) {
+        const icon = artifact.canRefine ? chalk.green('✓') : chalk.yellow('⚠')
+        const reason = artifact.canRefine ? '' : chalk.gray(` (${artifact.reason})`)
+        const stats = artifact.taskStats
+          ? chalk.gray(` [${artifact.taskStats.completed}✓ ${artifact.taskStats.inProgress}~ ${artifact.taskStats.pending}○]`)
+          : ''
+        console.log(`   ${icon} ${artifact.name}${stats}${reason}`)
+      }
+
+      const canRefine = refinable.filter((a) => a.canRefine)
+      if (canRefine.length === 0) {
+        console.log()
+        console.log(chalk.yellow('Nenhum artefato pode ser refinado no momento.'))
+        return
+      }
+
+      let context = options.context || ''
+
+      if (!context) {
+        console.log()
+        const response = await inquirer.prompt([
+          {
+            type: 'editor',
+            name: 'context',
+            message: 'Adicione o contexto para refinamento (abrirá editor):',
+            default: '',
+          },
+        ])
+        context = response.context
+      }
+
+      if (!context || context.trim() === '') {
+        console.log(chalk.yellow('Refinamento cancelado - nenhum contexto fornecido.'))
+        return
+      }
+
+      console.log()
+      console.log(chalk.gray('Contexto recebido:'))
+      console.log(chalk.gray('─'.repeat(40)))
+      console.log(chalk.gray(context.substring(0, 200) + (context.length > 200 ? '...' : '')))
+      console.log(chalk.gray('─'.repeat(40)))
+      console.log()
+
+      const defaultTargets = options.all
+        ? canRefine.map((a) => a.type)
+        : options.prd
+          ? ['prd']
+          : options.research
+            ? ['research']
+            : options.tasks
+              ? ['tasks', 'tasks-pending']
+              : []
+
+      let targets: string[]
+      if (defaultTargets.length > 0) {
+        targets = defaultTargets.filter((t) => canRefine.some((c) => c.type === t))
+      } else {
+        const { selectedTargets } = await inquirer.prompt([
+          {
+            type: 'checkbox',
+            name: 'selectedTargets',
+            message: 'O que deseja refinar?',
+            choices: canRefine.map((a) => ({
+              name: a.name,
+              value: a.type,
+              checked: false,
+            })),
+          },
+        ])
+        targets = selectedTargets
+      }
+
+      if (targets.length === 0) {
+        console.log(chalk.yellow('Nenhum alvo selecionado para refinamento.'))
+        return
+      }
+
+      console.log()
+      const results: Array<{ target: string; success: boolean; changes: number }> = []
+
+      for (const target of targets) {
+        const refineSpinner = ora(`Refinando ${target}...`).start()
+
+        try {
+          if (target === 'prd') {
+            await this.refinePrd(name, context)
+            results.push({ target: 'PRD', success: true, changes: 1 })
+            refineSpinner.succeed(`PRD refinado`)
+          } else if (target === 'research') {
+            await this.refineResearch(name, context)
+            results.push({ target: 'Research', success: true, changes: 1 })
+            refineSpinner.succeed(`Research refinado`)
+          } else if (target === 'tasks' || target === 'tasks-pending') {
+            const tasksPath = path.join(featurePath, 'tasks.md')
+            const tasksData = await loadTasksForFeature(name)
+            const analysis = analyzeTasksForRefinement(tasksData.tasks)
+
+            const preservedInfo = analysis.preservedTasks.length > 0
+              ? `\n\nTasks que NAO podem ser modificadas (já iniciadas/completadas):\n${analysis.preservedTasks.map((t) => `- [${t.status === 'completed' ? 'x' : '~'}] ${t.name}`).join('\n')}`
+              : ''
+
+            const pendingInfo = analysis.pendingTasks.length > 0
+              ? `\n\nTasks pendentes que podem ser refinadas:\n${analysis.pendingTasks.map((t) => `- [ ] ${t.name}`).join('\n')}`
+              : '\n\nNão há tasks pendentes para refinar.'
+
+            const prompt = `FASE: REFINAMENTO DE TASKS
+
+Feature: ${name}
+Arquivo: ${tasksPath}
+
+## Contexto Adicional do Usuario
+${context}
+${preservedInfo}
+${pendingInfo}
+
+## Sua Tarefa
+
+1. Leia o arquivo tasks.md existente em: ${tasksPath}
+2. Analise as tasks e o contexto adicional fornecido
+3. Use a ferramenta Edit para:
+   - Refinar descricoes de tasks pendentes se necessario
+   - Adicionar NOVAS tasks ao final do arquivo com prefixo [REFINAMENTO]
+4. NAO modifique tasks marcadas como [x] (completed) ou [~] (in_progress)
+
+IMPORTANTE:
+- Use a ferramenta Edit para modificar o arquivo diretamente
+- Preserve todas as tasks existentes (completed e in_progress)
+- Novas tasks devem ter prefixo [REFINAMENTO] no nome
+- Mantenha o formato markdown com checkboxes
+- Ao finalizar, confirme as mudancas feitas
+
+## Acao Esperada
+
+Use Read para ler ${tasksPath}, depois use Edit para adicionar/modificar tasks.
+`
+
+            const modelType = getModelForPhase('planning', options.model as ModelType | undefined)
+            await executeClaudeCommand(prompt, { model: modelType })
+
+            results.push({
+              target: 'Tasks',
+              success: true,
+              changes: 1,
+            })
+            refineSpinner.succeed(`Tasks refinadas`)
+          }
+        } catch (error) {
+          refineSpinner.fail(`Erro ao refinar ${target}`)
+          results.push({ target, success: false, changes: 0 })
+          logger.error(error instanceof Error ? error.message : String(error))
+        }
+      }
+
+      if (targets.includes('prd') && !targets.includes('tasks') && state.hasTasks) {
+        let shouldCascade = options.cascade
+
+        if (shouldCascade === undefined) {
+          console.log()
+          const response = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'cascade',
+              message: 'PRD foi refinado. Deseja atualizar tasks baseado nas mudanças?',
+              default: true,
+            },
+          ])
+          shouldCascade = response.cascade
+        }
+
+        if (shouldCascade) {
+          const cascadeSpinner = ora('Atualizando tasks em cascata...').start()
+          try {
+            const tasksPath = path.join(featurePath, 'tasks.md')
+            const prdPath = path.join(featurePath, 'prd.md')
+            const tasksData = await loadTasksForFeature(name)
+            const analysis = analyzeTasksForRefinement(tasksData.tasks)
+
+            const preservedInfo = analysis.preservedTasks.length > 0
+              ? `\n\nTasks que NAO podem ser modificadas:\n${analysis.preservedTasks.map((t) => `- [${t.status === 'completed' ? 'x' : '~'}] ${t.name}`).join('\n')}`
+              : ''
+
+            const prompt = `FASE: CASCATA - ATUALIZACAO DE TASKS APOS REFINAMENTO DE PRD
+
+Feature: ${name}
+Arquivo PRD: ${prdPath}
+Arquivo Tasks: ${tasksPath}
+
+## Contexto
+O PRD foi refinado com o seguinte contexto:
+${context}
+
+Agora as tasks pendentes precisam ser atualizadas para refletir as mudancas no PRD.
+${preservedInfo}
+
+## Sua Tarefa
+
+1. Leia o PRD atualizado em: ${prdPath}
+2. Leia as tasks atuais em: ${tasksPath}
+3. Identifique novas tasks necessarias baseadas nas mudancas do PRD
+4. Use Edit para adicionar novas tasks com prefixo [CASCATA] ao final do arquivo tasks.md
+5. NAO modifique tasks existentes marcadas como [x] ou [~]
+
+IMPORTANTE:
+- Use a ferramenta Edit para modificar o arquivo diretamente
+- Novas tasks devem ter prefixo [CASCATA] no nome
+- Mantenha o formato markdown com checkboxes
+- Ao finalizar, confirme as mudancas feitas
+`
+
+            const modelType = getModelForPhase('planning', options.model as ModelType | undefined)
+            await executeClaudeCommand(prompt, { model: modelType })
+
+            cascadeSpinner.succeed(`Tasks atualizadas em cascata`)
+            results.push({ target: 'Tasks (cascata)', success: true, changes: 1 })
+          } catch (error) {
+            cascadeSpinner.fail('Erro na atualização em cascata')
+            logger.error(error instanceof Error ? error.message : String(error))
+          }
+        }
+      }
+
+      await this.syncProgressState(name, 'refine', state.currentStage, 'adk feature refine')
+
+      console.log()
+      console.log(chalk.green('✅ Refinamento concluído!'))
+      console.log()
+      console.log(chalk.cyan('Resumo:'))
+      for (const r of results) {
+        const icon = r.success ? chalk.green('✓') : chalk.red('✗')
+        const changes = r.success ? chalk.gray(` (${r.changes} alterações)`) : ''
+        console.log(`   ${icon} ${r.target}${changes}`)
+      }
+      console.log()
+    } catch (error) {
+      spinner.fail('Erro no refinamento')
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  private async analyzeRefinableArtifacts(name: string, state: FeatureState): Promise<RefinableArtifact[]> {
+    const { analyzeTasksForRefinement, loadTasksForFeature } = await import('../utils/task-refiner.js')
+    const result: RefinableArtifact[] = []
+
+    if (state.hasPrd) {
+      result.push({ type: 'prd', name: 'PRD', canRefine: true })
+    }
+
+    if (state.hasResearch) {
+      result.push({ type: 'research', name: 'Research', canRefine: true })
+    }
+
+    if (state.hasTasks) {
+      const tasksData = await loadTasksForFeature(name)
+      const analysis = analyzeTasksForRefinement(tasksData.tasks)
+
+      const total = tasksData.tasks.length
+      const pending = analysis.pendingTasks.length
+      const inProgress = tasksData.tasks.filter((t) => t.status === 'in_progress').length
+      const completed = tasksData.tasks.filter((t) => t.status === 'completed').length
+
+      if (analysis.canRefineAll) {
+        result.push({
+          type: 'tasks',
+          name: 'Tasks (todas)',
+          canRefine: true,
+          taskStats: { total, pending, inProgress, completed },
+        })
+      } else if (pending > 0) {
+        result.push({
+          type: 'tasks-pending',
+          name: `Tasks (${pending} pendentes)`,
+          canRefine: true,
+          taskStats: { total, pending, inProgress, completed },
+        })
+      } else {
+        result.push({
+          type: 'tasks',
+          name: 'Tasks',
+          canRefine: false,
+          reason: 'todas as tasks já foram completadas',
+          taskStats: { total, pending, inProgress, completed },
+        })
+      }
+    }
+
+    return result
+  }
+
+  private async refinePrd(name: string, context: string): Promise<void> {
+    const featurePath = this.getFeaturePath(name)
+    const prdPath = path.join(featurePath, 'prd.md')
+
+    const prompt = `FASE: REFINAMENTO DE PRD
+
+Feature: ${name}
+Arquivo: ${prdPath}
+
+## Contexto Adicional do Usuario
+${context}
+
+## Sua Tarefa
+
+1. Leia o arquivo PRD existente em: ${prdPath}
+2. Analise o conteudo e incorpore o contexto adicional fornecido
+3. Use a ferramenta Edit para adicionar uma secao "## Refinamento" ao FINAL do arquivo com:
+   - Data do refinamento: ${new Date().toISOString().split('T')[0]}
+   - Contexto adicional incorporado
+   - Impacto nas outras secoes (se houver)
+4. Se necessario, use Edit para atualizar secoes especificas afetadas pelo novo contexto
+
+IMPORTANTE:
+- Use a ferramenta Edit para modificar o arquivo diretamente
+- Mantenha a estrutura original do PRD
+- NAO remova conteudo existente, apenas adicione/modifique
+- NAO reescreva o arquivo inteiro, use edits pontuais
+- Ao finalizar, confirme as mudancas feitas
+
+## Acao Esperada
+
+Use Read para ler ${prdPath}, depois use Edit para adicionar a secao de refinamento.
+`
+
+    await executeClaudeCommand(prompt)
+  }
+
+  private async refineResearch(name: string, context: string): Promise<void> {
+    const featurePath = this.getFeaturePath(name)
+    const researchPath = path.join(featurePath, 'research.md')
+
+    const prompt = `FASE: REFINAMENTO DE RESEARCH
+
+Feature: ${name}
+Arquivo: ${researchPath}
+
+## Contexto Adicional do Usuario
+${context}
+
+## Sua Tarefa
+
+1. Leia o arquivo Research existente em: ${researchPath}
+2. Analise o conteudo e incorpore o contexto adicional fornecido
+3. Use a ferramenta Edit para adicionar uma secao "## Descobertas Adicionais" ao FINAL do arquivo com:
+   - Data do refinamento: ${new Date().toISOString().split('T')[0]}
+   - Novas descobertas baseadas no contexto
+   - Impacto no plano de implementacao (se houver)
+4. Se necessario, use Edit para atualizar a secao de riscos
+
+IMPORTANTE:
+- Use a ferramenta Edit para modificar o arquivo diretamente
+- Mantenha a estrutura original do research
+- NAO remova conteudo existente, apenas adicione/modifique
+- NAO reescreva o arquivo inteiro, use edits pontuais
+- Ao finalizar, confirme as mudancas feitas
+
+## Acao Esperada
+
+Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de descobertas adicionais.
+`
+
+    await executeClaudeCommand(prompt)
+  }
+}
+
+interface RefineOptions {
+  prd?: boolean
+  research?: boolean
+  tasks?: boolean
+  all?: boolean
+  cascade?: boolean
+  context?: string
+  model?: string
+}
+
+interface RefinableArtifact {
+  type: 'prd' | 'research' | 'tasks' | 'tasks-pending'
+  name: string
+  canRefine: boolean
+  reason?: string
+  taskStats?: {
+    total: number
+    pending: number
+    inProgress: number
+    completed: number
+  }
 }
 
 export const featureCommand = new FeatureCommand()

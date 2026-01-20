@@ -1,0 +1,14 @@
+[
+  {
+    "timestamp": "2026-01-20T14:35:57.647Z",
+    "fromPhase": "docs",
+    "toPhase": "docs",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-20T14:35:57.653Z",
+    "fromPhase": "refine",
+    "toPhase": "qa concluído",
+    "trigger": "adk feature refine"
+  }
+]

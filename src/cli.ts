@@ -130,6 +130,19 @@ feature
   .action((name?: string) => featureCommand.next(name))
 
 feature
+  .command('refine <name>')
+  .description('Refina artefatos de uma feature (PRD, research, tasks) com contexto adicional')
+  .option('--prd', 'Refinar apenas PRD')
+  .option('--research', 'Refinar apenas Research')
+  .option('--tasks', 'Refinar apenas Tasks pendentes')
+  .option('--all', 'Refinar todos os artefatos elegíveis')
+  .option('--cascade', 'Propagar mudanças para fases seguintes (default: pergunta)')
+  .option('--no-cascade', 'Não propagar mudanças (pula pergunta)')
+  .option('-c, --context <text>', 'Contexto adicional inline')
+  .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku)')
+  .action((name, options) => featureCommand.refine(name, options))
+
+feature
   .command('autopilot <name> [description]')
   .description(
     'Executa fluxo completo automatizado em worktree isolado: PRD → Research → Tasks → Arquitetura → Implementação → QA → Documentação'

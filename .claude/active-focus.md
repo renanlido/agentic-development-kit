@@ -1,5 +1,5 @@
 # Foco Ativo
 
-feature: progress-sync
-status: documentação concluída
-path: .claude/plans/features/progress-sync/
+feature: project-features
+status: em andamento
+path: .claude/plans/features/project-features/
