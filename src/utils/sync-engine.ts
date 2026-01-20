@@ -19,6 +19,22 @@ export interface SyncOptions {
   strategy?: ProgressConflictStrategy
 }
 
+/**
+ * Orchestrates bidirectional synchronization between progress.md and tasks.md.
+ *
+ * Detects inconsistencies, applies resolution strategies, creates snapshots,
+ * and records transitions in history. All sync operations are atomic with
+ * automatic rollback on failure.
+ *
+ * @example
+ * ```typescript
+ * const engine = new SyncEngine({ strategy: 'merge' })
+ * const result = await engine.sync('my-feature')
+ * if (result.success) {
+ *   console.log(`Resolved ${result.inconsistenciesResolved} conflicts`)
+ * }
+ * ```
+ */
 export class SyncEngine {
   private stateManager: StateManager
   private historyTracker: HistoryTracker

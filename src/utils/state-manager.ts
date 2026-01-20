@@ -4,6 +4,19 @@ import os from 'node:os'
 import type { UnifiedFeatureState, TaskState } from '../types/progress-sync'
 import { parseTasksFile } from './task-parser'
 
+/**
+ * Manages unified feature state by consolidating data from progress.md and tasks.md.
+ *
+ * Provides state loading, caching, progress calculation, and synchronization between
+ * the two source files. State is cached in state.json for performance.
+ *
+ * @example
+ * ```typescript
+ * const manager = new StateManager()
+ * const state = await manager.loadUnifiedState('my-feature')
+ * console.log(`Progress: ${state.progress}%`)
+ * ```
+ */
 export class StateManager {
   private getBasePath(): string {
     if (process.env.TEST_FEATURE_PATH) {

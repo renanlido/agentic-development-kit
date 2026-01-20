@@ -6,6 +6,13 @@ import type { TransitionEntry } from '../types/progress-sync'
 
 const MAX_HISTORY_ENTRIES = 50
 
+/**
+ * Tracks phase transitions for audit trail and historical queries.
+ *
+ * Records all phase changes in history.json with timestamp, trigger,
+ * and duration. Auto-prunes to keep last 50 entries. Thread-safe with
+ * mutex for concurrent operations.
+ */
 export class HistoryTracker {
   private locks: Map<string, Promise<void>> = new Map()
 

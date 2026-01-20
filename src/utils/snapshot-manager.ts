@@ -4,6 +4,12 @@ import type { SnapshotMeta } from '../types/progress-sync'
 
 const SNAPSHOT_FILES = ['progress.md', 'tasks.md', 'state.json']
 
+/**
+ * Creates and manages state snapshots at critical workflow points.
+ *
+ * Snapshots are stored in .snapshots/ with semantic naming (trigger-date.json).
+ * Auto-cleanup keeps 10 most recent snapshots. Enables rollback to previous states.
+ */
 export class SnapshotManager {
   private getBasePath(): string {
     if (process.env.TEST_FEATURE_PATH) {

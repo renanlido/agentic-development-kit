@@ -5,6 +5,15 @@ const PRIORITY_REGEX = /P([0-4]):/i
 
 export type { TaskStatus } from '../types/progress-sync'
 
+/**
+ * Extracts task status from markdown checkbox format.
+ *
+ * Supported formats:
+ * - `[ ]` → pending
+ * - `[x]` → completed
+ * - `[~]` → in_progress
+ * - `[!]` → blocked
+ */
 export function extractTaskStatus(line: string): TaskState['status'] {
   const match = line.match(CHECKBOX_REGEX)
   if (!match) return 'pending'
@@ -44,6 +53,12 @@ function cleanTaskName(text: string): string {
     .trim()
 }
 
+/**
+ * Parses tasks.md file into structured TasksDocument.
+ *
+ * Extracts tasks with status, priorities (P0-P4), acceptance criteria,
+ * and handles nested subtasks. Gracefully degrades on malformed input.
+ */
 export function parseTasksFile(content: string): TasksDocument {
   if (!content || content.trim() === '') {
     return { tasks: [], acceptanceCriteria: [] }
