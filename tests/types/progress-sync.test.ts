@@ -168,7 +168,8 @@ describe('ProgressSync Types', () => {
   describe('Type Compatibility', () => {
     it('should be compatible with existing FeatureProgress type', async () => {
       const { UnifiedFeatureStateSchema } = await import('../../src/types/progress-sync')
-      const { FeatureProgress } = await import('../../src/utils/progress')
+      type FeatureProgress = import('../../src/utils/progress').FeatureProgress
+      type StepProgress = import('../../src/utils/progress').StepProgress
 
       const legacyProgress: FeatureProgress = {
         feature: 'test',
@@ -185,7 +186,7 @@ describe('ProgressSync Types', () => {
         feature: legacyProgress.feature,
         currentPhase: legacyProgress.currentPhase,
         progress: 50,
-        tasks: legacyProgress.steps.map(step => ({
+        tasks: legacyProgress.steps.map((step: StepProgress) => ({
           name: step.name,
           status: step.status,
           priority: 0,
@@ -243,9 +244,9 @@ describe('ProgressSync Types', () => {
     })
   })
 
-  describe('SyncResult Type', () => {
-    it('should validate successful SyncResult', async () => {
-      const { SyncResultSchema } = await import('../../src/types/progress-sync')
+  describe('ProgressSyncResult Type', () => {
+    it('should validate successful ProgressSyncResult', async () => {
+      const { ProgressSyncResultSchema } = await import('../../src/types/progress-sync')
 
       const result = {
         success: true,
@@ -254,11 +255,11 @@ describe('ProgressSync Types', () => {
         duration: 150,
       }
 
-      expect(() => SyncResultSchema.parse(result)).not.toThrow()
+      expect(() => ProgressSyncResultSchema.parse(result)).not.toThrow()
     })
 
-    it('should validate SyncResult with snapshot', async () => {
-      const { SyncResultSchema } = await import('../../src/types/progress-sync')
+    it('should validate ProgressSyncResult with snapshot', async () => {
+      const { ProgressSyncResultSchema } = await import('../../src/types/progress-sync')
 
       const result = {
         success: true,
@@ -268,7 +269,7 @@ describe('ProgressSync Types', () => {
         duration: 200,
       }
 
-      expect(() => SyncResultSchema.parse(result)).not.toThrow()
+      expect(() => ProgressSyncResultSchema.parse(result)).not.toThrow()
     })
   })
 })
