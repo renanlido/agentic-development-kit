@@ -2917,7 +2917,7 @@ NAO crie PRD, tasks, ou documentacao formal. Isso e uma tarefa rapida.
               ? `\n\nTasks pendentes que podem ser refinadas:\n${analysis.pendingTasks.map((t) => `- [ ] ${t.name}`).join('\n')}`
               : '\n\nNão há tasks pendentes para refinar.'
 
-            const prompt = `FASE: REFINAMENTO DE TASKS
+            const prompt = `FASE: REFINAMENTO PROGRESSIVO DE TASKS
 
 Feature: ${name}
 Arquivo: ${tasksPath}
@@ -2927,25 +2927,80 @@ ${context}
 ${preservedInfo}
 ${pendingInfo}
 
-## Sua Tarefa
+## PRINCIPIO FUNDAMENTAL: PENSAMENTO PROGRESSIVO
 
-1. Leia o arquivo tasks.md existente em: ${tasksPath}
-2. Analise as tasks e o contexto adicional fornecido
-3. Use a ferramenta Edit para:
-   - Refinar descricoes de tasks pendentes se necessario
-   - Adicionar NOVAS tasks ao final do arquivo com prefixo [REFINAMENTO]
-4. NAO modifique tasks marcadas como [x] (completed) ou [~] (in_progress)
+O refinamento deve CONSTRUIR sobre o trabalho existente, nao substituir ou duplicar.
+Pense assim: "O que FALTA para cobrir o novo contexto?" e NAO "O que preciso criar do zero?"
 
-IMPORTANTE:
-- Use a ferramenta Edit para modificar o arquivo diretamente
-- Preserve todas as tasks existentes (completed e in_progress)
-- Novas tasks devem ter prefixo [REFINAMENTO] no nome
-- Mantenha o formato markdown com checkboxes
-- Ao finalizar, confirme as mudancas feitas
+## Processo de Analise (OBRIGATORIO - Faca ANTES de qualquer edicao)
+
+### Passo 1: Leia e Entenda
+- Leia o arquivo ${tasksPath} COMPLETO
+- Identifique TODAS as tasks existentes e seus objetivos
+- Entenda a estrutura e organizacao atual (fases, prioridades, dependencias)
+
+### Passo 2: Mapeie o Contexto Adicional
+Para cada ponto do contexto adicional, pergunte-se:
+- "Alguma task existente JA COBRE isso?" → Se sim, NAO crie nova
+- "Alguma task existente PARCIALMENTE cobre?" → Se sim, REFINE a descricao dela
+- "Nenhuma task cobre?" → SOMENTE entao considere criar nova
+
+### Passo 3: Decida as Acoes
+Classifique cada necessidade em:
+1. **COBERTO**: Task existente ja atende → Nenhuma acao
+2. **REFINAR**: Task existente precisa de ajuste → Melhorar descricao/criterios
+3. **GAP REAL**: Cenario genuinamente novo → Criar task com [REFINAMENTO]
+
+## Regras Anti-Duplicacao
+
+ANTES de criar qualquer task nova, verifique:
+- [ ] Nao existe task com objetivo similar?
+- [ ] Nao existe task que poderia ser expandida para cobrir isso?
+- [ ] Nao e um sub-item de uma task existente?
+- [ ] E realmente um GAP e nao uma variacao do que ja existe?
+
+Se a resposta para QUALQUER pergunta for "existe/sim", NAO crie task nova.
+
+## Acoes Permitidas
+
+1. **REFINAR task pendente**: Melhorar descricao, adicionar criterios de aceitacao
+   - Mantenha o checkbox [ ] original
+   - Melhore a clareza sem mudar o escopo fundamental
+
+2. **ADICIONAR task genuinamente nova**: Apenas para gaps REAIS
+   - Use prefixo [REFINAMENTO] no nome
+   - Justifique mentalmente: "Isso NAO e coberto por nenhuma task existente porque..."
+   - Posicione logicamente (na fase correta, com dependencias certas)
+
+3. **NAO FAZER**:
+   - Criar tasks similares as existentes
+   - Criar tasks que sao sub-itens de outras
+   - Criar tasks vagas ou genericas
+   - Modificar tasks [x] ou [~]
+
+## Formato de Saida
+
+Se adicionar novas tasks, use este formato:
+\`\`\`markdown
+## Tasks Adicionadas em Refinamento (YYYY-MM-DD)
+
+### Task X.Y: [REFINAMENTO] Nome descritivo
+- Tipo: Implementation/Test/Config
+- Prioridade: P0/P1/P2
+- Dependencias: Task X.Z (se houver)
+- Justificativa: Este cenario nao era coberto porque...
+- Acceptance Criteria:
+  - [ ] Criterio especifico 1
+  - [ ] Criterio especifico 2
+\`\`\`
 
 ## Acao Esperada
 
-Use Read para ler ${tasksPath}, depois use Edit para adicionar/modificar tasks.
+1. Use Read para ler ${tasksPath}
+2. Analise seguindo o processo acima (Passos 1-3)
+3. Use Edit APENAS se houver refinamentos ou gaps reais
+4. Se NAO houver gaps, informe: "Analise concluida: tasks existentes ja cobrem o contexto adicional"
+5. Se houver mudancas, liste o que foi feito e por que
 `
 
             const modelType = getModelForPhase('planning', options.model as ModelType | undefined)
@@ -2993,7 +3048,7 @@ Use Read para ler ${tasksPath}, depois use Edit para adicionar/modificar tasks.
               ? `\n\nTasks que NAO podem ser modificadas:\n${analysis.preservedTasks.map((t) => `- [${t.status === 'completed' ? 'x' : '~'}] ${t.name}`).join('\n')}`
               : ''
 
-            const prompt = `FASE: CASCATA - ATUALIZACAO DE TASKS APOS REFINAMENTO DE PRD
+            const prompt = `FASE: CASCATA PROGRESSIVA - ATUALIZACAO DE TASKS APOS REFINAMENTO DE PRD
 
 Feature: ${name}
 Arquivo PRD: ${prdPath}
@@ -3003,22 +3058,65 @@ Arquivo Tasks: ${tasksPath}
 O PRD foi refinado com o seguinte contexto:
 ${context}
 
-Agora as tasks pendentes precisam ser atualizadas para refletir as mudancas no PRD.
+Agora precisamos verificar se as tasks existentes ainda cobrem todos os requisitos.
 ${preservedInfo}
 
-## Sua Tarefa
+## PRINCIPIO FUNDAMENTAL: CASCATA INTELIGENTE
 
-1. Leia o PRD atualizado em: ${prdPath}
-2. Leia as tasks atuais em: ${tasksPath}
-3. Identifique novas tasks necessarias baseadas nas mudancas do PRD
-4. Use Edit para adicionar novas tasks com prefixo [CASCATA] ao final do arquivo tasks.md
-5. NAO modifique tasks existentes marcadas como [x] ou [~]
+A cascata NAO significa "criar tasks para tudo que mudou no PRD".
+Significa: "verificar se as tasks existentes ainda sao suficientes e adicionar APENAS o que falta".
 
-IMPORTANTE:
-- Use a ferramenta Edit para modificar o arquivo diretamente
-- Novas tasks devem ter prefixo [CASCATA] no nome
-- Mantenha o formato markdown com checkboxes
-- Ao finalizar, confirme as mudancas feitas
+## Processo de Analise (OBRIGATORIO)
+
+### Passo 1: Leia Ambos os Arquivos
+- Leia o PRD completo em ${prdPath}, focando na secao de Refinamento
+- Leia todas as tasks em ${tasksPath}
+
+### Passo 2: Mapeie Mudancas do PRD vs Tasks Existentes
+Para cada mudanca/adicao no PRD refinado:
+- "Alguma task existente JA IMPLEMENTA isso?" → Coberto, nada a fazer
+- "Alguma task existente pode ser AJUSTADA?" → Considere refinar a task
+- "E um requisito GENUINAMENTE NOVO sem cobertura?" → Considere criar task
+
+### Passo 3: Filtre Rigorosamente
+Antes de criar qualquer task [CASCATA], valide:
+- [ ] O requisito do PRD NAO e coberto por NENHUMA task existente?
+- [ ] NAO e uma variacao ou detalhe de algo ja coberto?
+- [ ] E uma entrega DISTINTA que precisa de task propria?
+
+## Regras de Cascata
+
+1. **Prefira NAO criar** - Na duvida, as tasks existentes provavelmente cobrem
+2. **Cascata e exceção** - So crie task [CASCATA] para gaps OBVIOS e SIGNIFICATIVOS
+3. **Seja especifico** - Se criar, a task deve ter escopo claro e criterios de aceitacao
+
+## Acoes Permitidas
+
+1. **Nenhuma acao**: Se tasks existentes cobrem as mudancas do PRD (CASO MAIS COMUM)
+2. **Criar task [CASCATA]**: APENAS para requisitos novos sem NENHUMA cobertura
+
+## Formato para Novas Tasks (se necessario)
+
+\`\`\`markdown
+## Tasks Adicionadas por Cascata (YYYY-MM-DD)
+
+### Task X.Y: [CASCATA] Nome descritivo
+- Tipo: Implementation/Test
+- Prioridade: P1
+- Origem: Requisito RF-XX adicionado no refinamento do PRD
+- Justificativa: Nenhuma task existente cobre este requisito porque...
+- Acceptance Criteria:
+  - [ ] Criterio 1
+  - [ ] Criterio 2
+\`\`\`
+
+## Acao Esperada
+
+1. Use Read para ler ${prdPath} (foco na secao Refinamento)
+2. Use Read para ler ${tasksPath}
+3. Analise o mapeamento mudancas vs tasks
+4. Se NAO houver gaps: informe "Cascata concluida: tasks existentes ja cobrem as mudancas do PRD"
+5. Se houver gaps REAIS: use Edit para adicionar tasks [CASCATA] com justificativa clara
 `
 
             const modelType = getModelForPhase('planning', options.model as ModelType | undefined)

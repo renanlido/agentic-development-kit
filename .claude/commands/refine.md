@@ -37,6 +37,18 @@ Leia os artefatos existentes para entender o contexto:
 - Tasks: @.claude/plans/features/$1/tasks.md
 - Progress: @.claude/plans/features/$1/progress.md
 
+## PRINCIPIO FUNDAMENTAL: PENSAMENTO PROGRESSIVO
+
+O refinamento deve **CONSTRUIR** sobre o trabalho existente, **NAO** substituir ou duplicar.
+
+Pergunte-se sempre:
+- "O que FALTA para cobrir o novo contexto?" ✅
+- "O que preciso criar do zero?" ❌
+
+**Regra de Ouro**: Na duvida, as tasks/conteudos existentes provavelmente ja cobrem. Seja conservador ao adicionar.
+
+---
+
 ## Processo de Refinamento Interativo
 
 ### 1. Coleta de Contexto
@@ -109,18 +121,41 @@ Adicione secao de descobertas:
 [Novos riscos identificados]
 ```
 
-#### Para Tasks:
+#### Para Tasks (PENSAMENTO PROGRESSIVO):
 
-1. Preserve tasks completed/in_progress
-2. Refine tasks pending conforme contexto
-3. Adicione novas tasks com prefixo `[REFINAMENTO]`:
+**PRINCIPIO FUNDAMENTAL**: Refinamento CONSTROI sobre o existente, NAO duplica.
+
+**Processo de Analise OBRIGATORIO:**
+
+1. **Mapeie o contexto vs tasks existentes:**
+   - "Task existente JA COBRE isso?" → Nenhuma acao
+   - "Task existente PARCIALMENTE cobre?" → Refine a descricao
+   - "NENHUMA task cobre?" → Considere criar nova
+
+2. **Checklist Anti-Duplicacao (valide ANTES de criar):**
+   - [ ] Nao existe task com objetivo similar?
+   - [ ] Nao existe task que poderia ser expandida?
+   - [ ] Nao e sub-item de task existente?
+   - [ ] E um GAP REAL, nao variacao do existente?
+
+3. **Acoes Permitidas:**
+   - REFINAR: Melhorar descricao/criterios de task pendente
+   - ADICIONAR: Apenas para gaps GENUINOS com prefixo `[REFINAMENTO]`
+
+4. **Formato para novas tasks:**
 
 ```markdown
-## Tasks Adicionadas em Refinamento
+## Tasks Adicionadas em Refinamento (YYYY-MM-DD)
 
-- [ ] [REFINAMENTO] Nova task baseada no contexto
-- [ ] [REFINAMENTO] Outra task necessaria
+### Task X.Y: [REFINAMENTO] Nome descritivo
+- Tipo: Implementation/Test
+- Prioridade: P1
+- Justificativa: Nenhuma task existente cobre porque...
+- Acceptance Criteria:
+  - [ ] Criterio especifico
 ```
+
+5. **Se NAO houver gaps**: Informe "Tasks existentes ja cobrem o contexto"
 
 ### 4. Cascata (Opcional)
 
