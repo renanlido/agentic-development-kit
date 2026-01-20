@@ -105,6 +105,12 @@ feature
   .action((name, options) => featureCommand.docs(name, { baseBranch: options.baseBranch }))
 
 feature
+  .command('finish <name>')
+  .description('Finaliza feature: commit, push, PR/merge e cleanup do worktree')
+  .option('--base-branch <branch>', 'Branch base para merge/PR (padrão: main)')
+  .action((name, options) => featureCommand.finish(name, { baseBranch: options.baseBranch }))
+
+feature
   .command('list')
   .description('Lista todas features do projeto')
   .action(() => featureCommand.list())

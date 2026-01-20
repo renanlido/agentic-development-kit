@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import chalk from 'chalk'
 import fs from 'fs-extra'
@@ -7,6 +6,7 @@ import type { DecisionCategory, MemoryOptions, MemoryPhase, SearchMatch } from '
 import { MEMORY_LINE_LIMIT } from '../types/memory.js'
 import { executeClaudeCommand } from '../utils/claude.js'
 import { listDecisions, loadDecision, updateDecisionFeatures } from '../utils/decision-utils.js'
+import { getFeaturePath, getFeaturesBasePath } from '../utils/git-paths.js'
 import { logger } from '../utils/logger.js'
 import { formatSearchResults, getMemoryStats, recallMemory } from '../utils/memory-search.js'
 import {
@@ -21,29 +21,12 @@ import {
   serializeMemoryContent,
 } from '../utils/memory-utils.js'
 
-function getMainRepoPath(): string {
-  try {
-    const gitCommonDir = execFileSync('git', ['rev-parse', '--git-common-dir'], {
-      encoding: 'utf-8',
-    }).trim()
-
-    if (gitCommonDir === '.git' || gitCommonDir.endsWith('/.git')) {
-      return process.cwd()
-    }
-
-    return path.dirname(gitCommonDir)
-  } catch {
-    return process.cwd()
-  }
-}
-
 class MemoryCommand {
   async save(feature: string, options: MemoryOptions = {}): Promise<void> {
     const spinner = ora('Salvando memoria...').start()
 
     try {
-      const mainRepoPath = getMainRepoPath()
-      const featurePath = path.join(mainRepoPath, '.claude/plans/features', feature)
+      const featurePath = getFeaturePath(feature)
 
       if (!(await fs.pathExists(featurePath))) {
         spinner.fail(`Feature ${feature} nao encontrada`)
@@ -200,7 +183,7 @@ class MemoryCommand {
         console.log()
         console.log(chalk.gray(`${countLines(content)} linhas | ${globalPath}`))
 
-        const featuresPath = path.join(getMainRepoPath(), '.claude/plans/features')
+        const featuresPath = getFeaturesBasePath()
         if (await fs.pathExists(featuresPath)) {
           const features = await fs.readdir(featuresPath)
           const memoriesExist: string[] = []
@@ -323,7 +306,7 @@ IMPORTANTE:
 
     try {
       const results: SearchMatch[] = []
-      const featuresPath = path.join(getMainRepoPath(), '.claude/plans/features')
+      const featuresPath = getFeaturesBasePath()
 
       if (!(await fs.pathExists(featuresPath))) {
         spinner.fail('Nenhuma feature encontrada')
@@ -458,7 +441,7 @@ IMPORTANTE:
         process.exit(1)
       }
 
-      const featurePath = path.join(getMainRepoPath(), '.claude/plans/features', feature)
+      const featurePath = getFeaturePath(feature)
 
       if (!(await fs.pathExists(featurePath))) {
         spinner.fail(`Feature "${feature}" não encontrada`)
@@ -467,7 +450,7 @@ IMPORTANTE:
 
       await updateDecisionFeatures(decisionId, feature, 'add')
 
-      const contextPath = path.join(featurePath, 'context.md')
+      const contextPath = getFeaturePath(feature, 'context.md')
       let contextContent = ''
 
       if (await fs.pathExists(contextPath)) {

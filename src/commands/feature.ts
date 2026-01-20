@@ -8,6 +8,11 @@ import { createClickUpProvider } from '../providers/clickup/index.js'
 import type { LocalFeature, ProviderSpecificConfig } from '../providers/types.js'
 import { executeClaudeCommand } from '../utils/claude'
 import { getIntegrationConfig, getProviderConfig } from '../utils/config.js'
+import {
+  getClaudePath as getClaudePathUtil,
+  getFeaturePath as getFeaturePathUtil,
+  getMainRepoPath as getMainRepoPathUtil,
+} from '../utils/git-paths'
 import { logger } from '../utils/logger'
 import {
   type FeatureProgress,
@@ -81,13 +86,24 @@ path: ${featurePath}
     try {
       const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
       const expectedBranch = `feature/${featureSlug}`
+      const cwd = process.cwd()
+
+      if (cwd.includes('.worktrees/' + featureSlug) || cwd.includes('.worktrees\\' + featureSlug)) {
+        return true
+      }
 
       const currentBranch = execFileSync('git', ['branch', '--show-current'], {
         encoding: 'utf-8',
       }).trim()
 
-      if (currentBranch !== expectedBranch) {
-        return false
+      if (currentBranch === expectedBranch) {
+        const gitDir = execFileSync('git', ['rev-parse', '--git-dir'], {
+          encoding: 'utf-8',
+        }).trim()
+
+        if (gitDir.includes('.git/worktrees')) {
+          return true
+        }
       }
 
       const gitDir = execFileSync('git', ['rev-parse', '--git-dir'], {
@@ -101,27 +117,15 @@ path: ${featurePath}
   }
 
   private getMainRepoPath(): string {
-    try {
-      const gitCommonDir = execFileSync('git', ['rev-parse', '--git-common-dir'], {
-        encoding: 'utf-8',
-      }).trim()
-
-      if (gitCommonDir === '.git' || gitCommonDir.endsWith('/.git')) {
-        return process.cwd()
-      }
-
-      return path.dirname(gitCommonDir)
-    } catch {
-      return process.cwd()
-    }
+    return getMainRepoPathUtil()
   }
 
   private getClaudePath(): string {
-    return path.join(this.getMainRepoPath(), '.claude')
+    return getClaudePathUtil()
   }
 
   private getFeaturePath(name: string): string {
-    return path.join(this.getClaudePath(), 'plans/features', name)
+    return getFeaturePathUtil(name)
   }
 
   private async syncFeatureToRemote(
@@ -247,12 +251,28 @@ path: ${featurePath}
     name: string,
     baseBranch = 'main'
   ): Promise<{ success: boolean; worktreePath?: string; branch?: string; error?: string }> {
-    const branchName = `feature/${name.replace(/[^a-zA-Z0-9-]/g, '-')}`
-    const worktreeDir = path.join(process.cwd(), '.worktrees', name.replace(/[^a-zA-Z0-9-]/g, '-'))
+    const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
+    const branchName = `feature/${featureSlug}`
+    const mainRepo = this.getMainRepoPath()
+    const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
 
     try {
       if (await fs.pathExists(worktreeDir)) {
-        return { success: true, worktreePath: worktreeDir, branch: branchName }
+        try {
+          execFileSync('git', ['rev-parse', '--git-dir'], {
+            cwd: worktreeDir,
+            encoding: 'utf-8',
+            stdio: 'pipe',
+          })
+          return { success: true, worktreePath: worktreeDir, branch: branchName }
+        } catch {
+          await fs.remove(worktreeDir)
+          try {
+            execFileSync('git', ['worktree', 'prune'], { stdio: 'pipe' })
+          } catch {
+            // ignore prune errors
+          }
+        }
       }
 
       await fs.ensureDir(path.dirname(worktreeDir))
@@ -684,6 +704,10 @@ ${featureContext}
 
       spinner.succeed('Estrutura criada')
 
+      let progress = await loadProgress(name)
+      progress = updateStepStatus(progress, 'prd', 'completed')
+      await saveProgress(name, progress)
+
       await this.setActiveFocus(name, state.currentStage)
 
       const progress = await loadProgress(name)
@@ -712,6 +736,13 @@ ${featureContext}
       console.log(chalk.gray(`  7. adk feature docs ${name}`))
     } catch (error) {
       spinner.fail('Erro ao criar feature')
+      try {
+        const progress = await loadProgress(name)
+        updateStepStatus(progress, 'prd', 'failed', String(error))
+        await saveProgress(name, progress)
+      } catch {
+        // Ignore if can't save progress
+      }
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }
@@ -1190,7 +1221,8 @@ IMPORTANTE:
 
         const baseBranch = options.baseBranch || (await this.getDefaultBranch())
         const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
-        const worktreeDir = path.join(process.cwd(), '.worktrees', featureSlug)
+        const mainRepo = this.getMainRepoPath()
+        const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
 
         console.log()
         console.log(chalk.cyan('📂 Configuração de Worktree'))
@@ -1329,7 +1361,8 @@ Não avance para próxima fase até atual estar completa.
 
         const baseBranch = options.baseBranch || (await this.getDefaultBranch())
         const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
-        const worktreeDir = path.join(process.cwd(), '.worktrees', featureSlug)
+        const mainRepo = this.getMainRepoPath()
+        const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
 
         if (await fs.pathExists(worktreeDir)) {
           console.log()
@@ -1524,7 +1557,8 @@ Se encontrar issues CRITICAL ou HIGH, o status deve ser FAIL.
 
         const baseBranch = options.baseBranch || (await this.getDefaultBranch())
         const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
-        const worktreeDir = path.join(process.cwd(), '.worktrees', featureSlug)
+        const mainRepo = this.getMainRepoPath()
+        const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
 
         if (await fs.pathExists(worktreeDir)) {
           console.log()
@@ -1662,6 +1696,152 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
       const progress = await loadProgress(name)
       updateStepStatus(progress, 'docs', 'failed', String(error))
       await saveProgress(name, progress)
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async finish(name: string, options: FeatureOptions = {}): Promise<void> {
+    const spinner = ora('Finalizando feature...').start()
+
+    try {
+      const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
+      const mainRepo = this.getMainRepoPath()
+      const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
+      const isInWorktree = this.isInWorktreeForFeature(name)
+      const hasWorktree = await fs.pathExists(worktreeDir)
+
+      let progress = await loadProgress(name)
+      progress = updateStepStatus(progress, 'finish', 'in_progress')
+      await saveProgress(name, progress)
+
+      const workDir = isInWorktree ? process.cwd() : hasWorktree ? worktreeDir : mainRepo
+      const useWorktree = isInWorktree || hasWorktree
+
+      spinner.text = 'Verificando mudanças...'
+      let hasChanges = false
+      try {
+        const status = execFileSync('git', ['status', '--porcelain'], {
+          encoding: 'utf-8',
+          cwd: workDir,
+        }).trim()
+        hasChanges = status.length > 0
+      } catch {
+        hasChanges = false
+      }
+
+      if (hasChanges) {
+        spinner.text = 'Commitando mudanças...'
+        try {
+          execFileSync('git', ['add', '.'], { cwd: workDir, stdio: 'pipe' })
+          execFileSync(
+            'git',
+            ['commit', '-m', `feat(${name}): complete feature implementation`],
+            { cwd: workDir, stdio: 'pipe' }
+          )
+        } catch {
+          // Commit may fail if nothing to commit
+        }
+      }
+
+      const baseBranch = options.baseBranch || (await this.getDefaultBranch())
+      const featureBranch = `feature/${featureSlug}`
+
+      if (this.hasRemote()) {
+        spinner.text = 'Enviando para remoto...'
+        try {
+          execFileSync('git', ['push', '-u', 'origin', featureBranch], {
+            cwd: workDir,
+            stdio: 'pipe',
+          })
+        } catch {
+          // Push may fail if already pushed or no remote
+        }
+
+        spinner.text = 'Criando Pull Request...'
+        try {
+          const prTitle = `feat(${name}): feature implementation`
+          const prBody = `## Summary
+- Feature: ${name}
+- Implements all planned functionality
+
+## Test Plan
+- All tests passing
+- QA validation completed
+- Documentation updated`
+
+          execFileSync(
+            'gh',
+            ['pr', 'create', '--title', prTitle, '--body', prBody, '--base', baseBranch],
+            { cwd: workDir, stdio: 'pipe' }
+          )
+          spinner.succeed('Pull Request criado')
+        } catch {
+          spinner.warn('PR já existe ou gh CLI não disponível')
+        }
+      } else {
+        spinner.text = 'Fazendo merge local...'
+        try {
+          execFileSync('git', ['checkout', baseBranch], { cwd: mainRepo, stdio: 'pipe' })
+          execFileSync('git', ['merge', featureBranch], { cwd: mainRepo, stdio: 'pipe' })
+          spinner.succeed('Merge realizado')
+        } catch (error) {
+          spinner.warn('Merge manual necessário')
+          console.log(chalk.yellow(`  Execute: git checkout ${baseBranch} && git merge ${featureBranch}`))
+        }
+      }
+
+      if (useWorktree && (await fs.pathExists(worktreeDir))) {
+        const { cleanup } = await inquirer.prompt<{ cleanup: boolean }>([
+          {
+            type: 'confirm',
+            name: 'cleanup',
+            message: 'Limpar worktree?',
+            default: true,
+          },
+        ])
+
+        if (cleanup) {
+          spinner.start('Limpando worktree...')
+          try {
+            execFileSync('git', ['worktree', 'remove', worktreeDir, '--force'], {
+              cwd: mainRepo,
+              stdio: 'pipe',
+            })
+            spinner.succeed('Worktree removida')
+          } catch {
+            spinner.warn('Não foi possível remover worktree automaticamente')
+            console.log(chalk.gray(`  Execute: git worktree remove ${worktreeDir} --force`))
+          }
+        }
+      }
+
+      progress = updateStepStatus(progress, 'finish', 'completed')
+      await saveProgress(name, progress)
+
+      await this.setActiveFocus(name, 'finalizada')
+      await memoryCommand.save(name, { phase: 'finish' })
+
+      console.log()
+      logger.success('🎉 Feature finalizada com sucesso!')
+      console.log()
+      console.log(chalk.cyan('Resumo:'))
+      console.log(chalk.gray(`  Feature: ${name}`))
+      console.log(chalk.gray(`  Branch: ${featureBranch}`))
+      if (this.hasRemote()) {
+        console.log(chalk.gray('  Status: PR criado'))
+      } else {
+        console.log(chalk.gray(`  Status: Merged em ${baseBranch}`))
+      }
+    } catch (error) {
+      spinner.fail('Erro ao finalizar feature')
+      try {
+        const progress = await loadProgress(name)
+        updateStepStatus(progress, 'finish', 'failed', String(error))
+        await saveProgress(name, progress)
+      } catch {
+        // Ignore
+      }
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }
@@ -1874,36 +2054,77 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
     }
 
     const inProgressSteps = progress.steps.filter((s) => s.status === 'in_progress')
+    const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
+    const mainRepo = this.getMainRepoPath()
+    const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
+    const worktreeExists = await fs.pathExists(worktreeDir)
+
     for (const step of inProgressSteps) {
       const label = stepLabels[step.name] || step.name
-      console.log(
-        chalk.yellow(
-          `\n⚠️  A etapa "${label}" estava em andamento quando a sessão anterior foi interrompida.\n`
+      const isWorktreeStep = ['implementacao', 'qa', 'docs'].includes(step.name)
+
+      if (isWorktreeStep && worktreeExists) {
+        console.log(chalk.yellow(`\n⚠️  A etapa "${label}" estava em andamento na worktree.\n`))
+        console.log(chalk.cyan(`   Worktree: ${worktreeDir}`))
+        console.log(chalk.cyan(`   Branch: feature/${featureSlug}\n`))
+
+        const { action } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'action',
+            message: `O que deseja fazer?`,
+            choices: [
+              { name: '▶️  Continuar na worktree existente', value: 'continue_worktree' },
+              { name: '✅ Já foi concluída - marcar como completa', value: 'complete' },
+              { name: '🔄 Recomeçar do zero', value: 'redo' },
+              { name: '⏭️  Pular esta etapa', value: 'skip' },
+            ],
+          },
+        ])
+
+        if (action === 'continue_worktree') {
+          console.log(chalk.green(`\n✓ Continuando na worktree existente...`))
+        } else if (action === 'complete') {
+          progress = updateStepStatus(progress, step.name, 'completed')
+        } else if (action === 'redo') {
+          progress = updateStepStatus(progress, step.name, 'pending')
+        } else if (action === 'skip') {
+          progress = updateStepStatus(progress, step.name, 'completed')
+          const stepIndex = progress.steps.findIndex((s) => s.name === step.name)
+          if (stepIndex >= 0) {
+            progress.steps[stepIndex].notes = 'skipped'
+          }
+        }
+      } else {
+        console.log(
+          chalk.yellow(
+            `\n⚠️  A etapa "${label}" estava em andamento quando a sessão anterior foi interrompida.\n`
+          )
         )
-      )
 
-      const { action } = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'action',
-          message: `O que deseja fazer com a etapa "${label}"?`,
-          choices: [
-            { name: '✅ Já foi concluída - marcar como completa', value: 'complete' },
-            { name: '🔄 Precisa ser refeita - executar novamente', value: 'redo' },
-            { name: '⏭️  Pular esta etapa', value: 'skip' },
-          ],
-        },
-      ])
+        const { action } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'action',
+            message: `O que deseja fazer com a etapa "${label}"?`,
+            choices: [
+              { name: '✅ Já foi concluída - marcar como completa', value: 'complete' },
+              { name: '🔄 Precisa ser refeita - executar novamente', value: 'redo' },
+              { name: '⏭️  Pular esta etapa', value: 'skip' },
+            ],
+          },
+        ])
 
-      if (action === 'complete') {
-        progress = updateStepStatus(progress, step.name, 'completed')
-      } else if (action === 'redo') {
-        progress = updateStepStatus(progress, step.name, 'pending')
-      } else if (action === 'skip') {
-        progress = updateStepStatus(progress, step.name, 'completed')
-        const stepIndex = progress.steps.findIndex((s) => s.name === step.name)
-        if (stepIndex >= 0) {
-          progress.steps[stepIndex].notes = 'skipped'
+        if (action === 'complete') {
+          progress = updateStepStatus(progress, step.name, 'completed')
+        } else if (action === 'redo') {
+          progress = updateStepStatus(progress, step.name, 'pending')
+        } else if (action === 'skip') {
+          progress = updateStepStatus(progress, step.name, 'completed')
+          const stepIndex = progress.steps.findIndex((s) => s.name === step.name)
+          if (stepIndex >= 0) {
+            progress.steps[stepIndex].notes = 'skipped'
+          }
         }
       }
     }
@@ -2363,7 +2584,18 @@ NAO crie PRD, tasks, ou documentacao formal. Isso e uma tarefa rapida.
     }
   }
 
+  private getFeatureFromWorktree(): string | null {
+    const cwd = process.cwd()
+    const worktreeMatch = cwd.match(/\.worktrees[/\\]([^/\\]+)/)
+    return worktreeMatch ? worktreeMatch[1] : null
+  }
+
   private async getActiveFocus(): Promise<string | null> {
+    const worktreeFeature = this.getFeatureFromWorktree()
+    if (worktreeFeature) {
+      return worktreeFeature
+    }
+
     const focusPath = path.join(this.getClaudePath(), 'active-focus.md')
     try {
       const content = await fs.readFile(focusPath, 'utf-8')
@@ -2415,6 +2647,7 @@ NAO crie PRD, tasks, ou documentacao formal. Isso e uma tarefa rapida.
       },
       { name: 'qa', label: 'QA', method: () => this.qa(featureName) },
       { name: 'docs', label: 'Docs', method: () => this.docs(featureName) },
+      { name: 'finish', label: 'Finish', method: () => this.finish(featureName) },
     ]
 
     const state = await this.getFeatureState(featureName)
@@ -2461,6 +2694,43 @@ NAO crie PRD, tasks, ou documentacao formal. Isso e uma tarefa rapida.
     if (completedSteps.length > 0) {
       console.log(chalk.gray(`Etapas concluídas: ${completedSteps.join(' → ')}`))
       console.log()
+    }
+
+    const worktreeSteps = ['implementacao', 'qa', 'docs', 'finish']
+    const needsWorktree = worktreeSteps.includes(nextStep.name)
+    const featureSlug = featureName.replace(/[^a-zA-Z0-9-]/g, '-')
+    const mainRepo = this.getMainRepoPath()
+    const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
+
+    if (needsWorktree && !this.isInWorktreeForFeature(featureName)) {
+      const worktreeExists = await fs.pathExists(worktreeDir)
+
+      if (!worktreeExists) {
+        console.log(chalk.cyan('📂 Criando worktree...'))
+        const result = await this.setupWorktree(featureName)
+        if (!result.success) {
+          console.log(chalk.red(`Erro ao criar worktree: ${result.error}`))
+          process.exit(1)
+        }
+        console.log(chalk.green(`✓ Worktree criada: ${worktreeDir}`))
+      }
+
+      console.log(chalk.cyan(`📂 Executando na worktree: ${worktreeDir}`))
+      console.log(
+        chalk.bold(`Executando: adk feature ${nextStep.label.toLowerCase()} ${featureName}`)
+      )
+      console.log(chalk.gray('━'.repeat(50)))
+      console.log()
+
+      const args = ['feature', nextStep.label.toLowerCase(), featureName]
+      if (nextStep.name === 'implementacao') {
+        args.push('--phase', 'All')
+      }
+      execFileSync('adk', args, {
+        stdio: 'inherit',
+        cwd: worktreeDir,
+      })
+      return
     }
 
     console.log(

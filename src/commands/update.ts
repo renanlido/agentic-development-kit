@@ -3,6 +3,7 @@ import chalk from 'chalk'
 import fs from 'fs-extra'
 import inquirer from 'inquirer'
 import ora from 'ora'
+import { getClaudePath } from '../utils/git-paths'
 import { logger } from '../utils/logger'
 import { getTemplateDir } from '../utils/templates'
 
@@ -23,8 +24,7 @@ export async function updateCommand(options: UpdateOptions): Promise<void> {
   const spinner = ora()
 
   try {
-    const projectPath = process.cwd()
-    const claudePath = path.join(projectPath, '.claude')
+    const claudePath = getClaudePath()
 
     if (!(await fs.pathExists(claudePath))) {
       logger.error('Estrutura .claude não encontrada. Execute "adk init" primeiro.')

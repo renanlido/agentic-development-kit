@@ -1,21 +1,82 @@
-import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import fs from 'fs-extra'
+import { getFeaturePath, getMainRepoPath, isInWorktree } from './git-paths'
 
-function getMainRepoPath(): string {
-  try {
-    const gitCommonDir = execFileSync('git', ['rev-parse', '--git-common-dir'], {
-      encoding: 'utf-8',
-    }).trim()
+function getWorktreeProgressPath(featureName: string): string | null {
+  const mainRepo = getMainRepoPath()
+  const featureSlug = featureName.replace(/[^a-zA-Z0-9-]/g, '-')
 
-    if (gitCommonDir === '.git' || gitCommonDir.endsWith('/.git')) {
-      return process.cwd()
+  if (isInWorktree()) {
+    const cwd = process.cwd()
+    if (cwd.includes('.worktrees/' + featureSlug) || cwd.includes('.worktrees\\' + featureSlug)) {
+      return path.join(cwd, '.claude', 'plans', 'features', featureName, 'progress.md')
     }
-
-    return path.dirname(gitCommonDir)
-  } catch {
-    return process.cwd()
   }
+
+  const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
+  const worktreeProgressPath = path.join(
+    worktreeDir,
+    '.claude',
+    'plans',
+    'features',
+    featureName,
+    'progress.md'
+  )
+
+  return worktreeProgressPath
+}
+
+async function getFileModTime(filePath: string): Promise<number> {
+  try {
+    const stats = await fs.stat(filePath)
+    return stats.mtimeMs
+  } catch {
+    return 0
+  }
+}
+
+async function syncProgressFiles(
+  mainPath: string,
+  worktreePath: string | null
+): Promise<{ newestPath: string; needsSync: boolean }> {
+  if (!worktreePath) {
+    return { newestPath: mainPath, needsSync: false }
+  }
+
+  const mainExists = await fs.pathExists(mainPath)
+  const worktreeExists = await fs.pathExists(worktreePath)
+
+  if (!mainExists && !worktreeExists) {
+    return { newestPath: mainPath, needsSync: false }
+  }
+
+  if (mainExists && !worktreeExists) {
+    return { newestPath: mainPath, needsSync: false }
+  }
+
+  if (!mainExists && worktreeExists) {
+    const content = await fs.readFile(worktreePath, 'utf-8')
+    await fs.ensureDir(path.dirname(mainPath))
+    await fs.writeFile(mainPath, content)
+    return { newestPath: mainPath, needsSync: false }
+  }
+
+  const mainModTime = await getFileModTime(mainPath)
+  const worktreeModTime = await getFileModTime(worktreePath)
+
+  if (worktreeModTime > mainModTime) {
+    const content = await fs.readFile(worktreePath, 'utf-8')
+    await fs.writeFile(mainPath, content)
+    return { newestPath: mainPath, needsSync: false }
+  }
+
+  if (mainModTime > worktreeModTime) {
+    const content = await fs.readFile(mainPath, 'utf-8')
+    await fs.ensureDir(path.dirname(worktreePath))
+    await fs.writeFile(worktreePath, content)
+  }
+
+  return { newestPath: mainPath, needsSync: false }
 }
 
 export interface StepProgress {
@@ -42,10 +103,11 @@ const DEFAULT_STEPS: StepProgress[] = [
   { name: 'implementacao', status: 'pending' },
   { name: 'qa', status: 'pending' },
   { name: 'docs', status: 'pending' },
+  { name: 'finish', status: 'pending' },
 ]
 
 function getProgressPath(featureName: string): string {
-  return path.join(getMainRepoPath(), '.claude/plans/features', featureName, 'progress.md')
+  return getFeaturePath(featureName, 'progress.md')
 }
 
 function parseProgressFile(content: string): FeatureProgress | null {
@@ -162,10 +224,13 @@ function formatProgressFile(progress: FeatureProgress): string {
 }
 
 export async function loadProgress(featureName: string): Promise<FeatureProgress> {
-  const progressPath = getProgressPath(featureName)
+  const mainPath = getProgressPath(featureName)
+  const worktreePath = getWorktreeProgressPath(featureName)
 
-  if (await fs.pathExists(progressPath)) {
-    const content = await fs.readFile(progressPath, 'utf-8')
+  await syncProgressFiles(mainPath, worktreePath)
+
+  if (await fs.pathExists(mainPath)) {
+    const content = await fs.readFile(mainPath, 'utf-8')
     const parsed = parseProgressFile(content)
     if (parsed) {
       return parsed
@@ -181,12 +246,23 @@ export async function loadProgress(featureName: string): Promise<FeatureProgress
 }
 
 export async function saveProgress(featureName: string, progress: FeatureProgress): Promise<void> {
-  const progressPath = getProgressPath(featureName)
+  const mainPath = getProgressPath(featureName)
+  const worktreePath = getWorktreeProgressPath(featureName)
   progress.lastUpdated = new Date().toISOString()
 
   const content = formatProgressFile(progress)
-  await fs.ensureDir(path.dirname(progressPath))
-  await fs.writeFile(progressPath, content)
+
+  await fs.ensureDir(path.dirname(mainPath))
+  await fs.writeFile(mainPath, content)
+
+  if (worktreePath && worktreePath !== mainPath) {
+    try {
+      await fs.ensureDir(path.dirname(worktreePath))
+      await fs.writeFile(worktreePath, content)
+    } catch {
+      // Ignore errors syncing to worktree
+    }
+  }
 }
 
 export function updateStepStatus(

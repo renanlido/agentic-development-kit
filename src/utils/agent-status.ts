@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises'
 import chalk from 'chalk'
+import { getClaudePath } from './git-paths'
 
-const STATUS_FILE = '.claude/agent-status.json'
+const STATUS_FILE = getClaudePath('agent-status.json')
 
 export type AgentStatusState = 'pending' | 'running' | 'completed' | 'failed'
 

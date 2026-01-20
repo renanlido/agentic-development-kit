@@ -3,6 +3,7 @@ import chalk from 'chalk'
 import fs from 'fs-extra'
 import ora from 'ora'
 import { executeClaudeCommand } from '../utils/claude.js'
+import { getAgentsPath, getClaudePath } from '../utils/git-paths.js'
 import { logger } from '../utils/logger.js'
 import {
   DEFAULT_PARALLEL_CONFIG,
@@ -25,7 +26,7 @@ class AgentCommand {
     const spinner = ora('Criando agent...').start()
 
     try {
-      const agentsPath = path.join(getClaudePath(), 'agents')
+      const agentsPath = getAgentsPath()
       const agentPath = path.join(agentsPath, `${name}.md`)
 
       if (await fs.pathExists(agentPath)) {
@@ -56,7 +57,7 @@ class AgentCommand {
     const spinner = ora(`Executando agent ${name}...`).start()
 
     try {
-      const agentPath = path.join(getClaudePath(), 'agents', `${name}.md`)
+      const agentPath = path.join(getAgentsPath(), `${name}.md`)
 
       if (!(await fs.pathExists(agentPath))) {
         spinner.fail(`Agent ${name} não encontrado`)
@@ -97,7 +98,7 @@ Execute the agent tasks and report results.
       for (const agent of agents) {
         spinner.text = `Executando agent: ${agent}`
 
-        const agentPath = path.join(getClaudePath(), 'agents', `${agent}.md`)
+        const agentPath = path.join(getAgentsPath(), `${agent}.md`)
 
         if (await fs.pathExists(agentPath)) {
           await this.run(agent, { context: feature })
@@ -121,7 +122,7 @@ Execute the agent tasks and report results.
     const spinner = ora('Preparando execução paralela...').start()
 
     try {
-      const agentsPath = path.join(getClaudePath(), 'agents')
+      const agentsPath = getAgentsPath()
       const agents: string[] = []
 
       if (await fs.pathExists(agentsPath)) {
@@ -168,7 +169,7 @@ Execute the agent tasks and report results.
   }
 
   async status(options: AgentOptions): Promise<void> {
-    const statusPath = path.join(getClaudePath(), 'agent-status.json')
+    const statusPath = getClaudePath('agent-status.json')
 
     const displayStatus = async (): Promise<void> => {
       if (!(await fs.pathExists(statusPath))) {
