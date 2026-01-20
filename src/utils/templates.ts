@@ -82,18 +82,7 @@ export async function copyClaudeStructure(targetDir: string): Promise<void> {
     const destDir = path.join(targetClaudeDir, dir)
 
     if (await fs.pathExists(srcDir)) {
-      await fs.ensureDir(destDir)
-
-      const files = await fs.readdir(srcDir)
-      for (const file of files) {
-        const srcFile = path.join(srcDir, file)
-        const destFile = path.join(destDir, file)
-
-        const stat = await fs.stat(srcFile)
-        if (stat.isFile() && !(await fs.pathExists(destFile))) {
-          await fs.copy(srcFile, destFile)
-        }
-      }
+      await copyDirectoryRecursive(srcDir, destDir)
     }
   }
 
@@ -102,6 +91,25 @@ export async function copyClaudeStructure(targetDir: string): Promise<void> {
     const destPath = path.join(targetClaudeDir, file)
 
     if ((await fs.pathExists(srcPath)) && !(await fs.pathExists(destPath))) {
+      await fs.copy(srcPath, destPath)
+    }
+  }
+}
+
+async function copyDirectoryRecursive(srcDir: string, destDir: string): Promise<void> {
+  await fs.ensureDir(destDir)
+
+  const items = await fs.readdir(srcDir)
+
+  for (const item of items) {
+    const srcPath = path.join(srcDir, item)
+    const destPath = path.join(destDir, item)
+
+    const stat = await fs.stat(srcPath)
+
+    if (stat.isDirectory()) {
+      await copyDirectoryRecursive(srcPath, destPath)
+    } else if (stat.isFile() && !(await fs.pathExists(destPath))) {
       await fs.copy(srcPath, destPath)
     }
   }
