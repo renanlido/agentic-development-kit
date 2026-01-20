@@ -44,11 +44,21 @@ export async function updateCommand(options: UpdateOptions): Promise<void> {
     if (options.all) {
       categories.push('commands', 'hooks', 'agents', 'rules', 'skills')
     } else {
-      if (options.commands) categories.push('commands')
-      if (options.hooks) categories.push('hooks')
-      if (options.agents) categories.push('agents')
-      if (options.rules) categories.push('rules')
-      if (options.skills) categories.push('skills')
+      if (options.commands) {
+        categories.push('commands')
+      }
+      if (options.hooks) {
+        categories.push('hooks')
+      }
+      if (options.agents) {
+        categories.push('agents')
+      }
+      if (options.rules) {
+        categories.push('rules')
+      }
+      if (options.skills) {
+        categories.push('skills')
+      }
     }
 
     if (categories.length === 0) {
@@ -162,7 +172,11 @@ export async function updateCommand(options: UpdateOptions): Promise<void> {
 
     if (shouldBackup && updatedFiles.length > 0) {
       spinner.start('Criando backup...')
-      const backupDir = path.join(claudePath, '.backup', new Date().toISOString().replace(/[:.]/g, '-'))
+      const backupDir = path.join(
+        claudePath,
+        '.backup',
+        new Date().toISOString().replace(/[:.]/g, '-')
+      )
       await fs.ensureDir(backupDir)
 
       for (const update of updatedFiles) {

@@ -2,11 +2,14 @@
 import chalk from 'chalk'
 import { Command } from 'commander'
 import { agentCommand } from './commands/agent.js'
+import { configCommand } from './commands/config.js'
 import { deployCommand } from './commands/deploy.js'
 import { featureCommand } from './commands/feature.js'
+import { importCommand } from './commands/import.js'
 import { initCommand } from './commands/init.js'
 import { memoryCommand } from './commands/memory.js'
 import { specCommand } from './commands/spec.js'
+import { syncCommand } from './commands/sync.js'
 import { toolCommand } from './commands/tool.js'
 import { updateCommand } from './commands/update.js'
 import { workflowCommand } from './commands/workflow.js'
@@ -52,6 +55,7 @@ feature
   .option('-p, --priority <priority>', 'Prioridade (P0-P4)', 'P1')
   .option('-c, --context <file>', 'Arquivo de contexto adicional')
   .option('-d, --desc <description>', 'Descrição da feature (alternativa ao argumento posicional)')
+  .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
   .action((name, description, options) =>
     featureCommand.create(name, { ...options, description: options.desc || description })
   )
@@ -60,6 +64,7 @@ feature
   .command('research <name> [description]')
   .description('Executa fase de research da feature')
   .option('-c, --context <file>', 'Arquivo de contexto adicional')
+  .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
   .action((name, description, options) =>
     featureCommand.research(name, { ...options, description })
   )
@@ -73,6 +78,7 @@ feature
   .command('plan <name>')
   .description('Cria plano de implementação detalhado')
   .option('--skip-spec', 'Pula validação de spec (não recomendado)')
+  .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
   .action((name, options) => featureCommand.plan(name, options))
 
 feature
@@ -81,7 +87,10 @@ feature
   .option('--phase <phase>', 'Fase específica para implementar')
   .option('--skip-spec', 'Pula validação de spec (não recomendado)')
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
-  .action((name, options) => featureCommand.implement(name, { ...options, baseBranch: options.baseBranch }))
+  .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
+  .action((name, options) =>
+    featureCommand.implement(name, { ...options, baseBranch: options.baseBranch })
+  )
 
 feature
   .command('qa <name>')
@@ -341,6 +350,33 @@ tool
   .command('info <name>')
   .description('Mostra informações detalhadas de uma tool')
   .action((name) => toolCommand.info(name))
+
+// Comando: adk config
+const config = program.command('config').description('Gerencia configurações do ADK (integration)')
+
+config
+  .command('integration [provider]')
+  .description('Configura integração com ferramentas de projeto (ClickUp, etc)')
+  .option('--disable', 'Desabilita integração atual')
+  .option('--show', 'Mostra configuração atual')
+  .action((provider, options) => configCommand.integration(provider, options))
+
+// Comando: adk sync
+program
+  .command('sync [feature]')
+  .description('Sincroniza features com ferramenta de projeto integrada')
+  .option('--force', 'Força sincronização mesmo de features já sincronizadas')
+  .action((feature, options) => syncCommand.run(feature, options))
+
+// Comando: adk import
+program
+  .command('import')
+  .description('Importa tasks da ferramenta de projeto como features locais')
+  .option('--list', 'Lista tasks disponíveis sem importar')
+  .option('--dry-run', 'Mostra o que seria importado sem criar arquivos')
+  .option('--force', 'Sobrescreve features existentes')
+  .option('--id <taskId>', 'Importa task específica por ID')
+  .action((options) => importCommand.run(options))
 
 // Comando: adk report
 program
