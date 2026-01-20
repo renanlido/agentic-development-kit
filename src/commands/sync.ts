@@ -13,7 +13,7 @@ import type {
   SyncResult,
 } from '../providers/types.js'
 import { getIntegrationConfig, getProviderConfig } from '../utils/config.js'
-import { getMainRepoPath } from '../utils/paths.js'
+import { getMainRepoPath } from '../utils/git-paths.js'
 import {
   type ConflictResolution,
   createConflictReport,

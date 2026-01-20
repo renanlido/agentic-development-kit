@@ -366,8 +366,8 @@ IMPORTANTE:
     }
   }
 
-  async update(_options: MemoryOptions = {}): Promise<void> {
-    const spinner = ora('Atualizando memoria global...').start()
+  async sync(_options: MemoryOptions = {}): Promise<void> {
+    const spinner = ora('Sincronizando memoria global...').start()
 
     try {
       const globalPath = getMemoryPath()
@@ -379,7 +379,7 @@ IMPORTANTE:
       }
 
       const prompt = `
-UPDATE GLOBAL MEMORY
+SYNC GLOBAL MEMORY
 
 Arquivo: ${globalPath}
 
@@ -402,13 +402,18 @@ IMPORTANTE:
 
       await executeClaudeCommand(prompt)
 
-      spinner.succeed('Memoria global atualizada')
-      logger.success(`Atualizado: ${chalk.cyan('.claude/memory/')}`)
+      spinner.succeed('Memoria global sincronizada')
+      logger.success(`Sincronizado: ${chalk.cyan('.claude/memory/')}`)
     } catch (error) {
-      spinner.fail('Erro ao atualizar memoria')
+      spinner.fail('Erro ao sincronizar memoria')
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }
+  }
+
+  async update(options: MemoryOptions = {}): Promise<void> {
+    console.warn(chalk.yellow('⚠️  Deprecated: use "adk memory sync" instead of "adk memory update"'))
+    return this.sync(options)
   }
 
   async recall(query: string, options: { category?: string; limit?: string } = {}): Promise<void> {
@@ -487,6 +492,115 @@ IMPORTANTE:
       spinner.succeed(`Vínculo removido: "${decision.title}" de "${feature}"`)
     } catch (error) {
       spinner.fail('Erro ao remover vínculo')
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async status(): Promise<void> {
+    const spinner = ora('Verificando memórias...').start()
+
+    try {
+      const memories: Array<{
+        type: 'global' | 'feature'
+        name: string
+        lines: number
+        percentUsed: number
+        lastUpdated: Date
+        warning: boolean
+      }> = []
+
+      const globalPath = getMemoryPath()
+
+      if (await fs.pathExists(globalPath)) {
+        const content = await fs.readFile(globalPath, 'utf-8')
+        const stat = await fs.stat(globalPath)
+        const lines = countLines(content)
+        const percentUsed = Math.round((lines / MEMORY_LINE_LIMIT) * 100)
+
+        memories.push({
+          type: 'global',
+          name: 'project-context',
+          lines,
+          percentUsed,
+          lastUpdated: stat.mtime,
+          warning: percentUsed >= 80,
+        })
+      }
+
+      const featuresPath = getFeaturesBasePath()
+
+      if (await fs.pathExists(featuresPath)) {
+        const features = await fs.readdir(featuresPath)
+
+        for (const feature of features) {
+          const memoryPath = path.join(featuresPath, feature, 'memory.md')
+
+          if (await fs.pathExists(memoryPath)) {
+            const content = await fs.readFile(memoryPath, 'utf-8')
+            const stat = await fs.stat(memoryPath)
+            const lines = countLines(content)
+            const percentUsed = Math.round((lines / MEMORY_LINE_LIMIT) * 100)
+
+            memories.push({
+              type: 'feature',
+              name: feature,
+              lines,
+              percentUsed,
+              lastUpdated: stat.mtime,
+              warning: percentUsed >= 80,
+            })
+          }
+        }
+      }
+
+      spinner.stop()
+
+      if (memories.length === 0) {
+        console.log(chalk.yellow('Nenhuma memória encontrada'))
+        console.log(chalk.gray('Execute: adk init'))
+        return
+      }
+
+      console.log()
+      console.log(chalk.bold.cyan('Status das Memórias'))
+      console.log(chalk.gray('─'.repeat(60)))
+      console.log()
+
+      console.log(
+        chalk.gray(
+          `${'Tipo'.padEnd(10)} ${'Nome'.padEnd(25)} ${'Linhas'.padStart(8)} ${'Uso'.padStart(6)} ${'Última Atualização'.padStart(20)}`
+        )
+      )
+      console.log(chalk.gray('─'.repeat(60)))
+
+      for (const memory of memories) {
+        const typeLabel = memory.type === 'global' ? 'Global' : 'Feature'
+        const usageLabel = `${memory.percentUsed}%`
+        const dateLabel = memory.lastUpdated.toISOString().split('T')[0]
+
+        const usageColor = memory.warning ? chalk.yellow : chalk.green
+
+        console.log(
+          `${typeLabel.padEnd(10)} ${memory.name.padEnd(25)} ${String(memory.lines).padStart(8)} ${usageColor(usageLabel.padStart(6))} ${chalk.gray(dateLabel.padStart(20))}`
+        )
+      }
+
+      console.log()
+
+      const warnings = memories.filter((m) => m.warning)
+      if (warnings.length > 0) {
+        console.log(chalk.yellow('⚠️  Memórias próximas do limite (>= 80%):'))
+        for (const w of warnings) {
+          console.log(chalk.yellow(`   - ${w.name}: ${w.percentUsed}%`))
+        }
+        console.log(chalk.gray('   Execute: adk memory compact <feature>'))
+        console.log()
+      }
+
+      console.log(chalk.gray(`Total: ${memories.length} memórias | Limite: ${MEMORY_LINE_LIMIT} linhas`))
+    } catch (error) {
+      spinner.fail('Erro ao verificar memórias')
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }

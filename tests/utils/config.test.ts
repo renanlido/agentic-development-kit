@@ -4,9 +4,11 @@ import type { AdkConfig, IntegrationConfig } from '../../src/providers/types.js'
 import {
   getConfigPath,
   getIntegrationConfig,
+  getModelRoutingConfig,
   loadConfig,
   saveConfig,
   updateIntegrationConfig,
+  updateModelRoutingConfig,
 } from '../../src/utils/config.js'
 
 jest.mock('node:child_process', () => ({
@@ -382,6 +384,96 @@ describe('config utils', () => {
 
       const result = await isIntegrationEnabled()
       expect(result).toBe(false)
+    })
+  })
+
+  describe('getModelRoutingConfig', () => {
+    it('should return default model routing config when no config exists', async () => {
+      const routing = await getModelRoutingConfig()
+
+      expect(routing.enabled).toBe(true)
+      expect(routing.mapping?.research).toBe('opus')
+      expect(routing.mapping?.implement).toBe('sonnet')
+      expect(routing.mapping?.qa).toBe('haiku')
+    })
+
+    it('should load model routing config from file', async () => {
+      const config: AdkConfig = {
+        version: '1.0.0',
+        integration: {
+          provider: null,
+          enabled: false,
+          autoSync: false,
+          syncOnPhaseChange: true,
+          conflictStrategy: 'local-wins',
+        },
+        providers: {},
+        modelRouting: {
+          enabled: true,
+          mapping: {
+            research: 'haiku',
+            implement: 'opus',
+          },
+        },
+      }
+
+      await fs.writeJson(configPath, config, { spaces: 2 })
+
+      const routing = await getModelRoutingConfig()
+
+      expect(routing.enabled).toBe(true)
+      expect(routing.mapping?.research).toBe('haiku')
+      expect(routing.mapping?.implement).toBe('opus')
+      expect(routing.mapping?.qa).toBe('haiku')
+    })
+  })
+
+  describe('updateModelRoutingConfig', () => {
+    it('should update model routing config', async () => {
+      await updateModelRoutingConfig({
+        enabled: false,
+        mapping: { research: 'sonnet' },
+      })
+
+      const routing = await getModelRoutingConfig()
+      expect(routing.enabled).toBe(false)
+      expect(routing.mapping?.research).toBe('sonnet')
+    })
+
+    it('should preserve existing mappings when partially updating', async () => {
+      await updateModelRoutingConfig({
+        mapping: { research: 'haiku' },
+      })
+
+      const routing = await getModelRoutingConfig()
+      expect(routing.mapping?.research).toBe('haiku')
+      expect(routing.mapping?.implement).toBe('sonnet')
+      expect(routing.mapping?.qa).toBe('haiku')
+    })
+
+    it('should preserve other config sections when updating model routing', async () => {
+      const initialConfig: AdkConfig = {
+        version: '1.0.0',
+        integration: {
+          provider: 'clickup',
+          enabled: true,
+          autoSync: false,
+          syncOnPhaseChange: true,
+          conflictStrategy: 'local-wins',
+        },
+        providers: {
+          clickup: { workspaceId: 'ws-preserve' },
+        },
+      }
+
+      await saveConfig(initialConfig)
+
+      await updateModelRoutingConfig({ enabled: false })
+
+      const updated = await loadConfig()
+      expect(updated.integration.provider).toBe('clickup')
+      expect(updated.providers.clickup?.workspaceId).toBe('ws-preserve')
+      expect(updated.modelRouting?.enabled).toBe(false)
     })
   })
 })
