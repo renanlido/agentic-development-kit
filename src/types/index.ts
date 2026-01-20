@@ -1,6 +1,7 @@
 export * from './cdr'
 export * from './memory'
 export * from './model'
+export * from './progress-sync'
 export * from './provider'
 export * from './report'
 export * from './spec'
