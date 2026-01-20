@@ -1,5 +1,8 @@
 node_modules/
 dist/
+
+# Força o tracking da pasta .claude (sobrescreve gitignore global)
+!.claude/
 .env
 .env.local
 *.log
