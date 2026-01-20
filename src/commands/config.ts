@@ -11,7 +11,8 @@ import {
   setProviderConfig,
   updateIntegrationConfig,
 } from '../utils/config.js'
-import { getMainRepoPath } from '../utils/paths.js'
+import { getMainRepoPath } from '../utils/git-paths.js'
+import { migrateHooksConfig } from '../utils/migration.js'
 
 interface ConfigOptions {
   disable?: boolean
@@ -325,6 +326,39 @@ export class ConfigCommand {
     console.log()
     console.log(chalk.gray('Your configuration is preserved. Re-enable with:'))
     console.log(chalk.gray(`  adk config integration ${integration.provider}`))
+  }
+
+  async migrateHooks(): Promise<void> {
+    const spinner = ora('Migrating hooks configuration...').start()
+
+    try {
+      const result = await migrateHooksConfig()
+
+      if (!result.success) {
+        spinner.fail('Migration failed')
+        console.log(chalk.red(`Error: ${result.error || result.message}`))
+        return
+      }
+
+      if (result.migratedHooks) {
+        spinner.succeed('Hooks migrated successfully')
+        console.log()
+        console.log(chalk.green('✅ Hooks configuration migrated to .adk/config.json'))
+        console.log()
+
+        if (result.backupPath) {
+          console.log(chalk.gray(`Backup created: ${result.backupPath}`))
+        }
+
+        const hookTypes = Object.keys(result.migratedHooks)
+        console.log(chalk.cyan(`Migrated hook types: ${hookTypes.join(', ')}`))
+      } else {
+        spinner.succeed(result.message)
+      }
+    } catch (error) {
+      spinner.fail('Migration failed')
+      throw error
+    }
   }
 }
 

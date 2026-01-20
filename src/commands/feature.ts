@@ -7,6 +7,8 @@ import ora from 'ora'
 import { createClickUpProvider } from '../providers/clickup/index.js'
 import type { LocalFeature, ProviderSpecificConfig } from '../providers/types.js'
 import { executeClaudeCommand } from '../utils/claude'
+import { getModelForPhase } from '../utils/model-router'
+import { ModelType } from '../types/model'
 import { getIntegrationConfig, getProviderConfig } from '../utils/config.js'
 import {
   getClaudePath as getClaudePathUtil,
@@ -33,6 +35,7 @@ interface FeatureOptions {
   skipSpec?: boolean
   baseBranch?: string
   noSync?: boolean
+  model?: string
 }
 
 interface QuickOptions {
@@ -635,7 +638,8 @@ IMPORTANTE:
 Output: Salve o PRD em ${prdPath}
 `
 
-          await executeClaudeCommand(prdPrompt)
+          const prdModel = getModelForPhase('prd', options.model as ModelType | undefined)
+          await executeClaudeCommand(prdPrompt, { model: prdModel })
           spinner.succeed('PRD gerado a partir do contexto')
         } else {
           const prdTemplate = await loadTemplate('prd-template.md')
@@ -710,7 +714,6 @@ ${featureContext}
 
       await this.setActiveFocus(name, state.currentStage)
 
-      const progress = await loadProgress(name)
       await this.syncFeatureToRemote(name, progress, options.noSync)
 
       console.log()
@@ -876,7 +879,8 @@ Estrutura do research.md:
 [Lista de considerações]
 `
 
-      await executeClaudeCommand(prompt)
+      const researchModel = getModelForPhase('research', options.model as ModelType | undefined)
+      await executeClaudeCommand(prompt, { model: researchModel })
 
       spinner.succeed('Research concluído')
 
@@ -1015,7 +1019,8 @@ Output: .claude/plans/features/${name}/implementation-plan.md
 IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
 `
 
-      await executeClaudeCommand(prompt)
+      const planModel = getModelForPhase('planning', options.model as ModelType | undefined)
+      await executeClaudeCommand(prompt, { model: planModel })
 
       spinner.succeed('Plano criado')
 
@@ -1042,7 +1047,7 @@ IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
     }
   }
 
-  async tasks(name: string): Promise<void> {
+  async tasks(name: string, options: FeatureOptions = {}): Promise<void> {
     const spinner = ora('Criando breakdown de tasks...').start()
 
     try {
@@ -1146,7 +1151,8 @@ IMPORTANTE:
 - Cada task deve ter criterios de aceitacao claros
 `
 
-      await executeClaudeCommand(prompt)
+      const tasksModel = getModelForPhase('planning', options.model as ModelType | undefined)
+      await executeClaudeCommand(prompt, { model: tasksModel })
 
       spinner.succeed('Tasks criadas')
 
@@ -1326,7 +1332,8 @@ Não avance para próxima fase até atual estar completa.
 `
 
       spinner.text = 'Executando implementação com Claude Code...'
-      await executeClaudeCommand(prompt)
+      const implModel = getModelForPhase('implement', options.model as ModelType | undefined)
+      await executeClaudeCommand(prompt, { model: implModel })
 
       spinner.succeed('Implementação concluída')
 
@@ -1523,7 +1530,8 @@ Estrutura do report:
 Se encontrar issues CRITICAL ou HIGH, o status deve ser FAIL.
 `
 
-      await executeClaudeCommand(prompt)
+      const qaModel = getModelForPhase('qa', options.model as ModelType | undefined)
+      await executeClaudeCommand(prompt, { model: qaModel })
 
       spinner.succeed('QA concluído')
 
@@ -1674,7 +1682,8 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 - NAO crie documentacao desnecessaria
 `
 
-      await executeClaudeCommand(prompt)
+      const docsModel = getModelForPhase('docs', options.model as ModelType | undefined)
+      await executeClaudeCommand(prompt, { model: docsModel })
 
       spinner.succeed('Documentação gerada')
 
@@ -2524,7 +2533,8 @@ NAO crie PRD, tasks, ou documentacao formal. Isso e uma tarefa rapida.
 `
 
     try {
-      await executeClaudeCommand(prompt)
+      const defaultModel = getModelForPhase('default')
+      await executeClaudeCommand(prompt, { model: defaultModel })
 
       console.log()
       console.log(chalk.bold.green('✅ Quick task concluída!'))

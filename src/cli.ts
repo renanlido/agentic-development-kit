@@ -8,6 +8,7 @@ import { featureCommand } from './commands/feature.js'
 import { importCommand } from './commands/import.js'
 import { initCommand } from './commands/init.js'
 import { memoryCommand } from './commands/memory.js'
+import { reportCommand } from './commands/report.js'
 import { specCommand } from './commands/spec.js'
 import { syncCommand } from './commands/sync.js'
 import { toolCommand } from './commands/tool.js'
@@ -56,6 +57,7 @@ feature
   .option('-c, --context <file>', 'Arquivo de contexto adicional')
   .option('-d, --desc <description>', 'Descrição da feature (alternativa ao argumento posicional)')
   .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
+  .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
   .action((name, description, options) =>
     featureCommand.create(name, { ...options, description: options.desc || description })
   )
@@ -65,6 +67,7 @@ feature
   .description('Executa fase de research da feature')
   .option('-c, --context <file>', 'Arquivo de contexto adicional')
   .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
+  .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
   .action((name, description, options) =>
     featureCommand.research(name, { ...options, description })
   )
@@ -72,13 +75,15 @@ feature
 feature
   .command('tasks <name>')
   .description('Cria breakdown de tasks a partir do PRD/research')
-  .action((name) => featureCommand.tasks(name))
+  .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
+  .action((name, options) => featureCommand.tasks(name, options))
 
 feature
   .command('plan <name>')
   .description('Cria plano de implementação detalhado')
   .option('--skip-spec', 'Pula validação de spec (não recomendado)')
   .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
+  .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
   .action((name, options) => featureCommand.plan(name, options))
 
 feature
@@ -88,6 +93,7 @@ feature
   .option('--skip-spec', 'Pula validação de spec (não recomendado)')
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
   .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
+  .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
   .action((name, options) =>
     featureCommand.implement(name, { ...options, baseBranch: options.baseBranch })
   )
@@ -96,13 +102,15 @@ feature
   .command('qa <name>')
   .description('Executa revisão de qualidade (QA) - requer worktree')
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
-  .action((name, options) => featureCommand.qa(name, { baseBranch: options.baseBranch }))
+  .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
+  .action((name, options) => featureCommand.qa(name, { baseBranch: options.baseBranch, model: options.model }))
 
 feature
   .command('docs <name>')
   .description('Gera/atualiza documentação da feature - requer worktree')
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
-  .action((name, options) => featureCommand.docs(name, { baseBranch: options.baseBranch }))
+  .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
+  .action((name, options) => featureCommand.docs(name, { baseBranch: options.baseBranch, model: options.model }))
 
 feature
   .command('finish <name>')
@@ -229,7 +237,7 @@ deploy
 const memory = program
   .command('memory')
   .description(
-    'Gerencia memoria especializada por feature (save, load, view, compact, search, update)'
+    'Gerencia memoria especializada por feature (status, save, load, view, compact, search, sync)'
   )
 
 memory
@@ -260,8 +268,13 @@ memory
   .action((query, options) => memoryCommand.search(query, options))
 
 memory
+  .command('sync')
+  .description('Sincroniza memoria global do projeto')
+  .action(() => memoryCommand.sync())
+
+memory
   .command('update')
-  .description('Atualiza memoria global do projeto')
+  .description('(Deprecated: use sync) Atualiza memoria global')
   .action(() => memoryCommand.update())
 
 memory
@@ -287,6 +300,11 @@ memory
   .option('--format <format>', 'Formato de export (json, md)', 'md')
   .option('--output <path>', 'Caminho de saída')
   .action((options) => memoryCommand.export(options))
+
+memory
+  .command('status')
+  .description('Lista todas as memórias com estatísticas de uso')
+  .action(() => memoryCommand.status())
 
 // Comando: adk spec
 const spec = program
@@ -367,6 +385,11 @@ config
   .option('--show', 'Mostra configuração atual')
   .action((provider, options) => configCommand.integration(provider, options))
 
+config
+  .command('migrate-hooks')
+  .description('Migra configuração de hooks de .claude/settings.json para .adk/config.json')
+  .action(() => configCommand.migrateHooks())
+
 // Comando: adk sync
 program
   .command('sync [feature]')
@@ -387,13 +410,10 @@ program
 // Comando: adk report
 program
   .command('report')
-  .description('Gera relatórios (--weekly, --feature)')
-  .option('-w, --weekly', 'Relatório semanal')
-  .option('-f, --feature <feature>', 'Relatório de feature específica')
-  .action((_options) => {
-    console.log(chalk.blue('Gerando relatório...'))
-    // TODO: implementar
-  })
+  .description('Gera relatórios de atividade')
+  .option('-w, --weekly', 'Relatório semanal com commits e features')
+  .option('-f, --feature <feature>', 'Relatório detalhado de uma feature')
+  .action((options) => reportCommand.run(options))
 
 // Error handling
 program.on('command:*', () => {

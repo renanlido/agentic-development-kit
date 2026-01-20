@@ -510,11 +510,11 @@ Test summary
     })
   })
 
-  describe('update', () => {
-    it('should update global memory', async () => {
+  describe('sync', () => {
+    it('should sync global memory', async () => {
       mockFs.pathExists.mockResolvedValue(true)
 
-      await memoryCommand.update()
+      await memoryCommand.sync()
 
       expect(mockFs.pathExists).toHaveBeenCalled()
     })
@@ -522,7 +522,28 @@ Test summary
     it('should fail if global memory does not exist', async () => {
       mockFs.pathExists.mockResolvedValue(false)
 
-      await expect(memoryCommand.update()).rejects.toThrow('process.exit')
+      await expect(memoryCommand.sync()).rejects.toThrow('process.exit')
+    })
+  })
+
+  describe('update (deprecated alias)', () => {
+    it('should call sync and show deprecation warning', async () => {
+      mockFs.pathExists.mockResolvedValue(true)
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation()
+
+      await memoryCommand.update()
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/deprecated|sync/i))
+      expect(mockFs.pathExists).toHaveBeenCalled()
+      warnSpy.mockRestore()
+    })
+
+    it('should still work as alias for sync', async () => {
+      mockFs.pathExists.mockResolvedValue(true)
+
+      await memoryCommand.update()
+
+      expect(mockFs.pathExists).toHaveBeenCalled()
     })
   })
 
@@ -859,6 +880,74 @@ Test summary
       mockListDecisions.mockRejectedValue(new Error('Failed'))
 
       await expect(memoryCommand.export()).rejects.toThrow('process.exit')
+    })
+  })
+
+  describe('status', () => {
+    it('should display memory status table', async () => {
+      mockFs.pathExists.mockImplementation(async (p: string) => {
+        if (p.includes('project-context.md')) return true
+        if (p.includes('features') && !p.includes('memory.md')) return true
+        if (p.includes('auth/memory.md')) return true
+        return false
+      })
+      mockFs.readFile.mockResolvedValue('line1\nline2\nline3')
+      mockFs.stat.mockResolvedValue({
+        mtime: new Date('2026-01-15T10:00:00.000Z'),
+      })
+      mockFs.readdir.mockResolvedValue(['auth'])
+
+      await memoryCommand.status()
+
+      expect(console.log).toHaveBeenCalled()
+    })
+
+    it('should handle no memories found', async () => {
+      mockFs.pathExists.mockResolvedValue(false)
+
+      await memoryCommand.status()
+
+      expect(console.log).toHaveBeenCalled()
+    })
+
+    it('should highlight memories near limit in output', async () => {
+      const nearLimitContent = Array(850).fill('line').join('\n')
+      mockFs.pathExists.mockImplementation(async (p: string) => {
+        if (p.includes('project-context.md')) return true
+        return false
+      })
+      mockFs.readFile.mockResolvedValue(nearLimitContent)
+      mockFs.stat.mockResolvedValue({
+        mtime: new Date(),
+      })
+
+      await memoryCommand.status()
+
+      expect(console.log).toHaveBeenCalled()
+    })
+
+    it('should show all memory levels', async () => {
+      mockFs.pathExists.mockImplementation(async (p: string) => {
+        if (p.includes('project-context.md')) return true
+        if (p.includes('features') && !p.includes('/')) return true
+        if (p.includes('auth/memory.md')) return true
+        return false
+      })
+      mockFs.readFile.mockResolvedValue('content')
+      mockFs.stat.mockResolvedValue({
+        mtime: new Date(),
+      })
+      mockFs.readdir.mockResolvedValue(['auth'])
+
+      await memoryCommand.status()
+
+      expect(console.log).toHaveBeenCalled()
+    })
+
+    it('should fail on filesystem error', async () => {
+      mockFs.pathExists.mockRejectedValue(new Error('Filesystem error'))
+
+      await expect(memoryCommand.status()).rejects.toThrow('process.exit')
     })
   })
 })

@@ -10,7 +10,7 @@ import type {
   RemoteFeature,
   SyncResult,
 } from '../types/provider.js'
-import { getFeaturePath } from '../utils/paths.js'
+import { getFeaturePath } from '../utils/git-paths.js'
 import { loadProgress } from '../utils/progress.js'
 
 export class LocalProvider implements ProjectProvider {

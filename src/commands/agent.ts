@@ -11,7 +11,6 @@ import {
   executeWithFallback,
   formatParallelResult,
 } from '../utils/parallel-executor.js'
-import { getClaudePath } from '../utils/paths.js'
 
 interface AgentOptions {
   type?: string

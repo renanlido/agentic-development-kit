@@ -1,6 +1,6 @@
 import path from 'node:path'
 import fs from 'fs-extra'
-import { getMainRepoPath } from './paths.js'
+import { getMainRepoPath } from './git-paths.js'
 
 export interface QueuedOperation {
   id: string

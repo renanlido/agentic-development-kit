@@ -1,10 +1,10 @@
 # Agentic Development Kit (ADK)
 
-> CLI toolkit para desenvolvimento com Claude Code usando framework CADD
+> CLI toolkit para desenvolvimento com Claude Code usando framework CADD (Context-Agentic Development & Delivery)
 
 ## O que e o ADK?
 
-O ADK e um orquestrador de prompts para Claude Code. Ele nao executa codigo diretamente - ele gera prompts estruturados e envia para o Claude Code fazer o trabalho real.
+O ADK e um **orquestrador de prompts** para Claude Code. Ele nao executa codigo diretamente - ele gera prompts estruturados e envia para o Claude Code fazer o trabalho real.
 
 ```
 Voce roda: adk feature plan auth
@@ -15,6 +15,21 @@ ADK executa: claude "prompt..."
            |
 Claude Code faz o trabalho (le, escreve, implementa)
 ```
+
+**Principais caracteristicas:**
+- Workflow completo de desenvolvimento: PRD > Research > Tasks > Plan > Implement > QA > Docs
+- Isolamento via git worktrees (cada feature em branch separada)
+- Sistema de memoria hierarquica (4 niveis: Project > Feature > Phase > Session)
+- Retrieval dinamico de contexto (Agentic RAG)
+- Roteamento inteligente de modelos por fase
+- Resiliencia cognitiva (CDR): health probes, retry, recovery, fallback
+- AI-on-AI review para maior qualidade
+- Quality gates com risk scoring
+- 8 agents especializados (analyzer, implementer, tester, etc)
+- Integracao com project management (ClickUp)
+- TDD enforced (testes primeiro, sempre)
+
+---
 
 ## Instalacao
 
@@ -28,6 +43,13 @@ npm link
 adk --version
 ```
 
+**Requisitos:**
+- Node.js >= 18
+- Git
+- Claude Code CLI instalado (`claude --version`)
+
+---
+
 ## Quick Start
 
 ```bash
@@ -35,28 +57,7 @@ cd meu-projeto-existente
 adk init
 ```
 
----
-
-# Comandos
-
-## adk init
-
-Adiciona estrutura CADD (.claude/) a um projeto existente.
-
-### CLI
-
-```bash
-adk init
-adk init -n "Meu Projeto"
-```
-
-### Opcoes
-
-| Opcao | Descricao | Default |
-|-------|-----------|---------|
-| `-n, --name` | Nome do projeto | nome da pasta |
-
-### O que e criado
+Isso cria a estrutura CADD no seu projeto:
 
 ```
 projeto/
@@ -65,302 +66,221 @@ projeto/
     ├── memory/project-context.md
     ├── agents/                  # 8 agentes especializados
     ├── skills/                  # 4 skills com templates
-    ├── commands/                # 6 slash commands
+    ├── commands/                # 9 slash commands
     ├── rules/                   # 4 regras de qualidade
-    ├── hooks/                   # 5 hooks de automacao
+    ├── hooks/                   # 6 hooks de automacao
     ├── settings.json
     └── ...
 ```
 
-### Direto no Claude Code
+---
+
+## Arquitetura
+
+### Visao Geral
 
 ```
-Crie a estrutura CADD neste projeto:
-- .claude/memory/
-- .claude/plans/features/
-- .claude/agents/
-- .claude/skills/
-- .claude/commands/
-- .claude/rules/
-- .claude/hooks/
+┌─────────────────────────────────────────────────────────────────┐
+│                         ADK CLI                                  │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐   │
+│  │ feature │ │workflow │ │  agent  │ │ memory  │ │ deploy  │   │
+│  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘   │
+│       │           │           │           │           │         │
+│       └───────────┴───────────┴───────────┴───────────┘         │
+│                              │                                   │
+│                    ┌─────────▼─────────┐                        │
+│                    │  Prompt Generator  │                        │
+│                    │  (utils/claude.ts) │                        │
+│                    └─────────┬─────────┘                        │
+└──────────────────────────────┼──────────────────────────────────┘
+                               │
+                    ┌──────────▼──────────┐
+                    │   Claude Code CLI    │
+                    │  (executa prompts)   │
+                    └─────────────────────┘
 ```
+
+### Componentes Principais
+
+| Componente | Localizacao | Responsabilidade |
+|------------|-------------|------------------|
+| CLI Entry | `src/cli.ts` | Parser de comandos (Commander.js) |
+| Feature Command | `src/commands/feature.ts` | Lifecycle de features |
+| Workflow Command | `src/commands/workflow.ts` | Workflows automatizados |
+| Agent Command | `src/commands/agent.ts` | Gerenciamento de agents |
+| Memory Command | `src/commands/memory.ts` | Sistema de memoria |
+| Templates | `templates/` | Templates de PRD, tasks, plans |
+| Providers | `src/providers/` | Integracao externa (ClickUp) |
+
+### Fluxo de Feature (7 Fases)
+
+```
+┌─────────┐    ┌──────────┐    ┌───────┐    ┌──────────────┐
+│   PRD   │───▶│ Research │───▶│ Tasks │───▶│ Architecture │
+└─────────┘    └──────────┘    └───────┘    └──────────────┘
+                                                    │
+┌─────────┐    ┌──────────┐    ┌────┐              │
+│  Docs   │◀───│    QA    │◀───│Impl│◀─────────────┘
+└─────────┘    └──────────┘    └────┘
+                                  │
+                            ┌─────▼─────┐
+                            │  Finish   │
+                            │(PR/Merge) │
+                            └───────────┘
+```
+
+Cada fase gera arquivos em `.claude/plans/features/<nome>/`:
+- `prd.md` - Product Requirements
+- `research.md` - Analise do codebase
+- `tasks.md` - Breakdown de tasks
+- `implementation-plan.md` - Plano detalhado
+- `qa-report.md` - Relatorio de QA
 
 ---
 
-## adk quick (ou adk q)
+## Comandos
 
-Tarefa rapida sem processo formal. Para bugs, ajustes, micro features.
+### adk init
 
-### CLI
+Adiciona estrutura CADD a um projeto existente.
 
 ```bash
-adk quick "corrigir botao de login no mobile"
-adk q "adicionar validacao de email"
-
-adk quick "fix parser error" -f src/utils/parser.ts
-
-adk quick "ajustar cor" --no-test
-
-adk quick "fix typo" --commit
+adk init
+adk init -n "Meu Projeto"
 ```
-
-### Opcoes
 
 | Opcao | Descricao | Default |
 |-------|-----------|---------|
-| `-f, --file` | Arquivo especifico para focar | - |
-| `-t, --test` | Rodar testes apos | true |
-| `--no-test` | Nao rodar testes | - |
-| `--commit` | Commit automatico | false |
-
-### Direto no Claude Code
-
-```
-QUICK TASK: [descricao do problema]
-
-Regras:
-1. Analise rapida - identifique o problema
-2. Solucao minima - apenas o necessario
-3. Nao refatore codigo nao relacionado
-4. Rode testes existentes
-
-Ao final: mostre o que alterou e se testes passaram.
-```
+| `-n, --name` | Nome do projeto | nome da pasta |
 
 ---
 
-## adk feature new
+### adk update
 
-Cria nova feature com estrutura completa.
+Atualiza templates ADK sem perder dados existentes.
 
-### CLI
+```bash
+adk update              # Atualiza todos
+adk update --commands   # Apenas comandos
+adk update --hooks      # Apenas hooks
+adk update --force      # Sem confirmacao
+```
+
+| Opcao | Descricao |
+|-------|-----------|
+| `--commands` | Atualiza apenas slash commands |
+| `--hooks` | Atualiza apenas hooks |
+| `--agents` | Atualiza apenas agents |
+| `--rules` | Atualiza apenas rules |
+| `--skills` | Atualiza apenas skills |
+| `--all` | Atualiza tudo |
+| `--force` | Sem confirmacao |
+| `--no-backup` | Nao cria backup |
+
+---
+
+### adk feature
+
+Gerencia o lifecycle completo de features.
+
+#### feature new
 
 ```bash
 adk feature new auth
 adk feature new auth "Sistema de autenticacao com JWT"
-
 adk feature new auth -c /path/to/spec.md
-
-adk feature new auth "Resumo" -c /path/to/detalhes.md
+adk feature new auth -p P0  # Prioridade
 ```
-
-### Opcoes
 
 | Opcao | Descricao |
 |-------|-----------|
 | `[description]` | Descricao da feature |
 | `-c, --context` | Arquivo de contexto |
 | `-p, --priority` | Prioridade (P0-P4) |
+| `--no-sync` | Nao sincroniza com PM tool |
 
-### Arquivos criados
-
-```
-.claude/plans/features/auth/
-  prd.md          # Product Requirements
-  tasks.md        # Task breakdown
-  plan.md         # Implementation plan
-  context.md      # Contexto especifico
-```
-
-### Direto no Claude Code
-
-```
-Crie estrutura para feature "auth":
-1. Criar pasta .claude/plans/features/auth/
-2. Criar prd.md com template de PRD
-3. Criar tasks.md com template de tasks
-4. Criar context.md com: [contexto aqui]
-5. Criar branch feature/auth
-```
-
----
-
-## adk feature research
-
-Fase de pesquisa - analisa codebase antes de implementar.
-
-### CLI
+#### feature research
 
 ```bash
 adk feature research auth
-
 adk feature research auth "Focar em seguranca"
-
-adk feature research auth -c /path/to/requirements.md
 ```
 
-### Opcoes
+**Output:** `.claude/plans/features/auth/research.md`
 
-| Opcao | Descricao |
-|-------|-----------|
-| `[description]` | Contexto adicional |
-| `-c, --context` | Arquivo de contexto |
+#### feature tasks
 
-### Output
-
-```
-.claude/plans/features/auth/research.md
+```bash
+adk feature tasks auth
 ```
 
-### Direto no Claude Code
+**Prereq:** research.md deve existir
+**Output:** `.claude/plans/features/auth/tasks.md`
 
-```
-RESEARCH: feature auth
-
-1. Analise o codebase:
-   - Componentes similares
-   - Padroes existentes
-   - Tech stack
-
-2. Identifique:
-   - Arquivos a criar
-   - Arquivos a modificar
-   - Riscos tecnicos
-
-3. Salve em .claude/plans/features/auth/research.md
-```
-
----
-
-## adk feature plan
-
-Cria plano detalhado de implementacao.
-
-### CLI
+#### feature plan
 
 ```bash
 adk feature plan auth
+adk feature plan auth --skip-spec
 ```
 
-### Pre-requisito
+**Prereq:** tasks.md deve existir
+**Output:** `.claude/plans/features/auth/implementation-plan.md`
 
-Requer `research.md` existir.
-
-### Output
-
-```
-.claude/plans/features/auth/implementation-plan.md
-```
-
-### Direto no Claude Code
-
-```
-PLANNING: feature auth
-
-Leia:
-- .claude/plans/features/auth/prd.md
-- .claude/plans/features/auth/research.md
-
-Crie plano com:
-- Fases de implementacao
-- Tasks por fase
-- Testes necessarios
-- Criterios de aceitacao
-- Ordem de implementacao
-
-Output: .claude/plans/features/auth/implementation-plan.md
-```
-
----
-
-## adk feature implement
-
-Implementa feature seguindo TDD.
-
-### CLI
+#### feature implement
 
 ```bash
 adk feature implement auth
-
 adk feature implement auth --phase 1
+adk feature implement auth --base-branch develop
 ```
 
-### Pre-requisito
-
-Requer `implementation-plan.md` existir.
-
-### Opcoes
+**Prereq:** implementation-plan.md deve existir
+**Comportamento:** Cria worktree isolado em `.worktrees/auth/`
 
 | Opcao | Descricao |
 |-------|-----------|
 | `--phase` | Fase especifica |
+| `--skip-spec` | Pula validacao de spec |
+| `--base-branch` | Branch base (default: main) |
 
-### Direto no Claude Code
-
-```
-IMPLEMENTATION (TDD): feature auth
-
-Leia: .claude/plans/features/auth/implementation-plan.md
-
-Para cada task:
-1. RED: Escreva teste que falha
-2. GREEN: Implemente codigo minimo
-3. REFACTOR: Melhore mantendo testes passando
-4. Commit
-
-Criterios:
-- Todos testes passam
-- Coverage >= 80%
-- Lint clean
-```
-
----
-
-## adk feature autopilot
-
-Fluxo completo automatizado: PRD -> Tasks -> Arquitetura -> Implementacao -> Revisao -> Documentacao
-
-### CLI
+#### feature qa
 
 ```bash
-adk feature autopilot auth
-
-adk feature autopilot auth "Sistema de login com OAuth"
-
-adk feature autopilot auth -c /path/to/spec.md
+adk feature qa auth
 ```
 
-### Opcoes
+**Prereq:** Worktree deve existir (rode implement primeiro)
+**Output:** `.claude/plans/features/auth/qa-report.md`
 
-| Opcao | Descricao |
-|-------|-----------|
-| `[description]` | Descricao da feature |
-| `-c, --context` | Arquivo de contexto |
+#### feature docs
 
-### Comportamento
-
-- **Retomavel**: se parar no meio, roda novamente e continua de onde parou
-- **Pergunta entre etapas**: confirma antes de prosseguir
-- **6 etapas**: Entendimento -> Breakdown -> Arquitetura -> Implementacao -> Revisao -> Documentacao
-
-### Direto no Claude Code
-
-```
-AUTOPILOT: feature auth
-
-Etapas:
-1. Entendimento - pergunte sobre a feature, crie PRD
-2. Breakdown - quebre em tasks atomicas
-3. Arquitetura - desenhe arquitetura (ASCII), crie plano
-4. Implementacao - TDD rigoroso
-5. Revisao - checklist de qualidade
-6. Documentacao - README, JSDoc
+```bash
+adk feature docs auth
 ```
 
----
+**Prereq:** Worktree deve existir
 
-## adk feature list
+#### feature finish
 
-Lista todas as features e seus status.
+```bash
+adk feature finish auth
+adk feature finish auth --base-branch develop
+```
 
-### CLI
+**Comportamento:**
+1. Commit das mudancas
+2. Push para remote
+3. Cria PR ou merge
+4. Cleanup do worktree
+
+#### feature list
 
 ```bash
 adk feature list
 ```
 
-### Output
-
+**Output:**
 ```
 Features do Projeto:
 
@@ -369,264 +289,332 @@ Features do Projeto:
   * dashboard     Created
 ```
 
----
-
-## adk memory
-
-Gerencia memoria especializada por feature.
-
-### CLI
+#### feature next
 
 ```bash
-adk memory save auth
-
-adk memory load auth
-
-adk memory view auth
-
-adk memory view --global
-
-adk memory compact auth
-
-adk memory search "OAuth"
-adk memory search "login" -f auth
-
-adk memory update
+adk feature next auth    # Proxima etapa de auth
+adk feature next         # Proxima etapa da feature ativa
+adk feature n            # Alias
 ```
 
-### Subcomandos
+#### feature autopilot
 
-| Comando | Descricao |
-|---------|-----------|
-| `save <feature>` | Salva contexto atual para feature |
-| `load <feature>` | Carrega memoria de feature |
-| `view [feature]` | Visualiza memoria |
-| `compact <feature>` | Compacta memoria grande |
-| `search <query>` | Busca em memorias |
-| `update` | Atualiza memoria global |
-
-### Direto no Claude Code
-
+```bash
+adk feature autopilot auth
+adk feature autopilot auth "Sistema de login com OAuth"
+adk feature autopilot auth -c /path/to/spec.md
 ```
-Salve o contexto atual da feature "auth" em:
-.claude/plans/features/auth/memory.md
 
-Inclua:
-- Estado atual
-- Decisoes tomadas
-- Proximos passos
-- Bloqueios
-```
+**Comportamento:**
+- Executa todas as fases automaticamente
+- Retomavel: se parar no meio, continua de onde parou
+- Isolado: usa worktree separado
 
 ---
 
-## adk workflow daily
+### adk quick (ou adk q)
 
-Rotina diaria de setup.
+Tarefa rapida sem processo formal. Para bugs, ajustes, micro features.
 
-### CLI
+```bash
+adk quick "corrigir botao de login no mobile"
+adk q "adicionar validacao de email"
+adk quick "fix parser error" -f src/utils/parser.ts
+adk quick "ajustar cor" --no-test
+adk quick "fix typo" --commit
+```
+
+| Opcao | Descricao | Default |
+|-------|-----------|---------|
+| `-f, --file` | Arquivo especifico | - |
+| `-t, --test` | Rodar testes | true |
+| `--no-test` | Nao rodar testes | - |
+| `--commit` | Commit automatico | false |
+
+---
+
+### adk workflow
+
+Workflows automatizados de desenvolvimento.
+
+#### workflow daily
 
 ```bash
 adk workflow daily
 ```
 
-### Direto no Claude Code
+**Comportamento:**
+- Reviews git log desde ontem
+- Atualiza project memory
+- Cria nota em `.claude/daily/YYYY-MM-DD.md`
 
-```
-DAILY WORKFLOW:
-
-1. git log desde ontem
-2. Identifique work in progress
-3. Atualize .claude/memory/project-context.md
-4. Crie nota em .claude/daily/YYYY-MM-DD.md
-```
-
----
-
-## adk workflow pre-commit
-
-Validacao antes de commit.
-
-### CLI
+#### workflow pre-commit
 
 ```bash
 adk workflow pre-commit
 ```
 
-### Direto no Claude Code
+**Verifica:**
+- console.log/debugger
+- Secrets hardcoded
+- TODOs criticos
+- Testes quebrados
 
-```
-PRE-COMMIT:
-
-1. git diff --cached
-2. Verifique:
-   - Console.log/debug
-   - Secrets hardcoded
-   - TODOs criticos
-   - Testes quebrados
-3. npm test
-4. Reporte problemas
-```
-
----
-
-## adk workflow qa
-
-QA completo de feature.
-
-### CLI
-
-```bash
-adk workflow qa auth
-```
-
-### Direto no Claude Code
-
-```
-QA: feature auth
-
-Checklist:
-1. Lint/format - npm run check
-2. Testes - npm test (coverage >= 80%)
-3. Performance - p95 < 100ms
-4. Seguranca - SQL injection, XSS, secrets
-5. Self-review - codigo legivel?
-
-Output: .claude/plans/features/auth/qa-report.md
-```
-
----
-
-## adk workflow pre-deploy
-
-Checklist completo antes de deploy.
-
-### CLI
+#### workflow pre-deploy
 
 ```bash
 adk workflow pre-deploy -f auth
 ```
 
-### Direto no Claude Code
-
-```
-PRE-DEPLOY: feature auth
-
-Checklist:
+**Checklist:**
 - [ ] Testes passando
 - [ ] Coverage adequado
 - [ ] Sem vulnerabilidades
 - [ ] Documentacao atualizada
 - [ ] Feature flags configurados
 - [ ] Monitoring setup
-- [ ] Rollback plan
 
-Resultado: GO / NO-GO
-```
+**Resultado:** GO / NO-GO
 
 ---
 
-## adk agent create
+### adk agent
 
-Cria novo agent especializado.
+Gerencia agents especializados.
 
-### CLI
+#### agent create
 
 ```bash
 adk agent create security-scanner
-
 adk agent create optimizer -t analyzer
 ```
 
-### Opcoes
-
 | Opcao | Descricao |
 |-------|-----------|
-| `-t, --type` | Tipo (analyzer, implementer, tester) |
+| `-t, --type` | Tipo (analyzer, implementer, tester, generic) |
 
-### Arquivo criado
-
-```
-.claude/agents/security-scanner.md
-```
-
----
-
-## adk agent run
-
-Executa um agent.
-
-### CLI
+#### agent run
 
 ```bash
 adk agent run security-scanner
-
 adk agent run optimizer -c "Focar em queries SQL"
 ```
 
-### Opcoes
-
-| Opcao | Descricao |
-|-------|-----------|
-| `-c, --context` | Contexto adicional |
-
----
-
-## adk agent pipeline
-
-Executa pipeline de agents para feature.
-
-### CLI
+#### agent pipeline
 
 ```bash
 adk agent pipeline auth
 ```
 
-### Pipeline padrao
+**Pipeline padrao:** analyzer > optimizer > documenter
 
+#### agent parallel
+
+```bash
+adk agent parallel auth
+adk agent parallel auth --max-agents 5
+adk agent parallel auth --fallback-sequential
 ```
-analyzer -> optimizer -> documenter
+
+| Opcao | Descricao | Default |
+|-------|-----------|---------|
+| `--max-agents` | Maximo simultaneo | 3 |
+| `--fallback-sequential` | Fallback se paralelo falhar | false |
+
+#### agent status
+
+```bash
+adk agent status
+adk agent status --watch
 ```
 
 ---
 
-## adk deploy staging
+### adk memory
 
-Deploy para ambiente de staging.
+Gerencia memoria persistente do projeto.
 
-### CLI
+#### memory save
+
+```bash
+adk memory save auth
+```
+
+**Salva:** Contexto atual para feature especifica
+
+#### memory load
+
+```bash
+adk memory load auth
+```
+
+**Carrega:** Memoria de feature para sessao
+
+#### memory view
+
+```bash
+adk memory view auth
+adk memory view --global
+```
+
+#### memory compact
+
+```bash
+adk memory compact auth
+```
+
+**Comportamento:** Compacta memoria grande usando Claude (>800 linhas)
+
+#### memory search
+
+```bash
+adk memory search "OAuth"
+adk memory search "login" -f auth
+```
+
+#### memory update
+
+```bash
+adk memory update
+```
+
+**Atualiza:** Memoria global do projeto
+
+#### memory recall
+
+```bash
+adk memory recall "autenticacao"
+adk memory recall "cache" -c architecture -l 10
+```
+
+| Opcao | Descricao | Default |
+|-------|-----------|---------|
+| `-c, --category` | Filtrar por categoria | - |
+| `-l, --limit` | Limite de resultados | 5 |
+
+#### memory link / unlink
+
+```bash
+adk memory link auth ADR-001
+adk memory unlink auth ADR-001
+```
+
+**Comportamento:** Vincula/desvincula decisao a feature
+
+#### memory export
+
+```bash
+adk memory export
+adk memory export --format json --output ./backup/
+```
+
+---
+
+### adk spec
+
+Gerencia especificacoes formais de features.
+
+#### spec create
+
+```bash
+adk spec create auth
+adk spec create auth --from-prd
+```
+
+#### spec validate
+
+```bash
+adk spec validate auth
+adk spec validate auth --fix
+```
+
+#### spec generate
+
+```bash
+adk spec generate auth
+```
+
+**Comportamento:** Gera scaffolding de codigo a partir da spec
+
+#### spec view
+
+```bash
+adk spec view auth
+```
+
+---
+
+### adk tool
+
+Gerencia registry de tools.
+
+#### tool search
+
+```bash
+adk tool search "test"
+adk tool search "validation" -c testing -l 10
+```
+
+#### tool register / unregister
+
+```bash
+adk tool register my-linter
+adk tool register --from-file tools.json
+adk tool unregister my-linter
+```
+
+#### tool list
+
+```bash
+adk tool list
+adk tool list -c testing
+adk tool list --discoverable
+```
+
+#### tool index
+
+```bash
+adk tool index
+```
+
+**Comportamento:** Re-indexa tools de agents e skills
+
+#### tool info
+
+```bash
+adk tool info my-linter
+```
+
+---
+
+### adk deploy
+
+Gerencia deployments.
+
+#### deploy staging
 
 ```bash
 adk deploy staging auth
 ```
 
----
+**Comportamento:**
+- Merge para staging branch
+- Trigger CI/CD
+- Monitor deploy
+- Run smoke tests
 
-## adk deploy production
-
-Deploy para producao com rollout gradual.
-
-### CLI
+#### deploy production
 
 ```bash
 adk deploy production auth
-
 adk deploy production auth --percentage 10
 ```
 
-### Opcoes
-
 | Opcao | Descricao | Default |
 |-------|-----------|---------|
-| `--percentage` | Porcentagem inicial | 10 |
+| `--percentage` | Porcentagem inicial de rollout | 10 |
 
----
-
-## adk deploy rollback
-
-Rollback de feature.
-
-### CLI
+#### deploy rollback
 
 ```bash
 adk deploy rollback auth
@@ -634,102 +622,253 @@ adk deploy rollback auth
 
 ---
 
-# Estrutura CADD
+### adk config
+
+Configura integracoes externas.
+
+#### config integration
+
+```bash
+adk config integration clickup  # Setup interativo
+adk config integration --show   # Ver config atual
+adk config integration --disable
+```
+
+---
+
+### adk sync
+
+Sincroniza features com ferramenta de projeto.
+
+```bash
+adk sync              # Todas features pendentes
+adk sync auth         # Feature especifica
+adk sync --force      # Re-sync ja sincronizadas
+```
+
+---
+
+### adk import
+
+Importa tasks de ferramenta externa como features.
+
+```bash
+adk import            # Importa todas
+adk import --list     # Lista sem importar
+adk import --dry-run  # Preview
+adk import --id abc123  # Task especifica
+adk import --force    # Sobrescreve existentes
+```
+
+---
+
+### adk report
+
+Gera relatorios do projeto.
+
+```bash
+adk report --weekly            # Relatorio semanal
+adk report --feature auth      # Relatorio de feature
+```
+
+---
+
+## Estrutura CADD
 
 ```
 .claude/
-  memory/                 # Contexto persistente
-    project-context.md
-  plans/
-    features/
-      <feature>/
-        prd.md            # Product Requirements
-        tasks.md          # Task breakdown
-        plan.md           # Plan geral
-        research.md       # Analise de codebase
-        implementation-plan.md  # Plano detalhado
-        context.md        # Contexto especifico
-        memory.md         # Memoria da feature
-        qa-report.md      # Relatorio QA
-  agents/                 # Agents especializados
-  skills/                 # Skills reutilizaveis
-  commands/               # Custom commands
-  rules/                  # Regras automaticas
-  hooks/                  # Hooks de automacao
-  decisions/              # Architecture Decision Records
-  daily/                  # Notas diarias
-  reports/                # Relatorios
+├── memory/                 # Contexto persistente
+│   ├── project-context.md  # Memoria global
+│   └── features/           # Memorias por feature
+│       └── auth.md
+├── plans/
+│   └── features/
+│       └── auth/
+│           ├── prd.md
+│           ├── research.md
+│           ├── tasks.md
+│           ├── implementation-plan.md
+│           ├── spec.md
+│           ├── context.md
+│           ├── qa-report.md
+│           └── progress.json
+├── agents/                 # 8 agents especializados
+│   ├── analyzer.md
+│   ├── architect.md
+│   ├── implementer.md
+│   ├── tester.md
+│   ├── reviewer.md
+│   ├── prd-creator.md
+│   ├── task-breakdown.md
+│   └── documenter.md
+├── skills/                 # 4 skills
+│   ├── code-review/
+│   ├── tdd-development/
+│   ├── task-planning/
+│   └── prd-writing/
+├── commands/               # 9 slash commands
+│   ├── analyze.md
+│   ├── daily.md
+│   ├── new-feature.md
+│   ├── implement.md
+│   ├── qa.md
+│   ├── finish.md
+│   ├── init.md
+│   ├── recall.md
+│   └── next-step.md
+├── rules/                  # 4 regras
+│   ├── code-style.md
+│   ├── testing-standards.md
+│   ├── security-rules.md
+│   └── git-workflow.md
+├── hooks/                  # 6 hooks
+│   ├── inject-focus.sh
+│   ├── scope-check.sh
+│   ├── validate-bash.sh
+│   ├── post-write.sh
+│   ├── context-recall.sh
+│   └── update-state.sh
+├── decisions/              # ADRs
+├── daily/                  # Notas diarias
+├── reports/                # Relatorios gerados
+├── settings.json           # Config de hooks
+└── active-focus.md         # Feature ativa atual
 ```
 
 ---
 
-# Fluxos de Trabalho
+## Integracao com Project Management
 
-## Tarefa Rapida (Bug/Ajuste)
+### ClickUp
 
-```bash
-adk quick "descricao do problema"
-```
+O ADK suporta sincronizacao bidirecional com ClickUp.
 
-## Feature Completa (Manual)
+#### Setup
 
 ```bash
-adk feature new nome "descricao"
-adk feature research nome
-adk feature plan nome
-adk feature implement nome
-adk workflow qa nome
+adk config integration clickup
 ```
 
-## Feature Completa (Automatico)
+O assistente ira pedir:
+- API Token (salvo em `.env`)
+- Workspace ID
+- Space ID
+- List ID
 
-```bash
-adk feature autopilot nome "descricao"
+**Configuracao gerada:**
+
+`.adk/config.json`:
+```json
+{
+  "version": "1.0.0",
+  "integration": {
+    "provider": "clickup",
+    "enabled": true,
+    "autoSync": false,
+    "syncOnPhaseChange": true,
+    "conflictStrategy": "local-wins"
+  },
+  "providers": {
+    "clickup": {
+      "workspaceId": "123456",
+      "spaceId": "789012",
+      "listId": "345678"
+    }
+  }
+}
 ```
 
-## Retomando Feature Interrompida
-
-```bash
-adk feature autopilot nome
+`.env`:
 ```
+CLICKUP_API_TOKEN=pk_12345678_XXXX
+```
+
+#### Mapeamento
+
+| ADK | ClickUp |
+|-----|---------|
+| Feature name | Task name |
+| Phase | Task status |
+| PRD content | Task description |
+| Progress % | Custom field |
+
+#### Conflict Resolution
+
+Estrategias disponiveis (`conflictStrategy`):
+- `local-wins` - Local sempre sobrescreve (default)
+- `remote-wins` - Remoto sempre sobrescreve
+- `newest-wins` - Mais recente vence
+- `manual` - Gera conflict report
+
+#### Offline Queue
+
+Operacoes que falham sao enfileiradas em `.adk/sync-queue.json`:
+- Max 3 retries com exponential backoff
+- Persistente entre sessoes
+- `adk sync` processa a fila
 
 ---
 
-# Dicas
+## Extensibilidade
 
-## Passar contexto externo
+### Criar Novo Agent
 
-```bash
-adk feature research nome -c /path/to/documento.md
+1. Crie arquivo em `.claude/agents/meu-agent.md`:
+
+```markdown
+---
+name: meu-agent
+description: Descricao do agent
+context: fork
+---
+
+# Agent: Meu Agent
+
+## Objetivo
+[Descreva o objetivo]
+
+## Workflow
+1. Passo 1
+2. Passo 2
+3. Passo 3
+
+## Output
+[Descreva o output esperado]
 ```
 
-## Focar em arquivo especifico
-
+2. Execute:
 ```bash
-adk quick "fix bug" -f src/utils/auth.ts
+adk agent run meu-agent
 ```
 
-## Commit automatico apos quick task
+### Criar Novo Skill
 
-```bash
-adk quick "fix typo" --commit
-```
+1. Crie diretorio em `.claude/skills/meu-skill/`
+2. Adicione `SKILL.md` com instrucoes
+3. Adicione templates em `templates/`
+4. Reference no agent: `skill: meu-skill`
 
-## Pular testes em ajuste visual
+### Adicionar Novo Provider
 
-```bash
-adk quick "ajustar css" --no-test
-```
+1. Crie diretorio em `src/providers/meu-provider/`
+2. Implemente interface `ProjectProvider`:
+   - `connect(credentials)`
+   - `createFeature(feature)`
+   - `updateFeature(id, data)`
+   - `syncFeature(feature, remoteId?)`
+   - `getRemoteChanges(since)`
+3. Registre em `src/providers/index.ts`
+4. Adicione a `SUPPORTED_PROVIDERS` em `src/commands/config.ts`
 
 ---
 
-# Tecnicas de Prompt Engineering
+## Tecnicas de Prompt Engineering
 
-O ADK utiliza diversas tecnicas de engenharia de prompt para maximizar a eficacia do Claude Code.
+O ADK utiliza tecnicas avancadas de engenharia de prompt:
 
-## 1. Phased Prompting
+### 1. Phased Prompting
 
-Prompts estruturados em fases numeradas com objetivos claros.
+Prompts em fases numeradas:
 
 ```
 PHASE 1: RESEARCH
@@ -737,39 +876,18 @@ PHASE 2: DETAILED PLANNING
 PHASE 3: IMPLEMENTATION (TDD)
 ```
 
-**Por que funciona**: Divide problemas complexos em etapas gerenciaveis, evitando sobrecarga cognitiva do modelo.
-
-## 2. Input/Output Specification
-
-Definicao explicita de arquivos de entrada e saida esperada.
+### 2. Input/Output Specification
 
 ```
 Input: .claude/plans/features/auth/research.md
 Output: .claude/plans/features/auth/implementation-plan.md
 ```
 
-**Por que funciona**: Remove ambiguidade sobre onde buscar contexto e onde salvar resultados.
+### 3. Structured Templates
 
-## 3. Structured Output Templates
+Templates com estrutura pre-definida garantem consistencia.
 
-Templates com estrutura pre-definida para o output.
-
-```
-Estrutura do research.md:
-# Research: ${name}
-
-## Current State Analysis
-[Descreva estado atual]
-
-## Files to Create
-- [ ] file1.ts
-```
-
-**Por que funciona**: Garante consistencia e facilita parsing automatizado.
-
-## 4. Context Injection com XML Tags
-
-Uso de tags XML para delimitar contexto adicional.
+### 4. Context Injection
 
 ```
 <context>
@@ -777,125 +895,198 @@ ${contextContent}
 </context>
 ```
 
-**Por que funciona**: Separa claramente o contexto injetado do resto do prompt.
-
-## 5. Explicit Constraints (IMPORTANTE)
-
-Destacar restricoes criticas em caixa alta.
+### 5. Explicit Constraints
 
 ```
 IMPORTANTE: TDD - TESTES PRIMEIRO
-IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
+IMPORTANTE: Este e apenas o plano. NAO IMPLEMENTE AINDA.
 ```
 
-**Por que funciona**: Previne comportamentos indesejados, especialmente em tarefas multi-step.
-
-## 6. Task Lists Numeradas
-
-Listas numeradas de tarefas especificas.
-
-```
-Tasks:
-1. Leia PRD completamente
-2. Analise codebase atual
-3. Identifique arquivos a criar
-```
-
-**Por que funciona**: Cria um checklist mental que o modelo segue sequencialmente.
-
-## 7. Verification Gates
+### 6. Verification Gates
 
 Validacoes que impedem avanco sem pre-requisitos.
 
-```typescript
-if (!(await fs.pathExists(researchPath))) {
-  spinner.fail(`Execute research primeiro: adk feature research ${name}`)
-  process.exit(1)
-}
-```
-
-**Por que funciona**: Garante qualidade e ordem no processo.
-
-## 8. Role-Implicit Prompting
-
-Definicao implicita de papel atraves das tarefas.
-
-```
-Analyze staged files:
-Check for:
-- console.log/debugger
-- TODO/FIXME críticos
-- Secrets hardcoded
-```
-
-**Por que funciona**: O modelo infere o papel (code reviewer) pelas tarefas, sem precisar de "Voce e um..."
-
-## 9. Conditional Output
-
-Instrucoes condicionais para diferentes cenarios.
-
-```
-If issues found: LIST them and STOP
-If clean: Say "✅ Pre-commit checks passed"
-```
-
-**Por que funciona**: Define comportamentos claros para cada cenario possivel.
-
-## 10. Emoji Signals
-
-Emojis como identificadores visuais de tipo de workflow.
-
-```
-🌅 Daily Workflow
-🔍 Pre-commit Review
-```
-
-**Por que funciona**: Cria associacoes visuais rapidas e melhora a scanability dos logs.
-
-## 11. Chain of Thought Estruturado
-
-Processo de pensamento guiado passo a passo.
+### 7. Chain of Thought
 
 ```
 Process:
 1. WRITE TESTS FIRST
    - Escreva TODOS os testes da fase
-   - NÃO escreva implementação ainda
    - Execute e confirme que falham
-
 2. IMPLEMENT
-   - Implemente código para testes passarem
-   - Teste após cada mudança
+   - Implemente codigo minimo
 ```
 
-**Por que funciona**: Forca o modelo a seguir um processo mental especifico.
-
-## 12. Checklist-Driven Prompts
-
-Prompts baseados em checklists verificaveis.
+### 8. Checklist-Driven
 
 ```
 ## 1. Tests
 - [ ] Unit tests
 - [ ] Integration tests
-
-## 2. Code Quality
-- [ ] Lint
-- [ ] Format
 ```
-
-**Por que funciona**: Facilita verificacao e garante cobertura completa.
 
 ---
 
-# Desenvolvimento do ADK
+## Troubleshooting
+
+### Claude Code nao encontrado
+
+```
+Erro: Claude Code CLI nao esta instalado
+```
+
+**Solucao:**
+```bash
+# Verifique se claude esta no PATH
+which claude
+
+# Se nao estiver, instale via:
+npm install -g @anthropic-ai/claude-code
+```
+
+### Worktree ja existe
+
+```
+Erro: Worktree para feature 'auth' ja existe
+```
+
+**Solucao:**
+```bash
+# Liste worktrees
+git worktree list
+
+# Remova o existente
+git worktree remove .worktrees/auth --force
+
+# Tente novamente
+adk feature implement auth
+```
+
+### Fase nao pode ser executada
+
+```
+Erro: Execute research primeiro: adk feature research auth
+```
+
+**Solucao:** As fases devem ser executadas em ordem. Execute a fase faltante primeiro.
+
+### Sync falha repetidamente
+
+```
+Erro: Falha ao sincronizar com ClickUp
+```
+
+**Solucao:**
+1. Verifique `.env` tem token valido
+2. Verifique `.adk/config.json` tem IDs corretos
+3. Verifique conectividade de rede
+4. `adk sync --force` para re-tentar
+
+### Memoria muito grande
+
+```
+Warning: Memoria excede 800 linhas
+```
+
+**Solucao:**
+```bash
+adk memory compact auth
+```
+
+### Hooks nao executam
+
+**Solucao:**
+1. Verifique `.claude/settings.json` existe
+2. Verifique permissao de execucao: `chmod +x .claude/hooks/*.sh`
+3. Verifique sintaxe dos hooks
+
+---
+
+## Fluxos de Trabalho Recomendados
+
+### Bug Fix Rapido
+
+```bash
+adk quick "corrigir X" --commit
+```
+
+### Feature Completa (Manual)
+
+```bash
+adk feature new nome "descricao"
+adk feature research nome
+adk feature tasks nome
+adk feature plan nome
+adk feature implement nome
+adk feature qa nome
+adk feature docs nome
+adk feature finish nome
+```
+
+### Feature Completa (Automatico)
+
+```bash
+adk feature autopilot nome "descricao"
+```
+
+### Retomando Feature Interrompida
+
+```bash
+adk feature autopilot nome   # Continua de onde parou
+# ou
+adk feature next nome        # Proxima etapa
+```
+
+### Rotina Diaria
+
+```bash
+adk workflow daily
+adk feature list
+adk feature next             # Proxima etapa da feature ativa
+```
+
+---
+
+## Desenvolvimento do ADK
+
+### Comandos
 
 ```bash
 npm run dev        # Watch mode
 npm run build      # Compilar
 npm run check:fix  # Lint + format
 npm test           # Testes
+npm run type-check # Verificar tipos
 ```
+
+### Estrutura do Codigo
+
+```
+src/
+├── cli.ts           # Entry point
+├── commands/        # Implementacao de comandos
+├── providers/       # Integracoes externas
+├── types/           # TypeScript types
+└── utils/           # Utilitarios
+    ├── claude.ts    # Execucao de Claude Code
+    ├── templates.ts # Sistema de templates
+    ├── memory-utils.ts
+    ├── progress.ts
+    └── ...
+```
+
+### Adicionar Novo Comando
+
+1. Crie `src/commands/meu-comando.ts`
+2. Exporte instancia singleton
+3. Registre em `src/cli.ts`
+4. Siga pattern de error handling (ora + logger)
+
+---
+
+## Licenca
+
+MIT
 
 ---
 

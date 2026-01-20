@@ -5,7 +5,7 @@ import ora from 'ora'
 import { statusToPhase } from '../providers/clickup/mapper.js'
 import type { RemoteFeature } from '../providers/types.js'
 import { loadConfig } from '../utils/config.js'
-import { getClaudePath, getMainRepoPath } from '../utils/paths.js'
+import { getClaudePath, getMainRepoPath } from '../utils/git-paths.js'
 
 interface ImportOptions {
   list?: boolean
