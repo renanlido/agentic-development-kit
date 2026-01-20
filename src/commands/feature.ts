@@ -4,7 +4,10 @@ import chalk from 'chalk'
 import fs from 'fs-extra'
 import inquirer from 'inquirer'
 import ora from 'ora'
+import { createClickUpProvider } from '../providers/clickup/index.js'
+import type { LocalFeature, ProviderSpecificConfig } from '../providers/types.js'
 import { executeClaudeCommand } from '../utils/claude'
+import { getIntegrationConfig, getProviderConfig } from '../utils/config.js'
 import { logger } from '../utils/logger'
 import {
   type FeatureProgress,
@@ -24,6 +27,7 @@ interface FeatureOptions {
   description?: string
   skipSpec?: boolean
   baseBranch?: string
+  noSync?: boolean
 }
 
 interface QuickOptions {
@@ -90,7 +94,7 @@ path: ${featurePath}
         encoding: 'utf-8',
       }).trim()
 
-      return gitDir.includes('.git/worktrees') || gitDir.endsWith('.git/worktrees/' + featureSlug)
+      return gitDir.includes('.git/worktrees') || gitDir.endsWith(`.git/worktrees/${featureSlug}`)
     } catch {
       return false
     }
@@ -120,6 +124,115 @@ path: ${featurePath}
     return path.join(this.getClaudePath(), 'plans/features', name)
   }
 
+  private async syncFeatureToRemote(
+    name: string,
+    progress: FeatureProgress,
+    noSync?: boolean
+  ): Promise<void> {
+    if (noSync) {
+      return
+    }
+
+    const integration = await getIntegrationConfig()
+    if (!integration.enabled || !integration.provider) {
+      return
+    }
+
+    const token = await this.getTokenFromEnv(integration.provider)
+    if (!token) {
+      return
+    }
+
+    try {
+      const provider = this.createProviderInstance(integration.provider)
+      if (!provider) {
+        return
+      }
+
+      const providerConfig = await getProviderConfig<ProviderSpecificConfig>(integration.provider)
+      const connectionResult = await provider.connect({
+        token,
+        workspaceId: providerConfig?.workspaceId as string | undefined,
+        spaceId: providerConfig?.spaceId as string | undefined,
+        listId: providerConfig?.listId as string | undefined,
+      })
+
+      if (!connectionResult.success) {
+        logger.warn(`Sync skipped: ${connectionResult.message}`)
+        return
+      }
+
+      const localFeature = this.progressToLocalFeature(name, progress)
+      const progressPath = path.join(this.getFeaturePath(name), 'progress.json')
+      let remoteId: string | undefined
+
+      if (await fs.pathExists(progressPath)) {
+        try {
+          const progressData = await fs.readJson(progressPath)
+          remoteId = progressData.remoteId
+        } catch {
+          // Ignore JSON parse errors
+        }
+      }
+
+      const result = await provider.syncFeature(localFeature, remoteId)
+
+      if (result.status === 'synced' && result.remoteId) {
+        const progressData = (await fs.pathExists(progressPath))
+          ? await fs.readJson(progressPath)
+          : {}
+
+        await fs.writeJson(
+          progressPath,
+          {
+            ...progressData,
+            syncStatus: 'synced',
+            remoteId: result.remoteId,
+            lastSynced: result.lastSynced,
+          },
+          { spaces: 2 }
+        )
+        logger.info(`Synced to ${integration.provider}`)
+      }
+    } catch (error) {
+      logger.warn(`Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  private async getTokenFromEnv(provider: string): Promise<string | null> {
+    const envPath = path.join(this.getMainRepoPath(), '.env')
+
+    if (await fs.pathExists(envPath)) {
+      const content = await fs.readFile(envPath, 'utf-8')
+      const key = `${provider.toUpperCase()}_API_TOKEN`
+      const match = content.match(new RegExp(`^${key}=(.+)$`, 'm'))
+      return match ? match[1].trim() : null
+    }
+
+    return null
+  }
+
+  private createProviderInstance(providerName: string) {
+    switch (providerName) {
+      case 'clickup':
+        return createClickUpProvider()
+      default:
+        return null
+    }
+  }
+
+  private progressToLocalFeature(name: string, progress: FeatureProgress): LocalFeature {
+    const completedSteps = progress.steps.filter((s) => s.status === 'completed').length
+    const totalSteps = progress.steps.length
+
+    return {
+      name,
+      phase: progress.currentPhase,
+      progress: totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0,
+      lastUpdated: progress.lastUpdated,
+    }
+  }
+
   private async getDefaultBranch(): Promise<string> {
     try {
       const remote = execFileSync('git', ['remote', 'show', 'origin'], { encoding: 'utf-8' })
@@ -132,7 +245,7 @@ path: ${featurePath}
 
   private async setupWorktree(
     name: string,
-    baseBranch: string = 'main'
+    baseBranch = 'main'
   ): Promise<{ success: boolean; worktreePath?: string; branch?: string; error?: string }> {
     const branchName = `feature/${name.replace(/[^a-zA-Z0-9-]/g, '-')}`
     const worktreeDir = path.join(process.cwd(), '.worktrees', name.replace(/[^a-zA-Z0-9-]/g, '-'))
@@ -573,6 +686,9 @@ ${featureContext}
 
       await this.setActiveFocus(name, state.currentStage)
 
+      const progress = await loadProgress(name)
+      await this.syncFeatureToRemote(name, progress, options.noSync)
+
       console.log()
       logger.success(`✨ Feature ${name} criada!`)
       console.log()
@@ -738,6 +854,7 @@ Estrutura do research.md:
 
       await this.setActiveFocus(name, 'research feito')
       await memoryCommand.save(name, { phase: 'research' })
+      await this.syncFeatureToRemote(name, progress, options.noSync)
 
       console.log()
       logger.success(`Research salvo em: ${chalk.cyan(`${featurePath}/research.md`)}`)
@@ -876,6 +993,7 @@ IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
 
       await this.setActiveFocus(name, 'arquitetura pronta')
       await memoryCommand.save(name, { phase: 'plan' })
+      await this.syncFeatureToRemote(name, progress, options.noSync)
 
       console.log()
       logger.success(`Plano salvo em: ${chalk.cyan(`${featurePath}/implementation-plan.md`)}`)
@@ -1185,6 +1303,7 @@ Não avance para próxima fase até atual estar completa.
 
       await this.setActiveFocus(name, 'implementação em andamento')
       await memoryCommand.save(name, { phase: 'implement' })
+      await this.syncFeatureToRemote(name, progress, options.noSync)
 
       console.log()
       logger.success(`✨ ${phase} implementada!`)
@@ -1973,9 +2092,15 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
         console.log(chalk.green('✓ Documentação já concluída, pulando etapa 7'))
       } else {
         const pendingSteps: string[] = []
-        if (!implementDone) pendingSteps.push('Implementação')
-        if (!qaDone) pendingSteps.push('QA')
-        if (!docsDone) pendingSteps.push('Documentação')
+        if (!implementDone) {
+          pendingSteps.push('Implementação')
+        }
+        if (!qaDone) {
+          pendingSteps.push('QA')
+        }
+        if (!docsDone) {
+          pendingSteps.push('Documentação')
+        }
 
         const { continueImplement } = await inquirer.prompt([
           {
@@ -2025,10 +2150,14 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
             console.log(chalk.gray(`  Base: ${baseBranch}`))
             console.log()
             console.log(chalk.yellow('As próximas etapas serão executadas no worktree.'))
-            console.log(chalk.yellow('Múltiplos agentes podem trabalhar em paralelo em worktrees diferentes.'))
+            console.log(
+              chalk.yellow('Múltiplos agentes podem trabalhar em paralelo em worktrees diferentes.')
+            )
           } else {
             console.log(chalk.red(`Erro ao criar worktree: ${result.error}`))
-            console.log(chalk.yellow('Não é possível continuar sem worktree para garantir isolamento.'))
+            console.log(
+              chalk.yellow('Não é possível continuar sem worktree para garantir isolamento.')
+            )
             process.exit(1)
           }
           console.log()
@@ -2043,7 +2172,13 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 
         progress = await loadProgress(name)
         if (!isStepCompleted(progress, 'qa')) {
-          await executePhase(['feature', 'qa', name], 'qa', 6, 'QA - REVISÃO DE QUALIDADE', worktreePath)
+          await executePhase(
+            ['feature', 'qa', name],
+            'qa',
+            6,
+            'QA - REVISÃO DE QUALIDADE',
+            worktreePath
+          )
         } else {
           console.log(chalk.green('✓ QA já concluído, pulando etapa 6'))
         }
@@ -2070,13 +2205,17 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
           console.log(chalk.white(`     git diff`))
           console.log()
           console.log(chalk.gray('  2. Commit final (se houver mudanças pendentes):'))
-          console.log(chalk.white(`     git add . && git commit -m "feat(${name}): complete implementation"`))
+          console.log(
+            chalk.white(`     git add . && git commit -m "feat(${name}): complete implementation"`)
+          )
           console.log()
 
           if (hasRemote) {
             console.log(chalk.gray('  3. Push e abra PR:'))
             console.log(chalk.white(`     git push -u origin ${worktreeBranch}`))
-            console.log(chalk.white(`     gh pr create --base ${baseBranch} --title "feat: ${name}"`))
+            console.log(
+              chalk.white(`     gh pr create --base ${baseBranch} --title "feat: ${name}"`)
+            )
             console.log()
             console.log(chalk.gray('  4. Após merge do PR, limpe o worktree:'))
             console.log(chalk.white(`     cd ${mainRepoPath}`))

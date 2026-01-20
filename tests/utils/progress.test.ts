@@ -1,13 +1,33 @@
+import path from 'node:path'
+import fs from 'fs-extra'
 import {
   type FeatureProgress,
   getCompletedSteps,
   getNextStep,
   isStepCompleted,
+  loadProgress,
   type StepProgress,
+  saveProgress,
   updateStepStatus,
 } from '../../src/utils/progress.js'
 
+jest.mock('node:child_process', () => ({
+  execFileSync: jest.fn().mockReturnValue('.git'),
+}))
+
 describe('progress', () => {
+  const testDir = path.join(process.cwd(), '.test-progress-utils')
+  const featuresDir = path.join(testDir, '.claude', 'plans', 'features')
+
+  beforeEach(async () => {
+    await fs.ensureDir(featuresDir)
+    jest.spyOn(process, 'cwd').mockReturnValue(testDir)
+  }, 10000)
+
+  afterEach(async () => {
+    await fs.remove(testDir)
+    jest.restoreAllMocks()
+  }, 10000)
   const createMockProgress = (overrides?: Partial<FeatureProgress>): FeatureProgress => ({
     feature: 'test-feature',
     currentPhase: 'not_started',
@@ -354,6 +374,184 @@ describe('progress', () => {
       }
 
       expect(getNextStep(progress)).toBe('only')
+    })
+  })
+
+  describe('loadProgress', () => {
+    it('should return default progress when file does not exist', async () => {
+      const progress = await loadProgress('nonexistent-feature')
+
+      expect(progress.feature).toBe('nonexistent-feature')
+      expect(progress.currentPhase).toBe('not_started')
+      expect(progress.steps).toBeDefined()
+      expect(progress.steps.length).toBeGreaterThan(0)
+    })
+
+    it('should parse existing progress file', async () => {
+      const featureDir = path.join(featuresDir, 'existing-feature')
+      await fs.ensureDir(featureDir)
+      await fs.writeFile(
+        path.join(featureDir, 'progress.md'),
+        `# Progress: existing-feature
+
+> Last updated: 2026-01-16T00:00:00.000Z
+
+## Current State
+- **Phase**: research
+- **Next Step**: tasks
+
+## Steps
+- [x] **prd** (completed: 2026-01-15)
+- [~] **research** (started: 2026-01-16)
+- [ ] **tasks**
+`
+      )
+
+      const progress = await loadProgress('existing-feature')
+
+      expect(progress.feature).toBe('existing-feature')
+      expect(progress.currentPhase).toBe('research')
+      expect(progress.nextStep).toBe('tasks')
+    })
+
+    it('should return default when file has invalid format', async () => {
+      const featureDir = path.join(featuresDir, 'invalid-feature')
+      await fs.ensureDir(featureDir)
+      await fs.writeFile(
+        path.join(featureDir, 'progress.md'),
+        'invalid content without progress header'
+      )
+
+      const progress = await loadProgress('invalid-feature')
+
+      expect(progress.feature).toBe('invalid-feature')
+      expect(progress.currentPhase).toBe('not_started')
+    })
+
+    it('should parse failed step status', async () => {
+      const featureDir = path.join(featuresDir, 'failed-feature')
+      await fs.ensureDir(featureDir)
+      await fs.writeFile(
+        path.join(featureDir, 'progress.md'),
+        `# Progress: failed-feature
+
+> Last updated: 2026-01-16T00:00:00.000Z
+
+## Current State
+- **Phase**: implement
+
+## Steps
+- [x] **prd** (completed: 2026-01-15)
+- [!] **implement** (failed: tests are broken)
+- [ ] **qa**
+`
+      )
+
+      const progress = await loadProgress('failed-feature')
+
+      expect(progress.feature).toBe('failed-feature')
+      const failedStep = progress.steps.find((s) => s.name === 'implement')
+      expect(failedStep?.status).toBe('failed')
+      expect(failedStep?.notes).toBe('tests are broken')
+    })
+
+    it('should use default steps when no steps in file', async () => {
+      const featureDir = path.join(featuresDir, 'no-steps-feature')
+      await fs.ensureDir(featureDir)
+      await fs.writeFile(
+        path.join(featureDir, 'progress.md'),
+        `# Progress: no-steps-feature
+
+> Last updated: 2026-01-16T00:00:00.000Z
+
+## Current State
+- **Phase**: prd
+`
+      )
+
+      const progress = await loadProgress('no-steps-feature')
+
+      expect(progress.feature).toBe('no-steps-feature')
+      expect(progress.steps.length).toBeGreaterThan(0)
+      expect(progress.steps[0].name).toBe('prd')
+    })
+  })
+
+  describe('saveProgress', () => {
+    it('should save progress to file', async () => {
+      const progress: FeatureProgress = {
+        feature: 'save-test',
+        currentPhase: 'research',
+        steps: [
+          { name: 'prd', status: 'completed', completedAt: '2026-01-15' },
+          { name: 'research', status: 'in_progress', startedAt: '2026-01-16' },
+          { name: 'tasks', status: 'pending' },
+        ],
+        lastUpdated: '2026-01-16T00:00:00.000Z',
+        nextStep: 'tasks',
+      }
+
+      await saveProgress('save-test', progress)
+
+      const progressPath = path.join(featuresDir, 'save-test', 'progress.md')
+      expect(await fs.pathExists(progressPath)).toBe(true)
+
+      const content = await fs.readFile(progressPath, 'utf-8')
+      expect(content).toContain('# Progress: save-test')
+      expect(content).toContain('**Phase**: research')
+      expect(content).toContain('**Next Step**: tasks')
+      expect(content).toContain('[x] **prd**')
+      expect(content).toContain('[~] **research**')
+      expect(content).toContain('[ ] **tasks**')
+    })
+
+    it('should create directory if not exists', async () => {
+      const progress: FeatureProgress = {
+        feature: 'new-feature',
+        currentPhase: 'prd',
+        steps: [{ name: 'prd', status: 'in_progress' }],
+        lastUpdated: '2026-01-16T00:00:00.000Z',
+      }
+
+      await saveProgress('new-feature', progress)
+
+      const featureDir = path.join(featuresDir, 'new-feature')
+      expect(await fs.pathExists(featureDir)).toBe(true)
+    })
+
+    it('should save failed step with notes', async () => {
+      const progress: FeatureProgress = {
+        feature: 'failed-save-test',
+        currentPhase: 'implement',
+        steps: [
+          { name: 'prd', status: 'completed' },
+          { name: 'implement', status: 'failed', notes: 'Build error' },
+        ],
+        lastUpdated: '2026-01-16T00:00:00.000Z',
+      }
+
+      await saveProgress('failed-save-test', progress)
+
+      const progressPath = path.join(featuresDir, 'failed-save-test', 'progress.md')
+      const content = await fs.readFile(progressPath, 'utf-8')
+      expect(content).toContain('[!] **implement**')
+      expect(content).toContain('failed: Build error')
+    })
+
+    it('should save failed step without notes', async () => {
+      const progress: FeatureProgress = {
+        feature: 'failed-no-notes-test',
+        currentPhase: 'implement',
+        steps: [{ name: 'implement', status: 'failed' }],
+        lastUpdated: '2026-01-16T00:00:00.000Z',
+      }
+
+      await saveProgress('failed-no-notes-test', progress)
+
+      const progressPath = path.join(featuresDir, 'failed-no-notes-test', 'progress.md')
+      const content = await fs.readFile(progressPath, 'utf-8')
+      expect(content).toContain('[!] **implement**')
+      expect(content).toContain('(failed)')
     })
   })
 })

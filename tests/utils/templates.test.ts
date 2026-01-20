@@ -1,6 +1,23 @@
-import { getTemplateDir } from '../../src/utils/templates.js'
+import path from 'node:path'
+import fs from 'fs-extra'
+import {
+  copyClaudeStructure,
+  copyTemplate,
+  getTemplateDir,
+  listAvailableTemplates,
+  loadTemplate,
+} from '../../src/utils/templates.js'
 
 describe('templates', () => {
+  const testDir = path.join(process.cwd(), '.test-templates-utils')
+
+  beforeEach(async () => {
+    await fs.ensureDir(testDir)
+  }, 10000)
+
+  afterEach(async () => {
+    await fs.remove(testDir)
+  }, 10000)
   describe('getTemplateDir', () => {
     it('should return templates directory path', () => {
       const dir = getTemplateDir()
@@ -141,6 +158,112 @@ describe('templates', () => {
       const templateType = 'invalid'
       const errorMessage = `Template ${templateType} não encontrado`
       expect(errorMessage).toContain('não encontrado')
+    })
+  })
+
+  describe('loadTemplate', () => {
+    it('should load an existing template file', async () => {
+      const templatesDir = getTemplateDir()
+      const prdPath = path.join(templatesDir, 'prd-template.md')
+
+      if (await fs.pathExists(prdPath)) {
+        const content = await loadTemplate('prd-template.md')
+        expect(content).toBeTruthy()
+        expect(typeof content).toBe('string')
+        expect(content.length).toBeGreaterThan(0)
+      }
+    })
+
+    it('should throw error when template does not exist', async () => {
+      await expect(loadTemplate('definitely-does-not-exist.md')).rejects.toThrow(/não encontrado/i)
+    })
+  })
+
+  describe('copyTemplate', () => {
+    it('should throw error when template type does not exist', async () => {
+      await expect(copyTemplate('non-existent-template-type', testDir)).rejects.toThrow(
+        /não encontrado/i
+      )
+    })
+
+    it('should copy existing template type', async () => {
+      const templatesDir = getTemplateDir()
+      const projectsDir = path.join(templatesDir, 'projects')
+
+      if (await fs.pathExists(projectsDir)) {
+        const templates = await fs.readdir(projectsDir)
+        const dirTemplates = templates.filter(async (t) => {
+          const stats = await fs.stat(path.join(projectsDir, t))
+          return stats.isDirectory()
+        })
+
+        if (dirTemplates.length > 0) {
+          const firstTemplate = dirTemplates[0]
+          await copyTemplate(firstTemplate, testDir)
+          const files = await fs.readdir(testDir)
+          expect(files.length).toBeGreaterThan(0)
+        }
+      }
+    })
+  })
+
+  describe('listAvailableTemplates', () => {
+    it('should return array', async () => {
+      const templates = await listAvailableTemplates()
+      expect(Array.isArray(templates)).toBe(true)
+    })
+
+    it('should return empty array when projects directory does not exist', async () => {
+      const templatesDir = getTemplateDir()
+      const projectsDir = path.join(templatesDir, 'projects')
+
+      if (!(await fs.pathExists(projectsDir))) {
+        const templates = await listAvailableTemplates()
+        expect(templates).toEqual([])
+      }
+    })
+  })
+
+  describe('copyClaudeStructure', () => {
+    it('should create .claude directory with structure', async () => {
+      const templatesDir = getTemplateDir()
+      const claudeStructureDir = path.join(templatesDir, 'claude-structure')
+
+      if (await fs.pathExists(claudeStructureDir)) {
+        await copyClaudeStructure(testDir)
+        const claudeDir = path.join(testDir, '.claude')
+        expect(await fs.pathExists(claudeDir)).toBe(true)
+      }
+    })
+
+    it('should not overwrite existing files in target', async () => {
+      const templatesDir = getTemplateDir()
+      const claudeStructureDir = path.join(templatesDir, 'claude-structure')
+
+      if (await fs.pathExists(claudeStructureDir)) {
+        const claudeDir = path.join(testDir, '.claude')
+        await fs.ensureDir(claudeDir)
+
+        const existingFile = path.join(claudeDir, 'settings.json')
+        const originalContent = '{"existing": true}'
+        await fs.writeFile(existingFile, originalContent)
+
+        await copyClaudeStructure(testDir)
+
+        const content = await fs.readFile(existingFile, 'utf-8')
+        expect(content).toBe(originalContent)
+      }
+    })
+
+    it('should handle non-existent claude-structure directory', async () => {
+      const templatesDir = getTemplateDir()
+      const claudeStructureDir = path.join(templatesDir, 'claude-structure')
+
+      if (!(await fs.pathExists(claudeStructureDir))) {
+        await copyClaudeStructure(testDir)
+        const claudeDir = path.join(testDir, '.claude')
+        expect(await fs.pathExists(claudeDir)).toBe(false)
+      }
     })
   })
 })

@@ -19,3 +19,4 @@ coverage/
 
 # ADK - Arquivos locais (nao versionar)
 .claude/*.local.md
+.adk/

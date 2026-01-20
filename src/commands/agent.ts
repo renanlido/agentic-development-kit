@@ -4,13 +4,13 @@ import fs from 'fs-extra'
 import ora from 'ora'
 import { executeClaudeCommand } from '../utils/claude.js'
 import { logger } from '../utils/logger.js'
-import { getClaudePath } from '../utils/paths.js'
 import {
   DEFAULT_PARALLEL_CONFIG,
   executeParallel,
   executeWithFallback,
   formatParallelResult,
 } from '../utils/parallel-executor.js'
+import { getClaudePath } from '../utils/paths.js'
 
 interface AgentOptions {
   type?: string
