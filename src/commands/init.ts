@@ -78,7 +78,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
     console.log(chalk.cyan('Estrutura ADK incluida:'))
     console.log(chalk.gray('  - 9 agentes especializados'))
     console.log(chalk.gray('  - 4 skills com templates'))
-    console.log(chalk.gray('  - 9 slash commands'))
+    console.log(chalk.gray('  - 10 slash commands'))
     console.log(chalk.gray('  - 4 rules de qualidade'))
     console.log(chalk.gray('  - 6 hooks (foco, escopo, validacao, format, estado, session)'))
     console.log()
