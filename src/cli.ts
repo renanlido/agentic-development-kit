@@ -47,7 +47,7 @@ program
 const feature = program
   .command('feature')
   .description(
-    'Gerencia features do projeto (new, research, tasks, plan, implement, qa, docs, list, autopilot)'
+    'Gerencia features do projeto (new, research, tasks, plan, implement, qa, docs, finish, list, fix-worktrees, next, sync, restore, history, status, refine, autopilot)'
   )
 
 feature
@@ -225,7 +225,7 @@ workflow
 // Comando: adk agent
 const agent = program
   .command('agent')
-  .description('Gerencia agents especializados (create, run, pipeline)')
+  .description('Gerencia agents especializados (create, run, pipeline, parallel, status)')
 
 agent
   .command('create <name>')
@@ -282,7 +282,7 @@ deploy
 const memory = program
   .command('memory')
   .description(
-    'Gerencia memoria especializada por feature (status, save, load, view, compact, search, sync)'
+    'Gerencia memoria especializada por feature (save, load, view, compact, search, sync, recall, link, unlink, export, status)'
   )
 
 memory
@@ -421,7 +421,7 @@ tool
   .action((name) => toolCommand.info(name))
 
 // Comando: adk config
-const config = program.command('config').description('Gerencia configurações do ADK (integration)')
+const config = program.command('config').description('Gerencia configurações do ADK (integration, migrate-hooks)')
 
 config
   .command('integration [provider]')
