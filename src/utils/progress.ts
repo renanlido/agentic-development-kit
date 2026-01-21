@@ -14,6 +14,12 @@ function getWorktreeProgressPath(featureName: string): string | null {
   }
 
   const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
+  const gitFile = path.join(worktreeDir, '.git')
+
+  if (!fs.existsSync(gitFile)) {
+    return null
+  }
+
   const worktreeProgressPath = path.join(
     worktreeDir,
     '.claude',

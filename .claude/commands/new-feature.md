@@ -24,6 +24,41 @@ Caso contrário, use `$ARGUMENTS` como nome da feature.
 
 ## Processo
 
+### 0. Interview Pattern (Plan Mode) - NOVO
+
+Antes de criar qualquer artefato, entre em modo de planejamento para garantir requisitos completos.
+
+**Use EnterPlanMode** para iniciar uma sessao estruturada de coleta de requisitos.
+
+Durante o Plan Mode, use **AskUserQuestion** para coletar informacoes sobre:
+
+1. **Escopo da Feature**
+   - Qual problema essa feature resolve?
+   - Quem sao os usuarios alvo?
+   - Qual o resultado esperado?
+
+2. **Requisitos Funcionais**
+   - Quais acoes o usuario deve poder realizar?
+   - Existem integrações com outras features?
+   - Ha requisitos de dados especificos?
+
+3. **Restricoes e Limitacoes**
+   - Ha restricoes tecnicas (performance, seguranca)?
+   - Qual o escopo maximo (out of scope)?
+   - Existem dependencias externas?
+
+4. **Criterios de Sucesso**
+   - Como saberemos que a feature esta completa?
+   - Quais metricas de sucesso?
+
+**IMPORTANTE:**
+- NAO prossiga sem respostas claras sobre escopo e requisitos
+- Use perguntas abertas para explorar necessidades
+- Valide entendimento antes de criar artefatos
+- Se usuario quiser pular: use flag `--skip-plan`
+
+Apos coletar informacoes suficientes, use **ExitPlanMode** para sair do modo de planejamento e prosseguir.
+
 ### 1. Criar Estrutura
 
 Crie a pasta da feature:
@@ -47,9 +82,10 @@ path: .claude/plans/features/$ARGUMENTS/
 Use o Task tool para delegar ao agent `prd-creator`:
 
 **Instrucoes para o agent:**
+- Use as informacoes coletadas no Interview Pattern acima
 - Leia `.claude/memory/project-context.md` para entender o projeto
 - Use o template em `.claude/skills/prd-writing/templates/prd-template.md`
-- Faca perguntas ao usuario para entender os requisitos
+- Faca perguntas ADICIONAIS apenas se necessario
 - Salve o PRD em `.claude/plans/features/$ARGUMENTS/prd.md`
 
 ### 4. Criar Tasks

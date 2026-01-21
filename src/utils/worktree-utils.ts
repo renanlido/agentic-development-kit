@@ -1,7 +1,7 @@
 import { exec } from 'node:child_process'
-import fs from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import fs from 'fs-extra'
 
 const execAsync = promisify(exec)
 
@@ -194,4 +194,56 @@ export async function commitInWorktree(
 export function generateWorktreePath(feature: string, agent: string, index: number): string {
   const sanitized = `${feature}-${agent}`.replace(/[^a-z0-9-]/gi, '-').toLowerCase()
   return `${sanitized}-${index}`
+}
+
+export async function setupClaudeSymlink(worktreePath: string, mainRepoPath: string): Promise<void> {
+  const worktreeClaudePath = path.join(worktreePath, '.claude')
+  const mainClaudePath = path.join(mainRepoPath, '.claude')
+
+  try {
+    const stats = await fs.lstat(worktreeClaudePath)
+
+    if (stats.isSymbolicLink()) {
+      const target = await fs.readlink(worktreeClaudePath)
+      if (target === mainClaudePath || path.resolve(worktreePath, target) === mainClaudePath) {
+        return
+      }
+    }
+
+    if (stats.isDirectory()) {
+      await fs.remove(worktreeClaudePath)
+    }
+  } catch {
+    // Path doesn't exist, which is fine
+  }
+
+  await fs.ensureSymlink(mainClaudePath, worktreeClaudePath, 'dir')
+}
+
+export async function fixWorktreeSymlinks(
+  mainRepoPath: string,
+  config: WorktreeConfig = DEFAULT_WORKTREE_CONFIG
+): Promise<{ fixed: number; errors: string[] }> {
+  const worktrees = await listWorktrees()
+  let fixed = 0
+  const errors: string[] = []
+
+  for (const wt of worktrees) {
+    if (wt.isMain) {
+      continue
+    }
+
+    if (!wt.path.includes(config.baseDir)) {
+      continue
+    }
+
+    try {
+      await setupClaudeSymlink(wt.path, mainRepoPath)
+      fixed++
+    } catch (error) {
+      errors.push(`${wt.path}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  return { fixed, errors }
 }

@@ -27,6 +27,7 @@ import { SyncEngine } from '../utils/sync-engine'
 import { HistoryTracker } from '../utils/history-tracker'
 import { parseSpecFromMarkdown, validateSpec } from '../utils/spec-utils'
 import { loadTemplate } from '../utils/templates'
+import { setupClaudeSymlink } from '../utils/worktree-utils'
 import { memoryCommand } from './memory'
 
 interface FeatureOptions {
@@ -290,6 +291,7 @@ path: ${featurePath}
             encoding: 'utf-8',
             stdio: 'pipe',
           })
+          await setupClaudeSymlink(worktreeDir, mainRepo)
           return { success: true, worktreePath: worktreeDir, branch: branchName }
         } catch {
           await fs.remove(worktreeDir)
@@ -325,6 +327,8 @@ path: ${featurePath}
       }
 
       execFileSync('git', ['worktree', 'add', worktreeDir, branchName], { stdio: 'pipe' })
+
+      await setupClaudeSymlink(worktreeDir, mainRepo)
 
       return { success: true, worktreePath: worktreeDir, branch: branchName }
     } catch (error) {
@@ -2042,6 +2046,35 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
     }
   }
 
+  async fixWorktrees(): Promise<void> {
+    const spinner = ora('Corrigindo symlinks das worktrees...').start()
+
+    try {
+      const mainRepo = this.getMainRepoPath()
+      const { fixWorktreeSymlinks } = await import('../utils/worktree-utils')
+      const { fixed, errors } = await fixWorktreeSymlinks(mainRepo)
+
+      if (errors.length > 0) {
+        spinner.warn(`${fixed} worktrees corrigidas, ${errors.length} erros`)
+        for (const err of errors) {
+          console.log(chalk.red(`  ✗ ${err}`))
+        }
+      } else if (fixed === 0) {
+        spinner.info('Nenhuma worktree encontrada para corrigir')
+      } else {
+        spinner.succeed(`${fixed} worktrees corrigidas com sucesso`)
+      }
+
+      console.log()
+      console.log(chalk.gray('Os symlinks .claude agora apontam para o repositório principal.'))
+      console.log(chalk.gray('Mudanças em .claude/ serão refletidas em todas as worktrees.'))
+    } catch (error) {
+      spinner.fail('Erro ao corrigir worktrees')
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
   async autopilot(name: string, options: FeatureOptions = {}): Promise<void> {
     console.log()
     console.log(chalk.bold.magenta('🚀 ADK Autopilot (Subprocess Mode)'))
@@ -3271,6 +3304,236 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
 `
 
     await executeClaudeCommand(prompt)
+  }
+
+  async sync(
+    name: string,
+    options: { strategy?: 'merge' | 'tasks-wins' | 'progress-wins'; dryRun?: boolean; verbose?: boolean } = {}
+  ): Promise<void> {
+    const spinner = ora('Sincronizando estado da feature...').start()
+
+    try {
+      const featurePath = this.getFeaturePath(name)
+
+      if (!(await fs.pathExists(featurePath))) {
+        spinner.fail(`Feature "${name}" não encontrada`)
+        logger.error(`Feature "${name}" não encontrada`)
+        process.exit(1)
+      }
+
+      const syncEngine = new SyncEngine({
+        strategy: options.strategy || 'merge',
+      })
+
+      if (options.dryRun) {
+        spinner.text = 'Executando dry-run...'
+        const preview = await syncEngine.dryRun(name)
+        spinner.succeed('Dry-run concluído')
+
+        console.log(chalk.cyan('\n📋 Mudanças que seriam aplicadas:'))
+        if (preview.changes.length === 0) {
+          console.log(chalk.gray('  Nenhuma mudança necessária'))
+        } else {
+          for (const change of preview.changes) {
+            console.log(`  ${change.field}: ${String(change.oldValue)} → ${String(change.newValue)}`)
+          }
+        }
+
+        if (preview.inconsistencies.length > 0) {
+          console.log(chalk.yellow('\n⚠️ Inconsistências detectadas:'))
+          for (const inc of preview.inconsistencies) {
+            console.log(`  ${inc.type}: ${inc.description}`)
+          }
+        }
+        return
+      }
+
+      const result = await syncEngine.sync(name, { strategy: options.strategy })
+
+      spinner.succeed(`Sincronização concluída em ${result.duration}ms`)
+
+      if (options.verbose) {
+        console.log(chalk.cyan('\n📊 Resultado:'))
+        console.log(`  Inconsistências resolvidas: ${result.inconsistenciesResolved}`)
+        console.log(`  Mudanças aplicadas: ${result.changesApplied.length}`)
+        console.log(`  Snapshot criado: ${result.snapshotCreated ? 'Sim' : 'Não'}`)
+      }
+    } catch (error) {
+      spinner.fail('Falha na sincronização')
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async restore(name: string, options: { list?: boolean; to?: string } = {}): Promise<void> {
+    const spinner = ora('Carregando snapshots...').start()
+
+    try {
+      const featurePath = this.getFeaturePath(name)
+
+      if (!(await fs.pathExists(featurePath))) {
+        spinner.fail(`Feature "${name}" não encontrada`)
+        logger.error(`Feature "${name}" não encontrada`)
+        process.exit(1)
+      }
+
+      const { SnapshotManager } = await import('../utils/snapshot-manager')
+      const snapshotManager = new SnapshotManager()
+
+      if (options.list) {
+        const snapshots = await snapshotManager.listSnapshots(name)
+        spinner.succeed(`${snapshots.length} snapshots encontrados`)
+
+        if (snapshots.length === 0) {
+          console.log(chalk.gray('\nNenhum snapshot disponível'))
+          return
+        }
+
+        console.log(chalk.cyan('\n📸 Snapshots disponíveis:'))
+        for (let i = 0; i < snapshots.length; i++) {
+          const snap = snapshots[i]
+          console.log(`  ${i + 1}. ${snap.id}`)
+          console.log(`     Criado: ${snap.createdAt}`)
+          console.log(`     Trigger: ${snap.trigger}`)
+        }
+        return
+      }
+
+      if (!options.to) {
+        spinner.fail('Especifique --list para ver snapshots ou --to <id> para restaurar')
+        logger.error('Opção --to ou --list é obrigatória')
+        process.exit(1)
+      }
+
+      const { confirm } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirm',
+          message: `Restaurar feature "${name}" para snapshot "${options.to}"?`,
+          default: false,
+        },
+      ])
+
+      if (!confirm) {
+        spinner.info('Restauração cancelada')
+        return
+      }
+
+      spinner.text = 'Restaurando...'
+      await snapshotManager.restoreSnapshot(name, options.to)
+
+      spinner.succeed(`Restaurado para snapshot: ${options.to}`)
+      console.log(chalk.green('\n✅ Backup pré-restauração criado automaticamente'))
+    } catch (error) {
+      spinner.fail('Falha na restauração')
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async history(name: string, options: { limit?: number } = {}): Promise<void> {
+    const spinner = ora('Carregando histórico...').start()
+
+    try {
+      const featurePath = this.getFeaturePath(name)
+
+      if (!(await fs.pathExists(featurePath))) {
+        spinner.fail(`Feature "${name}" não encontrada`)
+        logger.error(`Feature "${name}" não encontrada`)
+        process.exit(1)
+      }
+
+      const tracker = new HistoryTracker()
+      const history = await tracker.getHistory(name, options.limit)
+
+      spinner.succeed(`${history.length} transições encontradas`)
+
+      if (history.length === 0) {
+        console.log(chalk.gray('\nNenhuma transição registrada'))
+        return
+      }
+
+      console.log(chalk.cyan('\n📜 Histórico de Transições:'))
+      console.log()
+
+      for (let i = 0; i < history.length; i++) {
+        const entry = history[i]
+        const date = new Date(entry.timestamp).toLocaleString('pt-BR')
+        const duration = entry.duration ? `(${Math.round(entry.duration / 1000)}s)` : ''
+
+        console.log(chalk.bold(`${history.length - i}. ${entry.fromPhase} → ${entry.toPhase}`))
+        console.log(`   📅 ${date} ${duration}`)
+        console.log(`   🔧 Trigger: ${entry.trigger}`)
+        console.log()
+      }
+    } catch (error) {
+      spinner.fail('Falha ao carregar histórico')
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async status(name: string, options: { unified?: boolean } = {}): Promise<void> {
+    const spinner = ora('Carregando status...').start()
+
+    try {
+      const featurePath = this.getFeaturePath(name)
+
+      if (!(await fs.pathExists(featurePath))) {
+        spinner.fail(`Feature "${name}" não encontrada`)
+        logger.error(`Feature "${name}" não encontrada`)
+        process.exit(1)
+      }
+
+      if (options.unified) {
+        const { StateManager } = await import('../utils/state-manager')
+        const manager = new StateManager()
+        const state = await manager.loadUnifiedState(name)
+
+        spinner.succeed('Estado unificado carregado')
+
+        console.log(chalk.cyan(`\n📊 Estado Unificado: ${name}`))
+        console.log()
+        console.log(`Fase Atual: ${chalk.bold(state.currentPhase)}`)
+        console.log(`Progresso: ${chalk.bold(`${state.progress}%`)}`)
+        console.log(`Última Atualização: ${state.lastUpdated}`)
+
+        console.log(chalk.cyan('\n📋 Tasks:'))
+        const tasksByStatus = {
+          completed: state.tasks.filter(t => t.status === 'completed'),
+          in_progress: state.tasks.filter(t => t.status === 'in_progress'),
+          pending: state.tasks.filter(t => t.status === 'pending'),
+          blocked: state.tasks.filter(t => t.status === 'blocked'),
+        }
+
+        console.log(`  ✅ Completed: ${tasksByStatus.completed.length}`)
+        console.log(`  🔄 In Progress: ${tasksByStatus.in_progress.length}`)
+        console.log(`  ⏳ Pending: ${tasksByStatus.pending.length}`)
+        console.log(`  🚫 Blocked: ${tasksByStatus.blocked.length}`)
+
+        if (state.transitions.length > 0) {
+          console.log(chalk.cyan('\n🕐 Últimas Transições:'))
+          const recentTransitions = state.transitions.slice(-3)
+          for (const t of recentTransitions) {
+            const date = new Date(t.timestamp).toLocaleDateString('pt-BR')
+            console.log(`  ${t.fromPhase} → ${t.toPhase} (${date})`)
+          }
+        }
+
+        return
+      }
+
+      const progress = await loadProgress(name)
+      spinner.succeed('Status carregado')
+
+      console.log(chalk.cyan(`\n📊 Feature: ${name}`))
+      console.log(`Fase: ${progress.currentPhase}`)
+      console.log(`Última atualização: ${progress.lastUpdated}`)
+    } catch (error) {
+      spinner.fail('Falha ao carregar status')
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
   }
 }
 

@@ -124,10 +124,42 @@ feature
   .action(() => featureCommand.list())
 
 feature
+  .command('fix-worktrees')
+  .description('Corrige symlinks .claude em todas as worktrees existentes')
+  .action(() => featureCommand.fixWorktrees())
+
+feature
   .command('next [name]')
   .alias('n')
   .description('Executa próxima etapa da feature (usa ativa se nome não informado)')
   .action((name?: string) => featureCommand.next(name))
+
+feature
+  .command('sync <name>')
+  .description('Sincroniza estado progress.md com tasks.md')
+  .option('--strategy <type>', 'Estratégia: merge|tasks-wins|progress-wins', 'merge')
+  .option('--dry-run', 'Mostra mudanças sem aplicar')
+  .option('--verbose', 'Saída detalhada')
+  .action((name, options) => featureCommand.sync(name, options))
+
+feature
+  .command('restore <name>')
+  .description('Restaura feature para estado anterior (snapshot)')
+  .option('--list', 'Lista snapshots disponíveis')
+  .option('--to <id>', 'ID do snapshot para restaurar')
+  .action((name, options) => featureCommand.restore(name, options))
+
+feature
+  .command('history <name>')
+  .description('Exibe histórico de transições da feature')
+  .option('-l, --limit <n>', 'Limite de entradas', Number.parseInt)
+  .action((name, options) => featureCommand.history(name, options))
+
+feature
+  .command('status <name>')
+  .description('Mostra status da feature')
+  .option('--unified', 'Mostra estado consolidado (progress.md + tasks.md)')
+  .action((name, options) => featureCommand.status(name, options))
 
 feature
   .command('refine <name>')

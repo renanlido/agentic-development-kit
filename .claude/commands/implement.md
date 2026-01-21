@@ -82,6 +82,26 @@ Use o Task tool para delegar ao agent `reviewer`:
 - Analise o codigo implementado
 - Use skill `code-review`
 - Reporte issues encontradas
+- Salve o report em `.claude/plans/features/$ARGUMENTS/review.md`
+
+### 3.5. Secondary Review (Validacao AI-on-AI)
+
+Use o Task tool para delegar ao agent `reviewer-secondary`:
+
+**Instrucoes:**
+- Faca review independente do codigo (NAO leia o review primario primeiro)
+- Foque em:
+  - Edge cases nao cobertos
+  - Implicacoes de seguranca
+  - Concerns de escalabilidade
+  - Riscos de integracao
+- Compare com review primario apos sua analise
+- Salve report em `.claude/plans/features/$ARGUMENTS/secondary-review.md`
+
+**IMPORTANTE:**
+- Este step e **NAO-BLOQUEANTE** - continua mesmo se nao encontrar issues
+- O objetivo e capturar o que o primeiro reviewer pode ter perdido
+- Se precisar pular, use flag `--skip-secondary-review`
 
 ### 4. Atualizar Progress
 

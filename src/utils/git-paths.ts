@@ -1,5 +1,36 @@
 import { execFileSync } from 'node:child_process'
+import fs from 'node:fs'
 import path from 'node:path'
+
+function findGitRoot(startDir: string): string | null {
+  let currentDir = startDir
+
+  while (currentDir !== path.dirname(currentDir)) {
+    const gitPath = path.join(currentDir, '.git')
+
+    if (fs.existsSync(gitPath)) {
+      const stat = fs.statSync(gitPath)
+      if (stat.isDirectory()) {
+        return currentDir
+      }
+      if (stat.isFile()) {
+        const content = fs.readFileSync(gitPath, 'utf-8').trim()
+        if (content.startsWith('gitdir:')) {
+          const gitDir = content.slice(7).trim()
+          const worktreesMatch = gitDir.match(/(.+)\/\.git\/worktrees\//)
+          if (worktreesMatch) {
+            return worktreesMatch[1]
+          }
+        }
+        return currentDir
+      }
+    }
+
+    currentDir = path.dirname(currentDir)
+  }
+
+  return null
+}
 
 export function getMainRepoPath(): string {
   try {
@@ -13,6 +44,10 @@ export function getMainRepoPath(): string {
 
     return path.dirname(gitCommonDir)
   } catch {
+    const gitRoot = findGitRoot(process.cwd())
+    if (gitRoot) {
+      return gitRoot
+    }
     return process.cwd()
   }
 }

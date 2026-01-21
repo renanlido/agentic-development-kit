@@ -1,5 +1,5 @@
 # Foco Ativo
 
-feature: project-features
-status: em andamento
-path: .claude/plans/features/project-features/
+feature: techniques-implementation
+status: refinamento concluído - pronto para finalização
+path: .claude/plans/features/techniques-implementation/
