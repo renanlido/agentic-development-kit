@@ -1,4 +1,12 @@
-export type MemoryPhase = 'research' | 'tasks' | 'plan' | 'implement' | 'qa' | 'docs' | 'finish' | 'deploy'
+export type MemoryPhase =
+  | 'research'
+  | 'tasks'
+  | 'plan'
+  | 'implement'
+  | 'qa'
+  | 'docs'
+  | 'finish'
+  | 'deploy'
 export type MemoryStatus = 'in_progress' | 'blocked' | 'completed'
 export type PhaseResult = 'completed' | 'blocked' | 'skipped'
 

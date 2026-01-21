@@ -53,8 +53,7 @@ export async function executeClaudeCommand(
   } finally {
     try {
       fs.unlinkSync(tempFile)
-    } catch {
-    }
+    } catch {}
   }
 }
 

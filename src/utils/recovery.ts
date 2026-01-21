@@ -1,12 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import type {
-  RecoveryCheckpoint,
-  CheckpointState,
-  RetryConfig,
-  RetryResult,
-} from '../types/cdr'
+import type { RecoveryCheckpoint, CheckpointState, RetryConfig, RetryResult } from '../types/cdr'
 import { DEFAULT_RETRY_CONFIG } from '../types/cdr'
 import type { PhaseType } from '../types/model'
 
@@ -18,10 +13,7 @@ export function calculateBackoff(attempt: number, config: RetryConfig): number {
   return Math.min(backoff, config.maxBackoffMs)
 }
 
-export function isRetryableError(
-  error: Error | null,
-  retryableErrors?: string[]
-): boolean {
+export function isRetryableError(error: Error | null, retryableErrors?: string[]): boolean {
   if (!error) {
     return false
   }
@@ -29,9 +21,7 @@ export function isRetryableError(
   const patterns = retryableErrors ?? DEFAULT_RETRY_CONFIG.retryableErrors ?? []
   const errorMessage = error.message || ''
 
-  return patterns.some((pattern) =>
-    errorMessage.toLowerCase().includes(pattern.toLowerCase())
-  )
+  return patterns.some((pattern) => errorMessage.toLowerCase().includes(pattern.toLowerCase()))
 }
 
 export async function retryWithBackoff<T>(
@@ -86,14 +76,7 @@ export async function retryWithBackoff<T>(
 }
 
 function getCheckpointsDir(feature: string): string {
-  return path.join(
-    process.cwd(),
-    '.claude',
-    'plans',
-    'features',
-    feature,
-    'checkpoints'
-  )
+  return path.join(process.cwd(), '.claude', 'plans', 'features', feature, 'checkpoints')
 }
 
 export function createCheckpoint(
@@ -211,9 +194,7 @@ export function getCheckpoints(feature: string): RecoveryCheckpoint[] {
   return checkpoints
 }
 
-export function getLatestCheckpoint(
-  feature: string
-): RecoveryCheckpoint | undefined {
+export function getLatestCheckpoint(feature: string): RecoveryCheckpoint | undefined {
   const checkpointsDir = getCheckpointsDir(feature)
 
   if (!fs.existsSync(checkpointsDir)) {

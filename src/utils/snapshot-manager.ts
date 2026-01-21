@@ -82,15 +82,12 @@ export class SnapshotManager {
           try {
             const meta = await fs.readJSON(metaPath)
             snapshots.push(meta)
-          } catch {
-          }
+          } catch {}
         }
       }
     }
 
-    snapshots.sort((a, b) =>
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    )
+    snapshots.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
     return snapshots
   }

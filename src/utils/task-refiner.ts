@@ -149,23 +149,18 @@ Gere APENAS o conteudo do arquivo tasks.md atualizado no formato:
 `
 }
 
-export function parseRefineResponse(
-  response: string,
-  preserved: TaskState[]
-): TaskRefineResult {
+export function parseRefineResponse(response: string, preserved: TaskState[]): TaskRefineResult {
   const markdownMatch = response.match(/```markdown\n([\s\S]*?)\n```/)
   const content = markdownMatch ? markdownMatch[1] : response
 
   const parsed = parseTasksFile(content)
 
-  const newTasks = parsed.tasks.filter((t) =>
-    t.name.includes('[REFINAMENTO]') ||
-    t.notes?.includes('refinamento')
+  const newTasks = parsed.tasks.filter(
+    (t) => t.name.includes('[REFINAMENTO]') || t.notes?.includes('refinamento')
   )
 
-  const refinedExisting = parsed.tasks.filter((t) =>
-    !t.name.includes('[REFINAMENTO]') &&
-    !preserved.some((p) => p.name === t.name)
+  const refinedExisting = parsed.tasks.filter(
+    (t) => !t.name.includes('[REFINAMENTO]') && !preserved.some((p) => p.name === t.name)
   )
 
   return {
@@ -195,11 +190,7 @@ export async function saveRefinedTasks(
   const featurePath = getFeaturePath(featureName)
   const tasksPath = path.join(featurePath, 'tasks.md')
 
-  const allTasks = mergeRefinedTasks(
-    result.preservedTasks,
-    result.updatedTasks,
-    result.newTasks
-  )
+  const allTasks = mergeRefinedTasks(result.preservedTasks, result.updatedTasks, result.newTasks)
 
   const content = serializeTasksMarkdown({
     tasks: allTasks,

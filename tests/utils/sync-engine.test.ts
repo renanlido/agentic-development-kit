@@ -103,14 +103,20 @@ describe('SyncEngine', () => {
       const featurePath = path.join(tempDir, '.claude', 'plans', 'features', featureName)
       await fs.ensureDir(featurePath)
 
-      await fs.writeFile(path.join(featurePath, 'progress.md'), `
+      await fs.writeFile(
+        path.join(featurePath, 'progress.md'),
+        `
 # Progress: ${featureName}
 - **Phase**: implement
-`)
-      await fs.writeFile(path.join(featurePath, 'tasks.md'), `
+`
+      )
+      await fs.writeFile(
+        path.join(featurePath, 'tasks.md'),
+        `
 - [x] Task 1
 - [ ] Task 2
-`)
+`
+      )
 
       await engine.sync(featureName)
 
@@ -195,13 +201,19 @@ describe('SyncEngine', () => {
       const featurePath = path.join(tempDir, '.claude', 'plans', 'features', featureName)
       await fs.ensureDir(featurePath)
 
-      await fs.writeFile(path.join(featurePath, 'progress.md'), `
+      await fs.writeFile(
+        path.join(featurePath, 'progress.md'),
+        `
 # Progress
 - **Phase**: qa
-`)
-      await fs.writeFile(path.join(featurePath, 'tasks.md'), `
+`
+      )
+      await fs.writeFile(
+        path.join(featurePath, 'tasks.md'),
+        `
 - [ ] P0: Critical implementation task
-`)
+`
+      )
 
       const preview = await engine.dryRun(featureName)
 
@@ -245,7 +257,10 @@ describe('SyncEngine', () => {
 
       const tasks = Array.from({ length: 50 }, (_, i) => `- [x] Task ${i + 1}`).join('\n')
       await fs.writeFile(path.join(featurePath, 'tasks.md'), tasks)
-      await fs.writeFile(path.join(featurePath, 'progress.md'), '# Progress\n- **Phase**: implement')
+      await fs.writeFile(
+        path.join(featurePath, 'progress.md'),
+        '# Progress\n- **Phase**: implement'
+      )
 
       const result = await engine.sync(featureName)
 
@@ -287,10 +302,13 @@ describe('SyncEngine', () => {
 
       const featurePath = path.join(tempDir, '.claude', 'plans', 'features', featureName)
       await fs.ensureDir(featurePath)
-      await fs.writeFile(path.join(featurePath, 'progress.md'), `
+      await fs.writeFile(
+        path.join(featurePath, 'progress.md'),
+        `
 # Progress
 - **Phase**: implement
-`)
+`
+      )
 
       await engine.sync(featureName)
 

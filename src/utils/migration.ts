@@ -46,10 +46,7 @@ export async function migrateHooksConfig(): Promise<MigrationResult> {
     }
   }
 
-  const backupPath = path.join(
-    path.dirname(settingsPath),
-    `settings.backup-${Date.now()}.json`
-  )
+  const backupPath = path.join(path.dirname(settingsPath), `settings.backup-${Date.now()}.json`)
 
   try {
     await fs.copy(settingsPath, backupPath)

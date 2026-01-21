@@ -212,7 +212,9 @@ describe('migrateHooksToAdkConfig', () => {
       await fs.remove(path.join(adkDir, 'config.json'))
 
       const hooks = {
-        PreToolUse: [{ matcher: 'Write', hooks: [{ type: 'script' as const, command: './test.sh' }] }],
+        PreToolUse: [
+          { matcher: 'Write', hooks: [{ type: 'script' as const, command: './test.sh' }] },
+        ],
       }
 
       await migrateHooksToAdkConfig(hooks)

@@ -29,15 +29,20 @@ describe('StateManager', () => {
         feature: featureName,
         currentPhase: 'implement',
         progress: 50,
-        tasks: [
-          { name: 'Task 1', status: 'completed', priority: 0 },
-        ],
+        tasks: [{ name: 'Task 1', status: 'completed', priority: 0 }],
         transitions: [],
         lastUpdated: new Date().toISOString(),
         lastSynced: new Date().toISOString(),
       }
 
-      const statePath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'state.json')
+      const statePath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'state.json'
+      )
       await fs.ensureDir(path.dirname(statePath))
       await fs.writeJSON(statePath, existingState)
 
@@ -71,7 +76,14 @@ describe('StateManager', () => {
         // Missing required fields
       }
 
-      const statePath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'state.json')
+      const statePath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'state.json'
+      )
       await fs.ensureDir(path.dirname(statePath))
       await fs.writeJSON(statePath, invalidState)
 
@@ -99,14 +111,21 @@ describe('StateManager', () => {
 - [ ] **plan**
 `
 
-      const progressPath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'progress.md')
+      const progressPath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'progress.md'
+      )
       await fs.ensureDir(path.dirname(progressPath))
       await fs.writeFile(progressPath, progressContent)
 
       const result = await manager.loadUnifiedState(featureName)
 
       expect(result.currentPhase).toBe('implement')
-      expect(result.tasks.some(t => t.name === 'prd' && t.status === 'completed')).toBe(true)
+      expect(result.tasks.some((t) => t.name === 'prd' && t.status === 'completed')).toBe(true)
     })
 
     it('should merge tasks.md data when available', async () => {
@@ -150,7 +169,14 @@ describe('StateManager', () => {
 
       await manager.saveUnifiedState(featureName, state)
 
-      const statePath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'state.json')
+      const statePath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'state.json'
+      )
       const exists = await fs.pathExists(statePath)
       expect(exists).toBe(true)
 
@@ -175,7 +201,14 @@ describe('StateManager', () => {
 
       await manager.saveUnifiedState(featureName, state)
 
-      const statePath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'state.json')
+      const statePath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'state.json'
+      )
       const saved = await fs.readJSON(statePath)
 
       expect(saved.lastUpdated).not.toBe(oldTimestamp)
@@ -197,7 +230,14 @@ describe('StateManager', () => {
 
       await manager.saveUnifiedState('new-feature', state)
 
-      const statePath = path.join(tempDir, '.claude', 'plans', 'features', 'new-feature', 'state.json')
+      const statePath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        'new-feature',
+        'state.json'
+      )
       const exists = await fs.pathExists(statePath)
       expect(exists).toBe(true)
     })
@@ -378,13 +418,20 @@ describe('StateManager', () => {
 - [ ] **research**
 `
 
-      const progressPath = path.join(tempDir, '.claude', 'plans', 'features', 'legacy-feature', 'progress.md')
+      const progressPath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        'legacy-feature',
+        'progress.md'
+      )
       await fs.ensureDir(path.dirname(progressPath))
       await fs.writeFile(progressPath, progressContent)
 
       const result = await manager.loadUnifiedState('legacy-feature')
 
-      expect(result.tasks.some(t => t.name === 'prd')).toBe(true)
+      expect(result.tasks.some((t) => t.name === 'prd')).toBe(true)
     })
   })
 })

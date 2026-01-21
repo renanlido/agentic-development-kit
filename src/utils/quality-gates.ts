@@ -50,9 +50,9 @@ export class QualityGate {
 const RISK_WEIGHTS = {
   codeComplexity: 0.15,
   testCoverage: 0.25,
-  securityIssues: 0.30,
-  aiReviewRisk: 0.20,
-  debtRatio: 0.10,
+  securityIssues: 0.3,
+  aiReviewRisk: 0.2,
+  debtRatio: 0.1,
 }
 
 export function calculateOverallRiskScore(factors: RiskFactors): number {
@@ -95,10 +95,10 @@ export function trackTechnicalDebt(input: {
 }
 
 const CONFIDENCE_WEIGHTS = {
-  testCoverage: 0.30,
+  testCoverage: 0.3,
   reviewAgreement: 0.35,
   codeComplexity: 0.15,
-  documentationScore: 0.20,
+  documentationScore: 0.2,
 }
 
 export function calculateConfidenceScore(factors: ConfidenceFactors): number {

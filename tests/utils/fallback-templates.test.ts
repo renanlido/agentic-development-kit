@@ -118,9 +118,7 @@ describe('fallback-templates', () => {
 
       const templates = getFallbackTemplates()
 
-      expect(templates.every((t) => t.phase !== ('config' as PhaseType))).toBe(
-        true
-      )
+      expect(templates.every((t) => t.phase !== ('config' as PhaseType))).toBe(true)
     })
   })
 
@@ -159,7 +157,9 @@ describe('fallback-templates', () => {
     })
 
     it('should return false for null template', () => {
-      const isValid = validateFallbackTemplate(null as unknown as ReturnType<typeof loadFallbackTemplate>)
+      const isValid = validateFallbackTemplate(
+        null as unknown as ReturnType<typeof loadFallbackTemplate>
+      )
 
       expect(isValid).toBe(false)
     })
@@ -265,10 +265,9 @@ describe('fallback-templates', () => {
 
       const template = loadFallbackTemplate('prd')
 
-      expect(
-        template?.content.includes('YYYY-MM-DD') ||
-          template?.content.includes('[Date]')
-      ).toBe(true)
+      expect(template?.content.includes('YYYY-MM-DD') || template?.content.includes('[Date]')).toBe(
+        true
+      )
     })
   })
 

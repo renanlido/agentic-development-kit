@@ -1,8 +1,4 @@
-import {
-  withRetry,
-  calculateBackoff,
-  isRetryableError,
-} from '../../src/utils/retry'
+import { withRetry, calculateBackoff, isRetryableError } from '../../src/utils/retry'
 import { DEFAULT_RETRY_CONFIG } from '../../src/types/cdr'
 import type { RetryConfig } from '../../src/types/cdr'
 
@@ -43,7 +39,8 @@ describe('retry utilities', () => {
 
     describe('retry behavior', () => {
       it('should retry on failure', async () => {
-        const fn = jest.fn()
+        const fn = jest
+          .fn()
           .mockRejectedValueOnce(new Error('ECONNRESET'))
           .mockResolvedValueOnce('success')
 
@@ -86,7 +83,8 @@ describe('retry utilities', () => {
 
     describe('backoff behavior', () => {
       it('should wait between retries with exponential backoff', async () => {
-        const fn = jest.fn()
+        const fn = jest
+          .fn()
           .mockRejectedValueOnce(new Error('ECONNRESET'))
           .mockRejectedValueOnce(new Error('ECONNRESET'))
           .mockResolvedValueOnce('success')
@@ -97,18 +95,18 @@ describe('retry utilities', () => {
         }
 
         const resultPromise = withRetry(fn, config)
-        
+
         expect(fn).toHaveBeenCalledTimes(1)
-        
+
         await jest.advanceTimersByTimeAsync(100)
         expect(fn).toHaveBeenCalledTimes(2)
-        
+
         await jest.advanceTimersByTimeAsync(200)
         expect(fn).toHaveBeenCalledTimes(3)
 
         await jest.runAllTimersAsync()
         const result = await resultPromise
-        
+
         expect(result.success).toBe(true)
         expect(result.attempts).toBe(3)
       })
@@ -146,7 +144,8 @@ describe('retry utilities', () => {
       })
 
       it('should retry errors in retryableErrors list', async () => {
-        const fn = jest.fn()
+        const fn = jest
+          .fn()
           .mockRejectedValueOnce(new Error('ECONNRESET'))
           .mockResolvedValueOnce('success')
         const config: RetryConfig = {
@@ -163,7 +162,8 @@ describe('retry utilities', () => {
       })
 
       it('should retry all errors when retryableErrors is undefined', async () => {
-        const fn = jest.fn()
+        const fn = jest
+          .fn()
           .mockRejectedValueOnce(new Error('random error'))
           .mockResolvedValueOnce('success')
         const config: RetryConfig = {
@@ -194,9 +194,9 @@ describe('retry utilities', () => {
       })
 
       it('should pass arguments to function', async () => {
-        const fn = jest.fn().mockImplementation((a: number, b: string) => 
-          Promise.resolve(a.toString() + b)
-        )
+        const fn = jest
+          .fn()
+          .mockImplementation((a: number, b: string) => Promise.resolve(a.toString() + b))
 
         const resultPromise = withRetry(() => fn(42, 'test'))
         await jest.runAllTimersAsync()

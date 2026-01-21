@@ -62,9 +62,7 @@ describe('model-router', () => {
     describe('with CLI override', () => {
       it('should return override model when provided', () => {
         mockFs.existsSync.mockReturnValue(false)
-        expect(getModelForPhase('research', ModelType.HAIKU)).toBe(
-          ModelType.HAIKU
-        )
+        expect(getModelForPhase('research', ModelType.HAIKU)).toBe(ModelType.HAIKU)
       })
 
       it('should ignore config and return override', () => {
@@ -78,9 +76,7 @@ describe('model-router', () => {
           })
         )
 
-        expect(getModelForPhase('research', ModelType.HAIKU)).toBe(
-          ModelType.HAIKU
-        )
+        expect(getModelForPhase('research', ModelType.HAIKU)).toBe(ModelType.HAIKU)
       })
     })
 

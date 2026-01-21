@@ -184,18 +184,42 @@ describe('Reflection Pattern', () => {
       const reflection = reflectOnResult(result, expected)
 
       expect(reflection.matchesExpected).toBe(false)
-      expect(reflection.discrepancies.some((d) => d.includes('Expected files not modified'))).toBe(true)
+      expect(reflection.discrepancies.some((d) => d.includes('Expected files not modified'))).toBe(
+        true
+      )
     })
 
     it('should clamp confidence score between 0 and 100', () => {
       const result: ActionResult = {
         success: false,
         output: 'Multiple failures',
-        filesModified: ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts', 'f.ts', 'g.ts', 'h.ts', 'i.ts', 'j.ts'],
+        filesModified: [
+          'a.ts',
+          'b.ts',
+          'c.ts',
+          'd.ts',
+          'e.ts',
+          'f.ts',
+          'g.ts',
+          'h.ts',
+          'i.ts',
+          'j.ts',
+        ],
       }
       const expected = {
         shouldSucceed: true,
-        expectedFiles: ['x.ts', 'y.ts', 'z.ts', 'w.ts', 'v.ts', 'u.ts', 't.ts', 's.ts', 'r.ts', 'q.ts'],
+        expectedFiles: [
+          'x.ts',
+          'y.ts',
+          'z.ts',
+          'w.ts',
+          'v.ts',
+          'u.ts',
+          't.ts',
+          's.ts',
+          'r.ts',
+          'q.ts',
+        ],
       }
 
       const reflection = reflectOnResult(result, expected)

@@ -217,12 +217,7 @@ export class SessionMemoryCache {
       return
     }
 
-    const lines = [
-      '# Session Memory',
-      '',
-      `> Flushed: ${new Date().toISOString()}`,
-      '',
-    ]
+    const lines = ['# Session Memory', '', `> Flushed: ${new Date().toISOString()}`, '']
 
     for (const entry of entries) {
       lines.push(`## ${entry.key}`)

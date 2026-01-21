@@ -108,16 +108,15 @@ describe('cdr-integration', () => {
 
     it('should call onProgress callback', async () => {
       const onProgress = jest.fn()
-      const fn = jest.fn().mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve('done'), 50))
-      )
+      const fn = jest
+        .fn()
+        .mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve('done'), 50)))
 
       await executeWithCDR(fn, {
         feature: 'test-feature',
         phase: 'implement',
         onProgress,
       })
-
     })
 
     it('should call onHealthWarning on status change', async () => {
@@ -129,7 +128,6 @@ describe('cdr-integration', () => {
         phase: 'implement',
         onHealthWarning,
       })
-
     })
 
     it('should return error when fallback is disabled and retries exhausted', async () => {
@@ -237,10 +235,7 @@ describe('cdr-integration', () => {
         state: { progress: 50, artifacts: [] },
         createdAt: new Date().toISOString(),
       }
-      await fs.writeJson(
-        path.join(featureDir, 'incomplete-checkpoint.json'),
-        checkpoint
-      )
+      await fs.writeJson(path.join(featureDir, 'incomplete-checkpoint.json'), checkpoint)
 
       const result = await validatePhaseHealth('test-feature', 'implement')
 

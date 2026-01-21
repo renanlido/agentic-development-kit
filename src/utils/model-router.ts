@@ -65,9 +65,7 @@ export function getModelRouterConfig(): ModelRoutingConfig {
   return cachedConfig
 }
 
-export function setModelRouterConfig(
-  config: Partial<ModelRoutingConfig>
-): void {
+export function setModelRouterConfig(config: Partial<ModelRoutingConfig>): void {
   const currentConfig = getModelRouterConfig()
   cachedConfig = {
     enabled: config.enabled ?? currentConfig.enabled,
@@ -90,10 +88,7 @@ export function resetModelRouterConfig(): void {
  * @param override - Override opcional via CLI (--model flag)
  * @returns Tipo de modelo Claude a ser usado (opus, sonnet, haiku)
  */
-export function getModelForPhase(
-  phase: PhaseType,
-  override?: ModelType
-): ModelType {
+export function getModelForPhase(phase: PhaseType, override?: ModelType): ModelType {
   if (override) {
     return override
   }

@@ -62,9 +62,11 @@ jest.mock('../../src/utils/git-paths', () => ({
   getAgentsPath: () => path.join(mockTempDir, '.claude/agents'),
 }))
 
-const mockProcessExit = jest.spyOn(process, 'exit').mockImplementation((_code?: string | number | null | undefined) => {
-  return undefined as never
-})
+const mockProcessExit = jest
+  .spyOn(process, 'exit')
+  .mockImplementation((_code?: string | number | null | undefined) => {
+    return undefined as never
+  })
 
 describe('FeatureCommand - sync()', () => {
   let tempDir: string

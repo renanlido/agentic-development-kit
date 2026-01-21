@@ -272,7 +272,12 @@ ghi9012|docs: update|Dev|2026-01-13`
           feature: featureName,
           currentPhase: 'implement',
           steps: [
-            { name: 'prd', status: 'completed', startedAt: '2026-01-10T10:00:00Z', completedAt: '2026-01-10T12:00:00Z' },
+            {
+              name: 'prd',
+              status: 'completed',
+              startedAt: '2026-01-10T10:00:00Z',
+              completedAt: '2026-01-10T12:00:00Z',
+            },
             { name: 'implement', status: 'in_progress', startedAt: '2026-01-15T10:00:00Z' },
           ],
           lastUpdated: '2026-01-16T10:00:00Z',
@@ -347,9 +352,7 @@ ghi9012|docs: update|Dev|2026-01-13`
         const progress: FeatureProgress = {
           feature: featureName,
           currentPhase: 'implement',
-          steps: [
-            { name: 'prd', status: 'completed', startedAt: createdDate },
-          ],
+          steps: [{ name: 'prd', status: 'completed', startedAt: createdDate }],
           lastUpdated: new Date().toISOString(),
         }
         await fs.writeJson(path.join(featureDir, 'progress.json'), progress)

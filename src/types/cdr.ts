@@ -85,13 +85,7 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxRetries: 3,
   baseBackoffMs: 1000,
   maxBackoffMs: 8000,
-  retryableErrors: [
-    'ECONNRESET',
-    'ETIMEDOUT',
-    'ENOTFOUND',
-    'rate_limit',
-    'overloaded',
-  ],
+  retryableErrors: ['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'rate_limit', 'overloaded'],
 }
 
 export const DEFAULT_CDR_CONFIG: CDRConfig = {

@@ -9,9 +9,7 @@ describe('ProgressConflict', () => {
         feature: 'test',
         currentPhase: 'completed',
         progress: 100,
-        tasks: [
-          { name: 'Task 1', status: 'pending' as const, priority: 0 },
-        ],
+        tasks: [{ name: 'Task 1', status: 'pending' as const, priority: 0 }],
         transitions: [],
         lastUpdated: new Date().toISOString(),
         lastSynced: new Date().toISOString(),
@@ -31,9 +29,7 @@ describe('ProgressConflict', () => {
         feature: 'test',
         currentPhase: 'completed',
         progress: 100,
-        tasks: [
-          { name: 'Critical task', status: 'pending' as const, priority: 0 },
-        ],
+        tasks: [{ name: 'Critical task', status: 'pending' as const, priority: 0 }],
         transitions: [],
         lastUpdated: new Date().toISOString(),
         lastSynced: new Date().toISOString(),
@@ -41,7 +37,7 @@ describe('ProgressConflict', () => {
 
       const inconsistencies = detectInconsistencies(state)
 
-      const p0Error = inconsistencies.find(i => i.type === 'missing_required')
+      const p0Error = inconsistencies.find((i) => i.type === 'missing_required')
       expect(p0Error).toBeDefined()
       expect(p0Error?.severity).toBe('error')
     })
@@ -54,7 +50,12 @@ describe('ProgressConflict', () => {
         currentPhase: 'qa',
         progress: 75,
         tasks: [
-          { name: 'Implementation task', status: 'in_progress' as const, priority: 1, phase: 'implement' },
+          {
+            name: 'Implementation task',
+            status: 'in_progress' as const,
+            priority: 1,
+            phase: 'implement',
+          },
         ],
         transitions: [],
         lastUpdated: new Date().toISOString(),
@@ -63,7 +64,7 @@ describe('ProgressConflict', () => {
 
       const inconsistencies = detectInconsistencies(state)
 
-      const statusMismatch = inconsistencies.find(i => i.type === 'task_status_mismatch')
+      const statusMismatch = inconsistencies.find((i) => i.type === 'task_status_mismatch')
       expect(statusMismatch).toBeDefined()
       expect(statusMismatch?.severity).toBe('warning')
     })
@@ -85,7 +86,7 @@ describe('ProgressConflict', () => {
 
       const inconsistencies = detectInconsistencies(state)
 
-      const orphan = inconsistencies.find(i => i.type === 'orphan_task')
+      const orphan = inconsistencies.find((i) => i.type === 'orphan_task')
       expect(orphan).toBeDefined()
       expect(orphan?.severity).toBe('warning')
     })
@@ -133,15 +134,15 @@ describe('ProgressConflict', () => {
 
   describe('resolveInconsistencies', () => {
     it('should apply progress-wins strategy', async () => {
-      const { resolveInconsistencies, detectInconsistencies } = await import('../../src/utils/progress-conflict')
+      const { resolveInconsistencies, detectInconsistencies } = await import(
+        '../../src/utils/progress-conflict'
+      )
 
       const state = {
         feature: 'test',
         currentPhase: 'implement',
         progress: 75,
-        tasks: [
-          { name: 'Task 1', status: 'pending' as const, priority: 0 },
-        ],
+        tasks: [{ name: 'Task 1', status: 'pending' as const, priority: 0 }],
         transitions: [],
         lastUpdated: new Date().toISOString(),
         lastSynced: new Date().toISOString(),
@@ -156,15 +157,15 @@ describe('ProgressConflict', () => {
     })
 
     it('should apply tasks-wins strategy', async () => {
-      const { resolveInconsistencies, detectInconsistencies } = await import('../../src/utils/progress-conflict')
+      const { resolveInconsistencies, detectInconsistencies } = await import(
+        '../../src/utils/progress-conflict'
+      )
 
       const state = {
         feature: 'test',
         currentPhase: 'completed',
         progress: 100,
-        tasks: [
-          { name: 'Task 1', status: 'in_progress' as const, priority: 0 },
-        ],
+        tasks: [{ name: 'Task 1', status: 'in_progress' as const, priority: 0 }],
         transitions: [],
         lastUpdated: new Date().toISOString(),
         lastSynced: new Date().toISOString(),
@@ -175,11 +176,13 @@ describe('ProgressConflict', () => {
 
       expect(result.applied).toBe(true)
       // Phase should be updated based on task status
-      expect(result.changes.some(c => c.field === 'currentPhase')).toBe(true)
+      expect(result.changes.some((c) => c.field === 'currentPhase')).toBe(true)
     })
 
     it('should apply merge strategy (combine information)', async () => {
-      const { resolveInconsistencies, detectInconsistencies } = await import('../../src/utils/progress-conflict')
+      const { resolveInconsistencies, detectInconsistencies } = await import(
+        '../../src/utils/progress-conflict'
+      )
 
       const state = {
         feature: 'test',
@@ -203,15 +206,15 @@ describe('ProgressConflict', () => {
     })
 
     it('should return requiresManual for manual strategy', async () => {
-      const { resolveInconsistencies, detectInconsistencies } = await import('../../src/utils/progress-conflict')
+      const { resolveInconsistencies, detectInconsistencies } = await import(
+        '../../src/utils/progress-conflict'
+      )
 
       const state = {
         feature: 'test',
         currentPhase: 'completed',
         progress: 100,
-        tasks: [
-          { name: 'Task 1', status: 'pending' as const, priority: 0 },
-        ],
+        tasks: [{ name: 'Task 1', status: 'pending' as const, priority: 0 }],
         transitions: [],
         lastUpdated: new Date().toISOString(),
         lastSynced: new Date().toISOString(),
@@ -226,15 +229,15 @@ describe('ProgressConflict', () => {
     })
 
     it('should track changes for audit', async () => {
-      const { resolveInconsistencies, detectInconsistencies } = await import('../../src/utils/progress-conflict')
+      const { resolveInconsistencies, detectInconsistencies } = await import(
+        '../../src/utils/progress-conflict'
+      )
 
       const state = {
         feature: 'test',
         currentPhase: 'qa',
         progress: 90,
-        tasks: [
-          { name: 'Task 1', status: 'pending' as const, priority: 0 },
-        ],
+        tasks: [{ name: 'Task 1', status: 'pending' as const, priority: 0 }],
         transitions: [],
         lastUpdated: new Date().toISOString(),
         lastSynced: new Date().toISOString(),
@@ -244,7 +247,7 @@ describe('ProgressConflict', () => {
       const result = resolveInconsistencies(state, inconsistencies, 'progress-wins')
 
       expect(result.changes).toBeDefined()
-      result.changes.forEach(change => {
+      result.changes.forEach((change) => {
         expect(change).toHaveProperty('field')
         expect(change).toHaveProperty('oldValue')
         expect(change).toHaveProperty('newValue')
@@ -252,7 +255,9 @@ describe('ProgressConflict', () => {
     })
 
     it('should not lose data during resolution', async () => {
-      const { resolveInconsistencies, detectInconsistencies } = await import('../../src/utils/progress-conflict')
+      const { resolveInconsistencies, detectInconsistencies } = await import(
+        '../../src/utils/progress-conflict'
+      )
 
       const state = {
         feature: 'test',
@@ -291,9 +296,7 @@ describe('ProgressConflict', () => {
         feature: 'test',
         currentPhase: 'completed',
         progress: 100,
-        tasks: [
-          { name: 'Pending P0 task', status: 'pending' as const, priority: 0 },
-        ],
+        tasks: [{ name: 'Pending P0 task', status: 'pending' as const, priority: 0 }],
         transitions: [],
         lastUpdated: new Date().toISOString(),
         lastSynced: new Date().toISOString(),
@@ -301,7 +304,7 @@ describe('ProgressConflict', () => {
 
       const inconsistencies = detectInconsistencies(state)
 
-      inconsistencies.forEach(inconsistency => {
+      inconsistencies.forEach((inconsistency) => {
         expect(inconsistency.description).toBeTruthy()
         expect(inconsistency.description.length).toBeGreaterThan(10)
       })
@@ -325,8 +328,8 @@ describe('ProgressConflict', () => {
 
       const inconsistencies = detectInconsistencies(state)
 
-      const errors = inconsistencies.filter(i => i.severity === 'error')
-      const warnings = inconsistencies.filter(i => i.severity === 'warning')
+      const errors = inconsistencies.filter((i) => i.severity === 'error')
+      const warnings = inconsistencies.filter((i) => i.severity === 'warning')
 
       expect(errors.length + warnings.length).toBe(inconsistencies.length)
       // P0 tasks should be errors
