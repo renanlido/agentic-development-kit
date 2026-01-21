@@ -55,7 +55,10 @@ describe('Tiered Memory System', () => {
 
         const phaseDir = path.join(featureDir, 'implement')
         await fs.ensureDir(phaseDir)
-        await fs.writeFile(path.join(phaseDir, 'memory.md'), '# Phase Memory\n\nPhase level context')
+        await fs.writeFile(
+          path.join(phaseDir, 'memory.md'),
+          '# Phase Memory\n\nPhase level context'
+        )
       })
 
       it('should load project memory', async () => {
@@ -205,7 +208,12 @@ describe('Tiered Memory System', () => {
         project: createTieredMemory('project', 'Project content'),
         session: {
           entries: [
-            { key: 'session-key', content: 'Session content here', timestamp: new Date().toISOString(), usageCount: 1 },
+            {
+              key: 'session-key',
+              content: 'Session content here',
+              timestamp: new Date().toISOString(),
+              usageCount: 1,
+            },
           ],
           lastUpdated: new Date().toISOString(),
         },
@@ -232,7 +240,12 @@ describe('Tiered Memory System', () => {
       const hierarchy: MemoryHierarchy = {
         session: {
           entries: [
-            { key: 'only-session', content: 'Only session content', timestamp: new Date().toISOString(), usageCount: 0 },
+            {
+              key: 'only-session',
+              content: 'Only session content',
+              timestamp: new Date().toISOString(),
+              usageCount: 0,
+            },
           ],
           lastUpdated: new Date().toISOString(),
         },

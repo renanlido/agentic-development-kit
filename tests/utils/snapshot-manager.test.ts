@@ -33,7 +33,14 @@ describe('SnapshotManager', () => {
       const { SnapshotManager } = await import('../../src/utils/snapshot-manager')
       const manager = new SnapshotManager()
 
-      const progressPath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'progress.md')
+      const progressPath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'progress.md'
+      )
       await fs.ensureDir(path.dirname(progressPath))
       await fs.writeFile(progressPath, '# Progress content')
 
@@ -61,7 +68,14 @@ describe('SnapshotManager', () => {
       const { SnapshotManager } = await import('../../src/utils/snapshot-manager')
       const manager = new SnapshotManager()
 
-      const statePath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'state.json')
+      const statePath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'state.json'
+      )
       await fs.ensureDir(path.dirname(statePath))
       await fs.writeJSON(statePath, { feature: featureName })
 
@@ -127,7 +141,14 @@ describe('SnapshotManager', () => {
       const { SnapshotManager } = await import('../../src/utils/snapshot-manager')
       const manager = new SnapshotManager()
 
-      const progressPath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'progress.md')
+      const progressPath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'progress.md'
+      )
       await fs.ensureDir(path.dirname(progressPath))
       await fs.writeFile(progressPath, 'Original content')
 
@@ -145,7 +166,14 @@ describe('SnapshotManager', () => {
       const { SnapshotManager } = await import('../../src/utils/snapshot-manager')
       const manager = new SnapshotManager()
 
-      const progressPath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'progress.md')
+      const progressPath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'progress.md'
+      )
       await fs.ensureDir(path.dirname(progressPath))
       await fs.writeFile(progressPath, 'Content to backup')
 
@@ -156,7 +184,7 @@ describe('SnapshotManager', () => {
       await manager.restoreSnapshot(featureName, snapshotId)
 
       const snapshots = await manager.listSnapshots(featureName)
-      const backupSnapshot = snapshots.find(s => s.trigger.includes('pre-restore'))
+      const backupSnapshot = snapshots.find((s) => s.trigger.includes('pre-restore'))
 
       expect(backupSnapshot).toBeDefined()
     })
@@ -165,9 +193,7 @@ describe('SnapshotManager', () => {
       const { SnapshotManager } = await import('../../src/utils/snapshot-manager')
       const manager = new SnapshotManager()
 
-      await expect(
-        manager.restoreSnapshot(featureName, 'invalid-snapshot-id')
-      ).rejects.toThrow()
+      await expect(manager.restoreSnapshot(featureName, 'invalid-snapshot-id')).rejects.toThrow()
     })
 
     it('should restore all files atomically (all-or-nothing)', async () => {
@@ -201,7 +227,7 @@ describe('SnapshotManager', () => {
 
       for (let i = 0; i < 15; i++) {
         await manager.createSnapshot(featureName, `snapshot-${i}`)
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       }
 
       const deleted = await manager.cleanupOldSnapshots(featureName, 10)
@@ -218,7 +244,7 @@ describe('SnapshotManager', () => {
 
       for (let i = 0; i < 20; i++) {
         await manager.createSnapshot(featureName, `snapshot-${i}`)
-        await new Promise(resolve => setTimeout(resolve, 10))
+        await new Promise((resolve) => setTimeout(resolve, 10))
       }
 
       await manager.cleanupOldSnapshots(featureName, 5)

@@ -196,7 +196,10 @@ export function generateWorktreePath(feature: string, agent: string, index: numb
   return `${sanitized}-${index}`
 }
 
-export async function setupClaudeSymlink(worktreePath: string, mainRepoPath: string): Promise<void> {
+export async function setupClaudeSymlink(
+  worktreePath: string,
+  mainRepoPath: string
+): Promise<void> {
   const worktreeClaudePath = path.join(worktreePath, '.claude')
   const mainClaudePath = path.join(mainRepoPath, '.claude')
 

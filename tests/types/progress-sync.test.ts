@@ -225,12 +225,7 @@ describe('ProgressSync Types', () => {
     it('should validate all inconsistency types', async () => {
       const { InconsistencySchema } = await import('../../src/types/progress-sync')
 
-      const types = [
-        'phase_mismatch',
-        'task_status_mismatch',
-        'orphan_task',
-        'missing_required',
-      ]
+      const types = ['phase_mismatch', 'task_status_mismatch', 'orphan_task', 'missing_required']
 
       for (const type of types) {
         const inconsistency = {

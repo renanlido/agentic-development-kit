@@ -10,11 +10,32 @@ describe('AI-on-AI Review', () => {
   describe('consolidateReviews', () => {
     it('should identify agreements between reviews', () => {
       const primary: ReviewFinding[] = [
-        { id: '1', category: 'security', severity: 'high', message: 'SQL injection risk', file: 'user.ts', line: 42 },
-        { id: '2', category: 'quality', severity: 'medium', message: 'Missing error handling', file: 'api.ts', line: 100 },
+        {
+          id: '1',
+          category: 'security',
+          severity: 'high',
+          message: 'SQL injection risk',
+          file: 'user.ts',
+          line: 42,
+        },
+        {
+          id: '2',
+          category: 'quality',
+          severity: 'medium',
+          message: 'Missing error handling',
+          file: 'api.ts',
+          line: 100,
+        },
       ]
       const secondary: ReviewFinding[] = [
-        { id: '3', category: 'security', severity: 'high', message: 'SQL injection vulnerability', file: 'user.ts', line: 42 },
+        {
+          id: '3',
+          category: 'security',
+          severity: 'high',
+          message: 'SQL injection vulnerability',
+          file: 'user.ts',
+          line: 42,
+        },
       ]
 
       const result = consolidateReviews(primary, secondary)
@@ -26,7 +47,14 @@ describe('AI-on-AI Review', () => {
 
     it('should identify primary-only findings', () => {
       const primary: ReviewFinding[] = [
-        { id: '1', category: 'quality', severity: 'low', message: 'Consider refactoring', file: 'utils.ts', line: 10 },
+        {
+          id: '1',
+          category: 'quality',
+          severity: 'low',
+          message: 'Consider refactoring',
+          file: 'utils.ts',
+          line: 10,
+        },
       ]
       const secondary: ReviewFinding[] = []
 
@@ -39,7 +67,14 @@ describe('AI-on-AI Review', () => {
     it('should identify secondary-only findings', () => {
       const primary: ReviewFinding[] = []
       const secondary: ReviewFinding[] = [
-        { id: '1', category: 'performance', severity: 'medium', message: 'N+1 query issue', file: 'db.ts', line: 55 },
+        {
+          id: '1',
+          category: 'performance',
+          severity: 'medium',
+          message: 'N+1 query issue',
+          file: 'db.ts',
+          line: 55,
+        },
       ]
 
       const result = consolidateReviews(primary, secondary)
@@ -50,10 +85,24 @@ describe('AI-on-AI Review', () => {
 
     it('should identify disagreements (different severity)', () => {
       const primary: ReviewFinding[] = [
-        { id: '1', category: 'security', severity: 'low', message: 'Minor issue', file: 'auth.ts', line: 20 },
+        {
+          id: '1',
+          category: 'security',
+          severity: 'low',
+          message: 'Minor issue',
+          file: 'auth.ts',
+          line: 20,
+        },
       ]
       const secondary: ReviewFinding[] = [
-        { id: '2', category: 'security', severity: 'critical', message: 'Critical security flaw', file: 'auth.ts', line: 20 },
+        {
+          id: '2',
+          category: 'security',
+          severity: 'critical',
+          message: 'Critical security flaw',
+          file: 'auth.ts',
+          line: 20,
+        },
       ]
 
       const result = consolidateReviews(primary, secondary)
@@ -74,10 +123,24 @@ describe('AI-on-AI Review', () => {
 
     it('should match findings by file and line proximity', () => {
       const primary: ReviewFinding[] = [
-        { id: '1', category: 'quality', severity: 'medium', message: 'Issue A', file: 'test.ts', line: 50 },
+        {
+          id: '1',
+          category: 'quality',
+          severity: 'medium',
+          message: 'Issue A',
+          file: 'test.ts',
+          line: 50,
+        },
       ]
       const secondary: ReviewFinding[] = [
-        { id: '2', category: 'quality', severity: 'medium', message: 'Issue B', file: 'test.ts', line: 52 },
+        {
+          id: '2',
+          category: 'quality',
+          severity: 'medium',
+          message: 'Issue B',
+          file: 'test.ts',
+          line: 52,
+        },
       ]
 
       const result = consolidateReviews(primary, secondary)
@@ -87,10 +150,24 @@ describe('AI-on-AI Review', () => {
 
     it('should not match findings from different files', () => {
       const primary: ReviewFinding[] = [
-        { id: '1', category: 'quality', severity: 'medium', message: 'Issue A', file: 'a.ts', line: 50 },
+        {
+          id: '1',
+          category: 'quality',
+          severity: 'medium',
+          message: 'Issue A',
+          file: 'a.ts',
+          line: 50,
+        },
       ]
       const secondary: ReviewFinding[] = [
-        { id: '2', category: 'quality', severity: 'medium', message: 'Issue B', file: 'b.ts', line: 50 },
+        {
+          id: '2',
+          category: 'quality',
+          severity: 'medium',
+          message: 'Issue B',
+          file: 'b.ts',
+          line: 50,
+        },
       ]
 
       const result = consolidateReviews(primary, secondary)
@@ -117,10 +194,26 @@ describe('AI-on-AI Review', () => {
 
     it('should increase risk for critical findings', () => {
       const consolidated: ConsolidatedReview = {
-        agreements: [{
-          primary: { id: '1', category: 'security', severity: 'critical', message: 'Critical', file: 'a.ts', line: 1 },
-          secondary: { id: '2', category: 'security', severity: 'critical', message: 'Critical', file: 'a.ts', line: 1 },
-        }],
+        agreements: [
+          {
+            primary: {
+              id: '1',
+              category: 'security',
+              severity: 'critical',
+              message: 'Critical',
+              file: 'a.ts',
+              line: 1,
+            },
+            secondary: {
+              id: '2',
+              category: 'security',
+              severity: 'critical',
+              message: 'Critical',
+              file: 'a.ts',
+              line: 1,
+            },
+          },
+        ],
         primaryOnly: [],
         secondaryOnly: [],
         disagreements: [],
@@ -136,11 +229,27 @@ describe('AI-on-AI Review', () => {
         agreements: [],
         primaryOnly: [],
         secondaryOnly: [],
-        disagreements: [{
-          primary: { id: '1', category: 'security', severity: 'low', message: 'Low', file: 'a.ts', line: 1 },
-          secondary: { id: '2', category: 'security', severity: 'critical', message: 'Critical', file: 'a.ts', line: 1 },
-          reason: 'Severity mismatch',
-        }],
+        disagreements: [
+          {
+            primary: {
+              id: '1',
+              category: 'security',
+              severity: 'low',
+              message: 'Low',
+              file: 'a.ts',
+              line: 1,
+            },
+            secondary: {
+              id: '2',
+              category: 'security',
+              severity: 'critical',
+              message: 'Critical',
+              file: 'a.ts',
+              line: 1,
+            },
+            reason: 'Severity mismatch',
+          },
+        ],
       }
 
       const risk = calculateRiskFromReviews(consolidated)
@@ -159,7 +268,7 @@ describe('AI-on-AI Review', () => {
       }))
 
       const consolidated: ConsolidatedReview = {
-        agreements: manyFindings.map(f => ({ primary: f, secondary: { ...f, id: `s${f.id}` } })),
+        agreements: manyFindings.map((f) => ({ primary: f, secondary: { ...f, id: `s${f.id}` } })),
         primaryOnly: [],
         secondaryOnly: [],
         disagreements: [],
@@ -172,20 +281,52 @@ describe('AI-on-AI Review', () => {
 
     it('should weight findings by severity', () => {
       const lowSeverity: ConsolidatedReview = {
-        agreements: [{
-          primary: { id: '1', category: 'quality', severity: 'low', message: 'Low', file: 'a.ts', line: 1 },
-          secondary: { id: '2', category: 'quality', severity: 'low', message: 'Low', file: 'a.ts', line: 1 },
-        }],
+        agreements: [
+          {
+            primary: {
+              id: '1',
+              category: 'quality',
+              severity: 'low',
+              message: 'Low',
+              file: 'a.ts',
+              line: 1,
+            },
+            secondary: {
+              id: '2',
+              category: 'quality',
+              severity: 'low',
+              message: 'Low',
+              file: 'a.ts',
+              line: 1,
+            },
+          },
+        ],
         primaryOnly: [],
         secondaryOnly: [],
         disagreements: [],
       }
 
       const highSeverity: ConsolidatedReview = {
-        agreements: [{
-          primary: { id: '1', category: 'security', severity: 'high', message: 'High', file: 'a.ts', line: 1 },
-          secondary: { id: '2', category: 'security', severity: 'high', message: 'High', file: 'a.ts', line: 1 },
-        }],
+        agreements: [
+          {
+            primary: {
+              id: '1',
+              category: 'security',
+              severity: 'high',
+              message: 'High',
+              file: 'a.ts',
+              line: 1,
+            },
+            secondary: {
+              id: '2',
+              category: 'security',
+              severity: 'high',
+              message: 'High',
+              file: 'a.ts',
+              line: 1,
+            },
+          },
+        ],
         primaryOnly: [],
         secondaryOnly: [],
         disagreements: [],
@@ -201,12 +342,35 @@ describe('AI-on-AI Review', () => {
   describe('formatReviewReport', () => {
     it('should format consolidated review as markdown', () => {
       const consolidated: ConsolidatedReview = {
-        agreements: [{
-          primary: { id: '1', category: 'security', severity: 'high', message: 'SQL injection', file: 'user.ts', line: 42 },
-          secondary: { id: '2', category: 'security', severity: 'high', message: 'SQL injection risk', file: 'user.ts', line: 42 },
-        }],
+        agreements: [
+          {
+            primary: {
+              id: '1',
+              category: 'security',
+              severity: 'high',
+              message: 'SQL injection',
+              file: 'user.ts',
+              line: 42,
+            },
+            secondary: {
+              id: '2',
+              category: 'security',
+              severity: 'high',
+              message: 'SQL injection risk',
+              file: 'user.ts',
+              line: 42,
+            },
+          },
+        ],
         primaryOnly: [
-          { id: '3', category: 'quality', severity: 'low', message: 'Consider refactoring', file: 'utils.ts', line: 10 },
+          {
+            id: '3',
+            category: 'quality',
+            severity: 'low',
+            message: 'Consider refactoring',
+            file: 'utils.ts',
+            line: 10,
+          },
         ],
         secondaryOnly: [],
         disagreements: [],
@@ -225,11 +389,27 @@ describe('AI-on-AI Review', () => {
         agreements: [],
         primaryOnly: [],
         secondaryOnly: [],
-        disagreements: [{
-          primary: { id: '1', category: 'security', severity: 'low', message: 'Minor', file: 'a.ts', line: 1 },
-          secondary: { id: '2', category: 'security', severity: 'critical', message: 'Critical', file: 'a.ts', line: 1 },
-          reason: 'Severity mismatch',
-        }],
+        disagreements: [
+          {
+            primary: {
+              id: '1',
+              category: 'security',
+              severity: 'low',
+              message: 'Minor',
+              file: 'a.ts',
+              line: 1,
+            },
+            secondary: {
+              id: '2',
+              category: 'security',
+              severity: 'critical',
+              message: 'Critical',
+              file: 'a.ts',
+              line: 1,
+            },
+            reason: 'Severity mismatch',
+          },
+        ],
       }
 
       const report = formatReviewReport(consolidated, 30)

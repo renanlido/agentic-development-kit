@@ -223,7 +223,8 @@ Scalability and statelessness`
     it('should lowercase keywords', () => {
       const keywords = extractKeywords('Create NEW Feature')
 
-      const allLowercase = keywords.length === 0 || keywords.every((k: string) => k === k.toLowerCase())
+      const allLowercase =
+        keywords.length === 0 || keywords.every((k: string) => k === k.toLowerCase())
       expect(allLowercase).toBe(true)
     })
   })

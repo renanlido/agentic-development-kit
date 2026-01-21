@@ -37,7 +37,9 @@ export class HistoryTracker {
     const existingLock = this.locks.get(feature)
 
     let resolve: () => void
-    const newLock = new Promise<void>(r => { resolve = r })
+    const newLock = new Promise<void>((r) => {
+      resolve = r
+    })
     this.locks.set(feature, newLock)
 
     if (existingLock) {

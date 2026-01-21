@@ -31,8 +31,8 @@ export async function validateTDD(
   result.testFile = possibleTestPaths[0]
   result.warnings.push(
     `⚠️  TDD Warning: Creating file in src/ without corresponding test.\n` +
-    `   Expected test at: ${possibleTestPaths[0]}\n` +
-    `   Alternative patterns: ${possibleTestPaths.slice(1).join(', ')}`
+      `   Expected test at: ${possibleTestPaths[0]}\n` +
+      `   Alternative patterns: ${possibleTestPaths.slice(1).join(', ')}`
   )
 
   return result

@@ -104,18 +104,14 @@ export function reflectOnResult(result: ActionResult, expected: ExpectedResult):
     confidence -= 30
   }
 
-  const unexpectedFiles = result.filesModified.filter(
-    (f) => !expected.expectedFiles.includes(f)
-  )
+  const unexpectedFiles = result.filesModified.filter((f) => !expected.expectedFiles.includes(f))
 
   if (unexpectedFiles.length > 0) {
     discrepancies.push(`Unexpected files modified: ${unexpectedFiles.join(', ')}`)
     confidence -= 10 * unexpectedFiles.length
   }
 
-  const missingFiles = expected.expectedFiles.filter(
-    (f) => !result.filesModified.includes(f)
-  )
+  const missingFiles = expected.expectedFiles.filter((f) => !result.filesModified.includes(f))
 
   if (missingFiles.length > 0 && expected.expectedFiles.length > 0) {
     discrepancies.push(`Expected files not modified: ${missingFiles.join(', ')}`)

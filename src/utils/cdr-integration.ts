@@ -7,15 +7,8 @@ import {
   updateHealthMetrics,
   checkTokenPressure,
 } from './health-probes'
-import {
-  retryWithBackoff,
-  createCheckpoint,
-  restoreCheckpoint,
-} from './recovery'
-import {
-  loadFallbackTemplate,
-  validateFallbackTemplate,
-} from './fallback-templates'
+import { retryWithBackoff, createCheckpoint, restoreCheckpoint } from './recovery'
+import { loadFallbackTemplate, validateFallbackTemplate } from './fallback-templates'
 import { logger } from './logger'
 
 export interface CDRPhaseOptions {

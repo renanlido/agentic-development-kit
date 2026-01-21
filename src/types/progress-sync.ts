@@ -128,7 +128,12 @@ function validateTaskState(data: any): TaskState {
 }
 
 function validateUnifiedState(data: any): UnifiedFeatureState {
-  if (!data.feature || !data.currentPhase || typeof data.progress !== 'number' || !Array.isArray(data.tasks)) {
+  if (
+    !data.feature ||
+    !data.currentPhase ||
+    typeof data.progress !== 'number' ||
+    !Array.isArray(data.tasks)
+  ) {
     throw new Error('Invalid UnifiedFeatureState')
   }
   return data as UnifiedFeatureState

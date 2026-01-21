@@ -92,7 +92,7 @@ describe('HistoryTracker', () => {
       }))
 
       // Rapid concurrent writes
-      await Promise.all(entries.map(e => tracker.recordTransition(featureName, e)))
+      await Promise.all(entries.map((e) => tracker.recordTransition(featureName, e)))
 
       const history = await tracker.getHistory(featureName)
       expect(history.length).toBe(10)

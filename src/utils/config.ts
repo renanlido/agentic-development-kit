@@ -1,7 +1,11 @@
 import path from 'node:path'
 import fs from 'fs-extra'
 import type { AdkConfig, IntegrationConfig, ModelRoutingConfig } from '../providers/types.js'
-import { DEFAULT_ADK_CONFIG, DEFAULT_INTEGRATION_CONFIG, DEFAULT_MODEL_ROUTING_CONFIG } from '../providers/types.js'
+import {
+  DEFAULT_ADK_CONFIG,
+  DEFAULT_INTEGRATION_CONFIG,
+  DEFAULT_MODEL_ROUTING_CONFIG,
+} from '../providers/types.js'
 import { getMainRepoPath } from './git-paths.js'
 
 export function getConfigPath(): string {

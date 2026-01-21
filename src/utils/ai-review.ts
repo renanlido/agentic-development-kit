@@ -125,10 +125,7 @@ export function calculateRiskFromReviews(consolidated: ConsolidatedReview): numb
   return Math.min(100, Math.round(risk))
 }
 
-export function formatReviewReport(
-  consolidated: ConsolidatedReview,
-  riskScore: number
-): string {
+export function formatReviewReport(consolidated: ConsolidatedReview, riskScore: number): string {
   const lines: string[] = []
 
   lines.push('## AI-on-AI Review')
@@ -167,9 +164,7 @@ export function formatReviewReport(
   }
 
   if (consolidated.primaryOnly.length > 0) {
-    lines.push(
-      '### Primary-only (' + consolidated.primaryOnly.length + ' findings)'
-    )
+    lines.push('### Primary-only (' + consolidated.primaryOnly.length + ' findings)')
     lines.push('')
     for (const finding of consolidated.primaryOnly) {
       lines.push(
@@ -188,9 +183,7 @@ export function formatReviewReport(
   }
 
   if (consolidated.secondaryOnly.length > 0) {
-    lines.push(
-      '### Secondary-only (' + consolidated.secondaryOnly.length + ' findings)'
-    )
+    lines.push('### Secondary-only (' + consolidated.secondaryOnly.length + ' findings)')
     lines.push('')
     for (const finding of consolidated.secondaryOnly) {
       lines.push(
@@ -209,9 +202,7 @@ export function formatReviewReport(
   }
 
   if (consolidated.disagreements.length > 0) {
-    lines.push(
-      '### Disagreements (' + consolidated.disagreements.length + ' items)'
-    )
+    lines.push('### Disagreements (' + consolidated.disagreements.length + ' items)')
     lines.push('')
     for (const disagreement of consolidated.disagreements) {
       lines.push(

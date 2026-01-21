@@ -103,14 +103,18 @@ feature
   .description('Executa revisão de qualidade (QA) - requer worktree')
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
-  .action((name, options) => featureCommand.qa(name, { baseBranch: options.baseBranch, model: options.model }))
+  .action((name, options) =>
+    featureCommand.qa(name, { baseBranch: options.baseBranch, model: options.model })
+  )
 
 feature
   .command('docs <name>')
   .description('Gera/atualiza documentação da feature - requer worktree')
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
-  .action((name, options) => featureCommand.docs(name, { baseBranch: options.baseBranch, model: options.model }))
+  .action((name, options) =>
+    featureCommand.docs(name, { baseBranch: options.baseBranch, model: options.model })
+  )
 
 feature
   .command('finish <name>')
@@ -421,7 +425,9 @@ tool
   .action((name) => toolCommand.info(name))
 
 // Comando: adk config
-const config = program.command('config').description('Gerencia configurações do ADK (integration, migrate-hooks)')
+const config = program
+  .command('config')
+  .description('Gerencia configurações do ADK (integration, migrate-hooks)')
 
 config
   .command('integration [provider]')

@@ -11,7 +11,14 @@ describe('session-bootstrap', () => {
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'test-bootstrap-'))
     activeFocusPath = path.join(tempDir, '.claude', 'active-focus.md')
-    constraintsPath = path.join(tempDir, '.claude', 'plans', 'features', 'test-feature', 'constraints.md')
+    constraintsPath = path.join(
+      tempDir,
+      '.claude',
+      'plans',
+      'features',
+      'test-feature',
+      'constraints.md'
+    )
 
     await fs.ensureDir(path.dirname(activeFocusPath))
     await fs.ensureDir(path.dirname(constraintsPath))
@@ -41,10 +48,7 @@ describe('session-bootstrap', () => {
 
       it('should load constraints from active feature', async () => {
         await fs.writeFile(activeFocusPath, 'Feature: test-feature\n')
-        await fs.writeFile(
-          constraintsPath,
-          '## Escopo Permitido\n- src/commands/\n- tests/\n'
-        )
+        await fs.writeFile(constraintsPath, '## Escopo Permitido\n- src/commands/\n- tests/\n')
 
         const result = await loadSessionContext(tempDir)
 

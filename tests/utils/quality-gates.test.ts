@@ -105,26 +105,71 @@ describe('Quality Gates', () => {
 
     it('should calculate debt ratio', () => {
       const debts: DebtItem[] = [
-        trackTechnicalDebt({ type: 'shortcut', description: 'A', file: 'a.ts', line: 1, severity: 'low' }),
-        trackTechnicalDebt({ type: 'hack', description: 'B', file: 'b.ts', line: 1, severity: 'high' }),
-        trackTechnicalDebt({ type: 'todo', description: 'C', file: 'c.ts', line: 1, severity: 'medium' }),
+        trackTechnicalDebt({
+          type: 'shortcut',
+          description: 'A',
+          file: 'a.ts',
+          line: 1,
+          severity: 'low',
+        }),
+        trackTechnicalDebt({
+          type: 'hack',
+          description: 'B',
+          file: 'b.ts',
+          line: 1,
+          severity: 'high',
+        }),
+        trackTechnicalDebt({
+          type: 'todo',
+          description: 'C',
+          file: 'c.ts',
+          line: 1,
+          severity: 'medium',
+        }),
       ]
 
       const totalLines = 1000
 
-      const ratio = debts.reduce((sum, d) => {
-        const weight = d.severity === 'high' ? 3 : d.severity === 'medium' ? 2 : 1
-        return sum + weight
-      }, 0) / totalLines * 100
+      const ratio =
+        (debts.reduce((sum, d) => {
+          const weight = d.severity === 'high' ? 3 : d.severity === 'medium' ? 2 : 1
+          return sum + weight
+        }, 0) /
+          totalLines) *
+        100
 
       expect(ratio).toBeGreaterThan(0)
     })
 
     it('should categorize debt types', () => {
-      const shortcut = trackTechnicalDebt({ type: 'shortcut', description: 'A', file: 'a.ts', line: 1, severity: 'low' })
-      const hack = trackTechnicalDebt({ type: 'hack', description: 'B', file: 'b.ts', line: 1, severity: 'low' })
-      const todo = trackTechnicalDebt({ type: 'todo', description: 'C', file: 'c.ts', line: 1, severity: 'low' })
-      const workaround = trackTechnicalDebt({ type: 'workaround', description: 'D', file: 'd.ts', line: 1, severity: 'low' })
+      const shortcut = trackTechnicalDebt({
+        type: 'shortcut',
+        description: 'A',
+        file: 'a.ts',
+        line: 1,
+        severity: 'low',
+      })
+      const hack = trackTechnicalDebt({
+        type: 'hack',
+        description: 'B',
+        file: 'b.ts',
+        line: 1,
+        severity: 'low',
+      })
+      const todo = trackTechnicalDebt({
+        type: 'todo',
+        description: 'C',
+        file: 'c.ts',
+        line: 1,
+        severity: 'low',
+      })
+      const workaround = trackTechnicalDebt({
+        type: 'workaround',
+        description: 'D',
+        file: 'd.ts',
+        line: 1,
+        severity: 'low',
+      })
 
       expect(shortcut.type).toBe('shortcut')
       expect(hack.type).toBe('hack')

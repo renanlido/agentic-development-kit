@@ -41,10 +41,7 @@ export async function archiveMemory(memoryPath: string): Promise<string> {
   return archivePath
 }
 
-export async function compressMemoryContent(
-  content: string,
-  memoryPath: string
-): Promise<string> {
+export async function compressMemoryContent(content: string, memoryPath: string): Promise<string> {
   const lineCount = content.split('\n').length
   const config = getCompressionConfig()
 

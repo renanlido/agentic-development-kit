@@ -264,11 +264,7 @@ describe('recovery', () => {
         artifacts: [],
       })
 
-      const checkpointPath = path.join(
-        featureDir,
-        'checkpoints',
-        `${checkpoint.id}.json`
-      )
+      const checkpointPath = path.join(featureDir, 'checkpoints', `${checkpoint.id}.json`)
       expect(await fs.pathExists(checkpointPath)).toBe(true)
     })
 

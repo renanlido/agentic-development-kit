@@ -24,7 +24,14 @@ describe('MetricsCollector', () => {
       const collector = new MetricsCollector()
 
       // Create history for phase timing
-      const historyPath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'history.json')
+      const historyPath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'history.json'
+      )
       await fs.ensureDir(path.dirname(historyPath))
       await fs.writeJSON(historyPath, [
         {
@@ -54,7 +61,14 @@ describe('MetricsCollector', () => {
       const { MetricsCollector } = await import('../../src/utils/metrics-collector')
       const collector = new MetricsCollector()
 
-      const historyPath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'history.json')
+      const historyPath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'history.json'
+      )
       await fs.ensureDir(path.dirname(historyPath))
 
       const startTime = '2026-01-20T10:00:00Z'
@@ -79,14 +93,17 @@ describe('MetricsCollector', () => {
 
       const tasksPath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'tasks.md')
       await fs.ensureDir(path.dirname(tasksPath))
-      await fs.writeFile(tasksPath, `
+      await fs.writeFile(
+        tasksPath,
+        `
 ## Phase: implement
 - [x] Task 1
 - [x] Task 2
 - [~] Task 3
 - [ ] Task 4
 - [ ] Task 5
-`)
+`
+      )
 
       const metrics = await collector.collectPhaseMetrics(featureName, 'implement')
 
@@ -141,7 +158,14 @@ describe('MetricsCollector', () => {
       const { MetricsCollector } = await import('../../src/utils/metrics-collector')
       const collector = new MetricsCollector()
 
-      const historyPath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'history.json')
+      const historyPath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'history.json'
+      )
       await fs.ensureDir(path.dirname(historyPath))
       await fs.writeJSON(historyPath, [
         {
@@ -178,11 +202,30 @@ describe('MetricsCollector', () => {
       const { MetricsCollector } = await import('../../src/utils/metrics-collector')
       const collector = new MetricsCollector()
 
-      const historyPath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'history.json')
+      const historyPath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'history.json'
+      )
       await fs.ensureDir(path.dirname(historyPath))
       await fs.writeJSON(historyPath, [
-        { timestamp: '2026-01-20T10:00:00Z', fromPhase: 'prd', toPhase: 'research', trigger: 'test', duration: 1000 },
-        { timestamp: '2026-01-20T10:16:40Z', fromPhase: 'research', toPhase: 'plan', trigger: 'test', duration: 2000 },
+        {
+          timestamp: '2026-01-20T10:00:00Z',
+          fromPhase: 'prd',
+          toPhase: 'research',
+          trigger: 'test',
+          duration: 1000,
+        },
+        {
+          timestamp: '2026-01-20T10:16:40Z',
+          fromPhase: 'research',
+          toPhase: 'plan',
+          trigger: 'test',
+          duration: 2000,
+        },
       ])
 
       const aggregated = await collector.aggregateMetrics(featureName)
@@ -194,11 +237,30 @@ describe('MetricsCollector', () => {
       const { MetricsCollector } = await import('../../src/utils/metrics-collector')
       const collector = new MetricsCollector()
 
-      const historyPath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'history.json')
+      const historyPath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'history.json'
+      )
       await fs.ensureDir(path.dirname(historyPath))
       await fs.writeJSON(historyPath, [
-        { timestamp: '2026-01-20T10:00:00Z', fromPhase: 'prd', toPhase: 'research', trigger: 'test', duration: 1000 },
-        { timestamp: '2026-01-20T10:16:40Z', fromPhase: 'research', toPhase: 'plan', trigger: 'test', duration: 2000 },
+        {
+          timestamp: '2026-01-20T10:00:00Z',
+          fromPhase: 'prd',
+          toPhase: 'research',
+          trigger: 'test',
+          duration: 1000,
+        },
+        {
+          timestamp: '2026-01-20T10:16:40Z',
+          fromPhase: 'research',
+          toPhase: 'plan',
+          trigger: 'test',
+          duration: 2000,
+        },
       ])
 
       const aggregated = await collector.aggregateMetrics(featureName)
@@ -248,10 +310,22 @@ describe('MetricsCollector', () => {
       const { MetricsCollector } = await import('../../src/utils/metrics-collector')
       const collector = new MetricsCollector()
 
-      const historyPath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'history.json')
+      const historyPath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'history.json'
+      )
       await fs.ensureDir(path.dirname(historyPath))
       await fs.writeJSON(historyPath, [
-        { timestamp: '2026-01-20T10:00:00Z', fromPhase: 'prd', toPhase: 'research', trigger: 'test' },
+        {
+          timestamp: '2026-01-20T10:00:00Z',
+          fromPhase: 'prd',
+          toPhase: 'research',
+          trigger: 'test',
+        },
       ])
 
       await collector.aggregateMetrics(featureName)
@@ -300,10 +374,22 @@ describe('MetricsCollector', () => {
       const { MetricsCollector } = await import('../../src/utils/metrics-collector')
       const collector = new MetricsCollector()
 
-      const historyPath = path.join(tempDir, '.claude', 'plans', 'features', featureName, 'history.json')
+      const historyPath = path.join(
+        tempDir,
+        '.claude',
+        'plans',
+        'features',
+        featureName,
+        'history.json'
+      )
       await fs.ensureDir(path.dirname(historyPath))
       await fs.writeJSON(historyPath, [
-        { timestamp: '2026-01-20T10:00:00Z', fromPhase: 'prd', toPhase: 'research', trigger: 'test' },
+        {
+          timestamp: '2026-01-20T10:00:00Z',
+          fromPhase: 'prd',
+          toPhase: 'research',
+          trigger: 'test',
+        },
         // No end transition for research phase
       ])
 

@@ -130,7 +130,7 @@ Random text
 
       expect(result.tasks).toHaveLength(5)
 
-      const statuses = result.tasks.map(t => t.status)
+      const statuses = result.tasks.map((t) => t.status)
       expect(statuses).toContain('completed')
       expect(statuses).toContain('in_progress')
       expect(statuses).toContain('pending')
@@ -214,7 +214,7 @@ Random text
 
       expect(result.tasks).toHaveLength(3)
       // Details should be preserved
-      expect(result.tasks.some(t => t.notes)).toBe(true)
+      expect(result.tasks.some((t) => t.notes)).toBe(true)
     })
   })
 
@@ -311,7 +311,7 @@ Random text
       expect(result.tasks.length).toBeGreaterThanOrEqual(5)
       expect(result.acceptanceCriteria.length).toBeGreaterThanOrEqual(3)
 
-      const p0Tasks = result.tasks.filter(t => t.priority === 0)
+      const p0Tasks = result.tasks.filter((t) => t.priority === 0)
       expect(p0Tasks.length).toBeGreaterThanOrEqual(3)
     })
 

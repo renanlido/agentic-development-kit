@@ -51,8 +51,7 @@ export class StateManager {
         if (this.isValidState(loaded)) {
           state = loaded
         }
-      } catch {
-      }
+      } catch {}
     }
 
     const progressPath = this.getProgressPath(feature)
@@ -107,7 +106,10 @@ export class StateManager {
   }
 
   mergeProgressAndTasks(
-    progressData: { currentPhase: string; steps: Array<{ name: string; status: TaskState['status'] }> },
+    progressData: {
+      currentPhase: string
+      steps: Array<{ name: string; status: TaskState['status'] }>
+    },
     tasksData: { tasks: TaskState[] }
   ): Partial<UnifiedFeatureState> {
     const tasks: TaskState[] = []
@@ -120,7 +122,7 @@ export class StateManager {
     }
 
     for (const task of tasksData.tasks) {
-      const existing = tasks.find(t => t.name === task.name)
+      const existing = tasks.find((t) => t.name === task.name)
       if (existing) {
         Object.assign(existing, task)
       } else {
@@ -157,7 +159,10 @@ export class StateManager {
     )
   }
 
-  private parseProgressMd(content: string): { currentPhase: string; steps: Array<{ name: string; status: TaskState['status'] }> } {
+  private parseProgressMd(content: string): {
+    currentPhase: string
+    steps: Array<{ name: string; status: TaskState['status'] }>
+  } {
     const steps: Array<{ name: string; status: TaskState['status'] }> = []
     let currentPhase = 'not_started'
 
@@ -190,12 +195,15 @@ export class StateManager {
 
   private mergeProgressIntoState(
     state: UnifiedFeatureState,
-    progressData: { currentPhase: string; steps: Array<{ name: string; status: TaskState['status'] }> }
+    progressData: {
+      currentPhase: string
+      steps: Array<{ name: string; status: TaskState['status'] }>
+    }
   ): UnifiedFeatureState {
     const tasks = [...state.tasks]
 
     for (const step of progressData.steps) {
-      const existing = tasks.find(t => t.name === step.name)
+      const existing = tasks.find((t) => t.name === step.name)
       if (existing) {
         existing.status = step.status
       } else {
@@ -215,12 +223,15 @@ export class StateManager {
 
   private mergeTasksIntoState(
     state: UnifiedFeatureState,
-    tasksData: { tasks: TaskState[]; acceptanceCriteria: Array<{ description: string; met: boolean }> }
+    tasksData: {
+      tasks: TaskState[]
+      acceptanceCriteria: Array<{ description: string; met: boolean }>
+    }
   ): UnifiedFeatureState {
     const tasks = [...state.tasks]
 
     for (const task of tasksData.tasks) {
-      const existing = tasks.find(t => t.name === task.name)
+      const existing = tasks.find((t) => t.name === task.name)
       if (existing) {
         Object.assign(existing, task)
       } else {

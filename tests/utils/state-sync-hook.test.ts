@@ -12,18 +12,9 @@ describe('state-sync-hook', () => {
     featureDir = path.join(tempDir, '.claude', 'plans', 'features', 'test-feature')
 
     await fs.ensureDir(featureDir)
-    await fs.writeFile(
-      path.join(tempDir, '.claude', 'active-focus.md'),
-      'Feature: test-feature\n'
-    )
-    await fs.writeFile(
-      path.join(featureDir, 'progress.md'),
-      '# Progress\nPhase: implement\n'
-    )
-    await fs.writeFile(
-      path.join(featureDir, 'tasks.md'),
-      '# Tasks\n- [ ] Task 1\n- [ ] Task 2\n'
-    )
+    await fs.writeFile(path.join(tempDir, '.claude', 'active-focus.md'), 'Feature: test-feature\n')
+    await fs.writeFile(path.join(featureDir, 'progress.md'), '# Progress\nPhase: implement\n')
+    await fs.writeFile(path.join(featureDir, 'tasks.md'), '# Tasks\n- [ ] Task 1\n- [ ] Task 2\n')
   })
 
   afterEach(async () => {
@@ -40,10 +31,7 @@ describe('state-sync-hook', () => {
         expect(result.synced).toBe(true)
         expect(result.filesUpdated).toContain('progress.md')
 
-        const progressContent = await fs.readFile(
-          path.join(featureDir, 'progress.md'),
-          'utf-8'
-        )
+        const progressContent = await fs.readFile(path.join(featureDir, 'progress.md'), 'utf-8')
         expect(progressContent).toContain(filePath)
       })
 
@@ -87,9 +75,7 @@ describe('state-sync-hook', () => {
       })
 
       it('should not throw error', async () => {
-        await expect(
-          syncStateAfterWrite('src/file.ts', tempDir)
-        ).resolves.not.toThrow()
+        await expect(syncStateAfterWrite('src/file.ts', tempDir)).resolves.not.toThrow()
       })
     })
 
@@ -106,9 +92,7 @@ describe('state-sync-hook', () => {
       it('should not throw on filesystem errors', async () => {
         await fs.remove(featureDir)
 
-        await expect(
-          syncStateAfterWrite('src/file.ts', tempDir)
-        ).resolves.not.toThrow()
+        await expect(syncStateAfterWrite('src/file.ts', tempDir)).resolves.not.toThrow()
       })
     })
 
@@ -117,10 +101,7 @@ describe('state-sync-hook', () => {
         await syncStateAfterWrite('src/commands/feature.ts', tempDir)
         await syncStateAfterWrite('src/utils/helper.ts', tempDir)
 
-        const progressContent = await fs.readFile(
-          path.join(featureDir, 'progress.md'),
-          'utf-8'
-        )
+        const progressContent = await fs.readFile(path.join(featureDir, 'progress.md'), 'utf-8')
 
         expect(progressContent).toContain('src/commands/feature.ts')
         expect(progressContent).toContain('src/utils/helper.ts')
@@ -130,10 +111,7 @@ describe('state-sync-hook', () => {
         await syncStateAfterWrite('src/commands/feature.ts', tempDir)
         await syncStateAfterWrite('src/commands/feature.ts', tempDir)
 
-        const progressContent = await fs.readFile(
-          path.join(featureDir, 'progress.md'),
-          'utf-8'
-        )
+        const progressContent = await fs.readFile(path.join(featureDir, 'progress.md'), 'utf-8')
 
         const matches = progressContent.match(/src\/commands\/feature\.ts/g)
         expect(matches?.length).toBe(1)
@@ -142,10 +120,7 @@ describe('state-sync-hook', () => {
 
     describe('when active-focus.md has no feature', () => {
       beforeEach(async () => {
-        await fs.writeFile(
-          path.join(tempDir, '.claude', 'active-focus.md'),
-          'No feature here\n'
-        )
+        await fs.writeFile(path.join(tempDir, '.claude', 'active-focus.md'), 'No feature here\n')
       })
 
       it('should return early without syncing', async () => {

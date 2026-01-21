@@ -26,9 +26,7 @@ export async function createSessionCheckpoint(
 
     const statePath = path.join(featureDir, 'state.json')
 
-    const state = (await fs.pathExists(statePath))
-      ? await fs.readJSON(statePath)
-      : {}
+    const state = (await fs.pathExists(statePath)) ? await fs.readJSON(statePath) : {}
 
     const timestamp = new Date().toISOString()
     const snapshotId = `session-end-${Date.now()}`

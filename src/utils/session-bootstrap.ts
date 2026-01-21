@@ -2,7 +2,9 @@ import * as fs from 'fs-extra'
 import * as path from 'node:path'
 import type { SessionBootstrapResult } from '../types/hooks'
 
-export async function loadSessionContext(cwd: string = process.cwd()): Promise<SessionBootstrapResult> {
+export async function loadSessionContext(
+  cwd: string = process.cwd()
+): Promise<SessionBootstrapResult> {
   const result: SessionBootstrapResult = {
     context: '',
     loaded: [],

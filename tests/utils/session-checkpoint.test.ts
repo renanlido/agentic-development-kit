@@ -17,9 +17,15 @@ describe('session-checkpoint', () => {
 
     await fs.ensureDir(featureDir)
     await fs.ensureDir(snapshotsDir)
-    await fs.writeFile(path.join(featureDir, 'progress.md'), '# Progress\nPhase: implement\nProgress: 50%\n')
+    await fs.writeFile(
+      path.join(featureDir, 'progress.md'),
+      '# Progress\nPhase: implement\nProgress: 50%\n'
+    )
     await fs.writeFile(path.join(featureDir, 'tasks.md'), '# Tasks\n- [x] Task 1\n- [ ] Task 2\n')
-    await fs.writeFile(path.join(featureDir, 'state.json'), '{"progress": 50, "currentPhase": "implement"}')
+    await fs.writeFile(
+      path.join(featureDir, 'state.json'),
+      '{"progress": 50, "currentPhase": "implement"}'
+    )
   })
 
   afterEach(async () => {
@@ -105,9 +111,7 @@ describe('session-checkpoint', () => {
 
     describe('error handling', () => {
       it('should not throw when feature directory does not exist', async () => {
-        await expect(
-          createSessionCheckpoint('nonexistent-feature', tempDir)
-        ).resolves.not.toThrow()
+        await expect(createSessionCheckpoint('nonexistent-feature', tempDir)).resolves.not.toThrow()
       })
 
       it('should return snapshotCreated: false on error', async () => {

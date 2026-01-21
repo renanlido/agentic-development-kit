@@ -226,8 +226,7 @@ path: ${featurePath}
         toPhase,
         trigger,
       })
-    } catch {
-    }
+    } catch {}
   }
 
   private async getTokenFromEnv(provider: string): Promise<string | null> {
@@ -1776,11 +1775,10 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
         spinner.text = 'Commitando mudanças...'
         try {
           execFileSync('git', ['add', '.'], { cwd: workDir, stdio: 'pipe' })
-          execFileSync(
-            'git',
-            ['commit', '-m', `feat(${name}): complete feature implementation`],
-            { cwd: workDir, stdio: 'pipe' }
-          )
+          execFileSync('git', ['commit', '-m', `feat(${name}): complete feature implementation`], {
+            cwd: workDir,
+            stdio: 'pipe',
+          })
         } catch {
           // Commit may fail if nothing to commit
         }
@@ -1829,7 +1827,9 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
           spinner.succeed('Merge realizado')
         } catch (error) {
           spinner.warn('Merge manual necessário')
-          console.log(chalk.yellow(`  Execute: git checkout ${baseBranch} && git merge ${featureBranch}`))
+          console.log(
+            chalk.yellow(`  Execute: git checkout ${baseBranch} && git merge ${featureBranch}`)
+          )
         }
       }
 
@@ -2816,7 +2816,9 @@ NAO crie PRD, tasks, ou documentacao formal. Isso e uma tarefa rapida.
   }
 
   async refine(name: string, options: RefineOptions = {}): Promise<void> {
-    const { analyzeTasksForRefinement, loadTasksForFeature } = await import('../utils/task-refiner.js')
+    const { analyzeTasksForRefinement, loadTasksForFeature } = await import(
+      '../utils/task-refiner.js'
+    )
     const { SnapshotManager } = await import('../utils/snapshot-manager.js')
 
     console.log()
@@ -2849,7 +2851,9 @@ NAO crie PRD, tasks, ou documentacao formal. Isso e uma tarefa rapida.
         const icon = artifact.canRefine ? chalk.green('✓') : chalk.yellow('⚠')
         const reason = artifact.canRefine ? '' : chalk.gray(` (${artifact.reason})`)
         const stats = artifact.taskStats
-          ? chalk.gray(` [${artifact.taskStats.completed}✓ ${artifact.taskStats.inProgress}~ ${artifact.taskStats.pending}○]`)
+          ? chalk.gray(
+              ` [${artifact.taskStats.completed}✓ ${artifact.taskStats.inProgress}~ ${artifact.taskStats.pending}○]`
+            )
           : ''
         console.log(`   ${icon} ${artifact.name}${stats}${reason}`)
       }
@@ -2942,13 +2946,15 @@ NAO crie PRD, tasks, ou documentacao formal. Isso e uma tarefa rapida.
             const tasksData = await loadTasksForFeature(name)
             const analysis = analyzeTasksForRefinement(tasksData.tasks)
 
-            const preservedInfo = analysis.preservedTasks.length > 0
-              ? `\n\nTasks que NAO podem ser modificadas (já iniciadas/completadas):\n${analysis.preservedTasks.map((t) => `- [${t.status === 'completed' ? 'x' : '~'}] ${t.name}`).join('\n')}`
-              : ''
+            const preservedInfo =
+              analysis.preservedTasks.length > 0
+                ? `\n\nTasks que NAO podem ser modificadas (já iniciadas/completadas):\n${analysis.preservedTasks.map((t) => `- [${t.status === 'completed' ? 'x' : '~'}] ${t.name}`).join('\n')}`
+                : ''
 
-            const pendingInfo = analysis.pendingTasks.length > 0
-              ? `\n\nTasks pendentes que podem ser refinadas:\n${analysis.pendingTasks.map((t) => `- [ ] ${t.name}`).join('\n')}`
-              : '\n\nNão há tasks pendentes para refinar.'
+            const pendingInfo =
+              analysis.pendingTasks.length > 0
+                ? `\n\nTasks pendentes que podem ser refinadas:\n${analysis.pendingTasks.map((t) => `- [ ] ${t.name}`).join('\n')}`
+                : '\n\nNão há tasks pendentes para refinar.'
 
             const prompt = `FASE: REFINAMENTO PROGRESSIVO DE TASKS
 
@@ -3077,9 +3083,10 @@ Se adicionar novas tasks, use este formato:
             const tasksData = await loadTasksForFeature(name)
             const analysis = analyzeTasksForRefinement(tasksData.tasks)
 
-            const preservedInfo = analysis.preservedTasks.length > 0
-              ? `\n\nTasks que NAO podem ser modificadas:\n${analysis.preservedTasks.map((t) => `- [${t.status === 'completed' ? 'x' : '~'}] ${t.name}`).join('\n')}`
-              : ''
+            const preservedInfo =
+              analysis.preservedTasks.length > 0
+                ? `\n\nTasks que NAO podem ser modificadas:\n${analysis.preservedTasks.map((t) => `- [${t.status === 'completed' ? 'x' : '~'}] ${t.name}`).join('\n')}`
+                : ''
 
             const prompt = `FASE: CASCATA PROGRESSIVA - ATUALIZACAO DE TASKS APOS REFINAMENTO DE PRD
 
@@ -3183,8 +3190,13 @@ Antes de criar qualquer task [CASCATA], valide:
     }
   }
 
-  private async analyzeRefinableArtifacts(name: string, state: FeatureState): Promise<RefinableArtifact[]> {
-    const { analyzeTasksForRefinement, loadTasksForFeature } = await import('../utils/task-refiner.js')
+  private async analyzeRefinableArtifacts(
+    name: string,
+    state: FeatureState
+  ): Promise<RefinableArtifact[]> {
+    const { analyzeTasksForRefinement, loadTasksForFeature } = await import(
+      '../utils/task-refiner.js'
+    )
     const result: RefinableArtifact[] = []
 
     if (state.hasPrd) {
@@ -3308,7 +3320,11 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
 
   async sync(
     name: string,
-    options: { strategy?: 'merge' | 'tasks-wins' | 'progress-wins'; dryRun?: boolean; verbose?: boolean } = {}
+    options: {
+      strategy?: 'merge' | 'tasks-wins' | 'progress-wins'
+      dryRun?: boolean
+      verbose?: boolean
+    } = {}
   ): Promise<void> {
     const spinner = ora('Sincronizando estado da feature...').start()
 
@@ -3335,7 +3351,9 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
           console.log(chalk.gray('  Nenhuma mudança necessária'))
         } else {
           for (const change of preview.changes) {
-            console.log(`  ${change.field}: ${String(change.oldValue)} → ${String(change.newValue)}`)
+            console.log(
+              `  ${change.field}: ${String(change.oldValue)} → ${String(change.newValue)}`
+            )
           }
         }
 
@@ -3500,10 +3518,10 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
 
         console.log(chalk.cyan('\n📋 Tasks:'))
         const tasksByStatus = {
-          completed: state.tasks.filter(t => t.status === 'completed'),
-          in_progress: state.tasks.filter(t => t.status === 'in_progress'),
-          pending: state.tasks.filter(t => t.status === 'pending'),
-          blocked: state.tasks.filter(t => t.status === 'blocked'),
+          completed: state.tasks.filter((t) => t.status === 'completed'),
+          in_progress: state.tasks.filter((t) => t.status === 'in_progress'),
+          pending: state.tasks.filter((t) => t.status === 'pending'),
+          blocked: state.tasks.filter((t) => t.status === 'blocked'),
         }
 
         console.log(`  ✅ Completed: ${tasksByStatus.completed.length}`)

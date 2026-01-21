@@ -117,7 +117,7 @@ export class SyncEngine {
     const inconsistencies = detectInconsistencies(state)
 
     const resolution = resolveInconsistencies(
-      { ...state, tasks: state.tasks.map(t => ({ ...t })) },
+      { ...state, tasks: state.tasks.map((t) => ({ ...t })) },
       inconsistencies,
       this.defaultStrategy
     )

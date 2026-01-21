@@ -33,11 +33,13 @@ export class MetricsCollector {
     const tasks = await this.loadTasks(feature)
     const files = await this.getFilesChanged(feature)
 
-    const phaseStart = history.find(h => h.toPhase === phase)
-    const phaseEnd = history.find(h => h.fromPhase === phase)
+    const phaseStart = history.find((h) => h.toPhase === phase)
+    const phaseEnd = history.find((h) => h.fromPhase === phase)
 
-    const phaseTasks = tasks.filter(t => t.phase?.toLowerCase() === phase.toLowerCase() || !t.phase)
-    const completedTasks = phaseTasks.filter(t => t.status === 'completed')
+    const phaseTasks = tasks.filter(
+      (t) => t.phase?.toLowerCase() === phase.toLowerCase() || !t.phase
+    )
+    const completedTasks = phaseTasks.filter((t) => t.status === 'completed')
 
     let duration: number | undefined
     if (phaseStart && phaseEnd) {
@@ -98,8 +100,7 @@ export class MetricsCollector {
       const metricsPath = this.getMetricsPath(feature)
       await fs.ensureDir(path.dirname(metricsPath))
       await fs.writeJSON(metricsPath, aggregated, { spaces: 2 })
-    } catch {
-    }
+    } catch {}
 
     return aggregated
   }
@@ -118,7 +119,9 @@ export class MetricsCollector {
     }
   }
 
-  private async loadTasks(feature: string): Promise<Array<{ name: string; status: string; phase?: string }>> {
+  private async loadTasks(
+    feature: string
+  ): Promise<Array<{ name: string; status: string; phase?: string }>> {
     const tasksPath = this.getTasksPath(feature)
 
     if (!(await fs.pathExists(tasksPath))) {
@@ -128,7 +131,7 @@ export class MetricsCollector {
     try {
       const content = await fs.readFile(tasksPath, 'utf-8')
       const doc = parseTasksFile(content)
-      return doc.tasks.map(t => ({
+      return doc.tasks.map((t) => ({
         name: t.name,
         status: t.status,
         phase: t.phase,

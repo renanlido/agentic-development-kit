@@ -1,5 +1,25 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/session-bootstrap.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/session-checkpoint.sh"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
@@ -26,6 +46,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/scope-check.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/validate-tdd.sh"
           }
         ]
       },
@@ -46,6 +70,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/post-write.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/sync-state.sh"
           }
         ]
       }

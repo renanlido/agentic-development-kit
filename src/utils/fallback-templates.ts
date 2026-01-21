@@ -313,9 +313,7 @@ export function getFallbackTemplatePath(phase: PhaseType): string {
   return path.join(getTemplatesDir(), `${phase}.md`)
 }
 
-export function loadFallbackTemplate(
-  phase: PhaseType
-): FallbackTemplate | undefined {
+export function loadFallbackTemplate(phase: PhaseType): FallbackTemplate | undefined {
   const templatePath = getFallbackTemplatePath(phase)
 
   try {
@@ -370,9 +368,7 @@ export function getFallbackTemplates(): FallbackTemplate[] {
   return templates
 }
 
-export function validateFallbackTemplate(
-  template: FallbackTemplate | null | undefined
-): boolean {
+export function validateFallbackTemplate(template: FallbackTemplate | null | undefined): boolean {
   if (!template) {
     return false
   }

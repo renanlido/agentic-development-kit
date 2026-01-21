@@ -412,7 +412,9 @@ IMPORTANTE:
   }
 
   async update(options: MemoryOptions = {}): Promise<void> {
-    console.warn(chalk.yellow('⚠️  Deprecated: use "adk memory sync" instead of "adk memory update"'))
+    console.warn(
+      chalk.yellow('⚠️  Deprecated: use "adk memory sync" instead of "adk memory update"')
+    )
     return this.sync(options)
   }
 
@@ -598,7 +600,9 @@ IMPORTANTE:
         console.log()
       }
 
-      console.log(chalk.gray(`Total: ${memories.length} memórias | Limite: ${MEMORY_LINE_LIMIT} linhas`))
+      console.log(
+        chalk.gray(`Total: ${memories.length} memórias | Limite: ${MEMORY_LINE_LIMIT} linhas`)
+      )
     } catch (error) {
       spinner.fail('Erro ao verificar memórias')
       logger.error(error instanceof Error ? error.message : String(error))

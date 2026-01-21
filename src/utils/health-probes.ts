@@ -116,10 +116,7 @@ export function clearHealthProbes(): void {
   probes.clear()
 }
 
-export function updateHealthMetrics(
-  id: string,
-  updates: Partial<HealthMetrics>
-): boolean {
+export function updateHealthMetrics(id: string, updates: Partial<HealthMetrics>): boolean {
   const internal = probes.get(id)
 
   if (!internal) {
@@ -151,10 +148,7 @@ export function updateHealthMetrics(
   return true
 }
 
-export function checkTokenPressure(
-  id: string,
-  threshold?: number
-): boolean {
+export function checkTokenPressure(id: string, threshold?: number): boolean {
   const internal = probes.get(id)
 
   if (!internal) {

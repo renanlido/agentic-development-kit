@@ -185,11 +185,11 @@ export class ReportCommand {
 
   private getLinesChanged(): { linesAdded: number; linesRemoved: number } {
     try {
-      const output = execFileSync(
-        'git',
-        ['diff', '--stat', '--since=7 days ago', 'HEAD~100'],
-        { encoding: 'utf-8', cwd: getMainRepoPath(), stdio: ['pipe', 'pipe', 'pipe'] }
-      )
+      const output = execFileSync('git', ['diff', '--stat', '--since=7 days ago', 'HEAD~100'], {
+        encoding: 'utf-8',
+        cwd: getMainRepoPath(),
+        stdio: ['pipe', 'pipe', 'pipe'],
+      })
 
       const match = output.match(/(\d+) insertions?\(\+\), (\d+) deletions?\(-\)/)
 

@@ -98,8 +98,8 @@ export function detectInconsistencies(state: UnifiedFeatureState): Inconsistency
     }
   }
 
-  const uniqueInconsistencies = inconsistencies.filter((item, index, self) =>
-    index === self.findIndex(t => t.description === item.description)
+  const uniqueInconsistencies = inconsistencies.filter(
+    (item, index, self) => index === self.findIndex((t) => t.description === item.description)
   )
 
   return uniqueInconsistencies
@@ -135,9 +135,9 @@ export function resolveInconsistencies(
       break
 
     case 'tasks-wins': {
-      const hasIncomplete = state.tasks.some(t => t.status !== 'completed')
+      const hasIncomplete = state.tasks.some((t) => t.status !== 'completed')
       if (hasIncomplete) {
-        const inProgress = state.tasks.some(t => t.status === 'in_progress')
+        const inProgress = state.tasks.some((t) => t.status === 'in_progress')
         const newPhase = inProgress ? 'implement' : 'prd'
         if (state.currentPhase !== newPhase) {
           changes.push({
