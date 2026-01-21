@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "provider": "mcp-memory",
+  "storage": {
+    "path": ".adk/memory.db",
+    "maxSize": "500MB"
+  },
+  "embedding": {
+    "model": "nomic-embed-text-v1.5",
+    "chunkSize": 512,
+    "overlap": 100
+  },
+  "retrieval": {
+    "topK": 10,
+    "finalK": 5,
+    "threshold": 0.65
+  },
+  "hybridSearch": {
+    "enabled": true,
+    "weights": {
+      "semantic": 0.7,
+      "keyword": 0.3
+    }
+  },
+  "indexPatterns": [
+    ".claude/**/*.md",
+    ".claude/**/*.txt"
+  ],
+  "ignorePatterns": [
+    "**/.env*",
+    "**/credentials*",
+    "**/*.key",
+    "**/*.pem",
+    "**/secrets*"
+  ]
+}

@@ -1,4 +1,5 @@
 export * from './cdr'
+export * from './mcp-memory'
 export * from './memory'
 export * from './model'
 export * from './progress-sync'
