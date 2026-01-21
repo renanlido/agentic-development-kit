@@ -286,7 +286,7 @@ deploy
 const memory = program
   .command('memory')
   .description(
-    'Gerencia memoria especializada por feature (save, load, view, compact, search, sync, recall, link, unlink, export, status)'
+    'Gerencia memoria especializada por feature (save, load, view, compact, search, sync, recall, link, unlink, export, status, index)'
   )
 
 memory
@@ -354,6 +354,14 @@ memory
   .command('status')
   .description('Lista todas as memórias com estatísticas de uso')
   .action(() => memoryCommand.status())
+
+memory
+  .command('index <paths...>')
+  .description('Indexa arquivos no MCP Memory para busca semântica')
+  .option('-t, --tags <tags...>', 'Tags para categorizar o documento')
+  .option('-f, --feature <feature>', 'Feature relacionada')
+  .option('--title <title>', 'Título customizado do documento')
+  .action((paths, options) => memoryCommand.index(paths, options))
 
 // Comando: adk spec
 const spec = program

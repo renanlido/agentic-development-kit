@@ -8,6 +8,7 @@ import { executeClaudeCommand } from '../utils/claude.js'
 import { listDecisions, loadDecision, updateDecisionFeatures } from '../utils/decision-utils.js'
 import { getFeaturePath, getFeaturesBasePath } from '../utils/git-paths.js'
 import { logger } from '../utils/logger.js'
+import { MemoryMCP } from '../utils/memory-mcp.js'
 import { formatSearchResults, getMemoryStats, recallMemory } from '../utils/memory-search.js'
 import {
   countLines,
@@ -680,6 +681,100 @@ IMPORTANTE:
       logger.info(`${decisions.length} decisões exportadas`)
     } catch (error) {
       spinner.fail('Erro ao exportar')
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async index(
+    paths: string | string[],
+    options: { tags?: string[]; feature?: string; title?: string } = {}
+  ): Promise<void> {
+    const spinner = ora('Indexando arquivos...').start()
+
+    try {
+      const filePaths = Array.isArray(paths) ? paths : [paths]
+      const mcp = new MemoryMCP()
+
+      const connected = await mcp.connect()
+      if (!connected) {
+        spinner.fail('Falha ao conectar ao MCP')
+        logger.error('Nao foi possivel estabelecer conexao com o servidor MCP')
+        process.exit(1)
+      }
+
+      let indexed = 0
+      let failed = 0
+      const failures: string[] = []
+
+      for (const filePath of filePaths) {
+        if (!(await fs.pathExists(filePath))) {
+          logger.warn(`Arquivo nao encontrado: ${chalk.gray(filePath)}`)
+          failed++
+          failures.push(filePath)
+          continue
+        }
+
+        try {
+          const content = await fs.readFile(filePath, 'utf-8')
+          const stat = await fs.stat(filePath)
+
+          const metadata: Record<string, unknown> = {
+            source: filePath,
+            createdAt: stat.mtime.toISOString(),
+            updatedAt: stat.mtime.toISOString(),
+          }
+
+          if (options.tags) {
+            metadata.tags = options.tags
+          }
+
+          if (options.feature) {
+            metadata.feature = options.feature
+          }
+
+          if (options.title) {
+            metadata.title = options.title
+          }
+
+          const result = await mcp.index(content, metadata)
+
+          if (!result.success) {
+            logger.warn(`Falha ao indexar ${chalk.gray(filePath)}: ${result.error}`)
+            failed++
+            failures.push(filePath)
+          } else {
+            indexed++
+          }
+        } catch (error) {
+          logger.warn(`Erro ao processar ${chalk.gray(filePath)}: ${error instanceof Error ? error.message : String(error)}`)
+          failed++
+          failures.push(filePath)
+        }
+      }
+
+      await mcp.disconnect()
+
+      if (indexed === 0) {
+        spinner.fail('Nenhum arquivo indexado')
+        if (failures.length > 0) {
+          logger.error(`Falhas: ${failures.join(', ')}`)
+        }
+        process.exit(1)
+      }
+
+      if (failed > 0) {
+        spinner.warn(`${indexed} de ${filePaths.length} arquivos indexados`)
+        logger.warn(`${failed} falhas`)
+      } else if (indexed === 1) {
+        spinner.succeed('Arquivo indexado com sucesso')
+        logger.success(`${chalk.cyan(filePaths[0])} adicionado ao indice`)
+      } else {
+        spinner.succeed('Arquivos indexados com sucesso')
+        logger.success(`${indexed} arquivos adicionados ao indice`)
+      }
+    } catch (error) {
+      spinner.fail('Erro ao indexar')
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }
