@@ -1,6 +1,6 @@
 # ADK Project Context
 
-**Last Updated**: 2026-01-19
+**Last Updated**: 2026-01-21
 **Project**: Agentic Development Kit (ADK)
 **Version**: 1.0.0
 
@@ -260,14 +260,18 @@ ADK is in active development with these priorities:
 7. Tool registry with fuzzy search - DONE
 8. Project management integration (ClickUp provider) - DONE
 9. Sync/Import commands for remote tasks - DONE
-10. Testing and integration validation - IN PROGRESS
+10. Progress sync system (progress.md ↔ tasks.md) - DONE
+11. Feature refinement system (/refine command) - DONE
+12. Documentation automation (/docs skill) - DONE
+13. Testing and integration validation - IN PROGRESS (1242 tests passing)
 
 ## Known Issues
 
 - Deploy command needs full implementation
 - Report command is stub only
 - Need integration tests for full workflows
-- Some commands partially implemented (TODOs in code)
+- Stale branches need cleanup (feature/progress-sync, feature/project-features)
+- Stash contains old WIP (can be dropped)
 
 ## Project Management Integration
 
@@ -307,24 +311,32 @@ Padrao plugavel em `src/providers/` permitindo adicionar novos providers (Jira, 
 - Check for path traversal
 - Validate template content
 
-## Recent Changes (2026-01-19)
+## Recent Changes (2026-01-21)
 
+- Feature refinement system (`/refine` command) for selective PRD, research, and tasks refinement
+- Documentation automation (`/docs` skill) integrated into feature lifecycle
+- reviewer-secondary agent integrated into /implement skill for independent validation
+- Plan Mode integrated into /new-feature skill for upfront planning
+- Daily workflow fully documented with automation examples
+- CLI command descriptions updated with all subcommands
+- 1242 tests passing (100% coverage)
+
+### Previous Updates (2026-01-20)
+- techniques-implementation feature reached finish phase
+- Advanced agentic techniques integrated throughout workflows
+
+### Previous Updates (2026-01-19)
 - Project management integration (ClickUp provider) fully implemented
 - Sync and import commands for remote task management
 - Provider registry pattern for pluggable integrations
 - Offline queue system for failed sync operations
 - Conflict resolution strategies (local-wins, remote-wins, newest-wins, manual)
-- 27 test files covering commands, providers, and utilities
-- Updated architecture documentation with provider system
 
 ### Previous Updates (2026-01-15)
 - Added comprehensive architecture documentation
-- Updated project-context.md with current state
 - Documented all 8 command groups with subcommands
 - Documented 14 utility modules
 - Added agent system documentation
-- Added hook system documentation
-- Documented design patterns in use
 
 ## Future Enhancements
 

@@ -1,5 +1,5 @@
 # Foco Ativo
 
 feature: techniques-implementation
-status: refinamento concluído - pronto para finalização
+status: estrutura criada
 path: .claude/plans/features/techniques-implementation/
