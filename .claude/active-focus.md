@@ -1,5 +1,5 @@
 # Foco Ativo
 
-feature: adk-v2-fase1
-status: documentação concluída
-path: .claude/plans/features/adk-v2-fase1/
+feature: test-worktree-debug
+status: não iniciada
+path: .claude/plans/features/test-worktree-debug/

@@ -96,6 +96,10 @@ export async function initCommand(options: InitOptions): Promise<void> {
 }
 
 async function createCADDStructure(projectPath: string): Promise<void> {
+  // IMPORTANT: When adding new directories here, you MUST also update:
+  // - src/utils/worktree-utils.ts -> subdirectoriesToLink array
+  // This ensures the new directory is properly symlinked in worktrees.
+  // See CLAUDE.md section "Worktree Symlink Architecture" for details.
   const dirs = [
     '.claude/memory',
     '.claude/plans/features',
