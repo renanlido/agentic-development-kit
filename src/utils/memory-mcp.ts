@@ -29,6 +29,33 @@ interface InternalDocument {
   indexedAt: string
 }
 
+/**
+ * MemoryMCP provides a wrapper around MCP Memory server for semantic search
+ * with automatic fallback to keyword search when MCP is unavailable.
+ *
+ * Features:
+ * - Automatic retry with exponential backoff
+ * - Timeout protection (5s default)
+ * - Graceful fallback to keyword search
+ * - Performance metrics tracking
+ *
+ * @example
+ * ```typescript
+ * const mcp = new MemoryMCP()
+ * await mcp.connect()
+ *
+ * await mcp.index('Content about authentication', {
+ *   source: '.claude/decisions/auth.md',
+ *   tags: ['auth', 'security']
+ * })
+ *
+ * const results = await mcp.recall('autenticação', {
+ *   limit: 5,
+ *   threshold: 0.65,
+ *   hybrid: true
+ * })
+ * ```
+ */
 export class MemoryMCP {
   private config: MemoryConfig | null = null
   private connected = false
@@ -49,6 +76,10 @@ export class MemoryMCP {
     this.config = config ?? null
   }
 
+  /**
+   * Connects to MCP Memory server with retry logic
+   * @returns {Promise<boolean>} True if connection successful, false otherwise
+   */
   async connect(): Promise<boolean> {
     if (this.connected) {
       return true
@@ -73,14 +104,41 @@ export class MemoryMCP {
     }
   }
 
+  /**
+   * Disconnects from MCP Memory server
+   * @returns {Promise<void>}
+   */
   async disconnect(): Promise<void> {
     this.connected = false
   }
 
+  /**
+   * Checks if currently connected to MCP server
+   * @returns {boolean} Connection status
+   */
   isConnected(): boolean {
     return this.connected
   }
 
+  /**
+   * Indexes content for semantic search
+   * Automatically connects if not connected
+   * @param {string} content - Content to index
+   * @param {Record<string, unknown>} metadata - Metadata (source, tags, feature, etc.)
+   * @returns {Promise<IndexResult>} Result with document ID or error
+   *
+   * @example
+   * ```typescript
+   * const result = await mcp.index('JWT authentication strategy', {
+   *   source: '.claude/decisions/auth.md',
+   *   tags: ['auth', 'security'],
+   *   feature: 'user-auth'
+   * })
+   * if (result.success) {
+   *   console.log('Indexed with ID:', result.documentId)
+   * }
+   * ```
+   */
   async index(content: string, metadata: Record<string, unknown>): Promise<IndexResult> {
     const startTime = Date.now()
 
@@ -117,6 +175,29 @@ export class MemoryMCP {
     }
   }
 
+  /**
+   * Performs semantic search on indexed content
+   * Automatically falls back to keyword search if MCP unavailable
+   * @param {string} query - Search query (natural language)
+   * @param {MemoryQueryOptions} [options] - Search options
+   * @param {number} [options.limit=5] - Maximum results to return
+   * @param {number} [options.threshold=0.65] - Minimum similarity score (0-1)
+   * @param {boolean} [options.hybrid=true] - Use hybrid semantic+keyword search
+   * @returns {Promise<MemoryResult>} Search results with scores and timings
+   *
+   * @example
+   * ```typescript
+   * const results = await mcp.recall('authentication patterns', {
+   *   limit: 10,
+   *   threshold: 0.7,
+   *   hybrid: true
+   * })
+   * console.log(`Found ${results.documents.length} results in ${results.timings.total}ms`)
+   * results.documents.forEach(doc => {
+   *   console.log(`${doc.metadata.source} (${(doc.score * 100).toFixed(1)}%)`)
+   * })
+   * ```
+   */
   async recall(query: string, options?: MemoryQueryOptions): Promise<MemoryResult> {
     const startTime = Date.now()
 
@@ -148,6 +229,10 @@ export class MemoryMCP {
     }
   }
 
+  /**
+   * Returns performance metrics for monitoring
+   * @returns {MemoryMetrics} Metrics including operation counts and average times
+   */
   getMetrics(): MemoryMetrics {
     return {
       indexOperations: this.metrics.indexOperations,

@@ -11,6 +11,30 @@ interface QueueOptions {
   debounceMs?: number
 }
 
+/**
+ * Queue system for async indexation with debouncing
+ *
+ * Prevents excessive indexing by grouping multiple writes to the same file
+ * within a debounce window. Processes queue automatically after debounce delay.
+ *
+ * Features:
+ * - Debounce (default 2s) to batch rapid changes
+ * - Automatic deduplication by file path
+ * - Non-blocking async processing
+ * - Graceful error handling with logging
+ *
+ * @example
+ * ```typescript
+ * const queue = new MemoryIndexQueue()
+ *
+ * // Enqueue files - will auto-process after 2s
+ * queue.enqueue('.claude/research.md')
+ * queue.enqueue('.claude/plan.md')
+ *
+ * // Or process immediately
+ * await queue.processQueue()
+ * ```
+ */
 export class MemoryIndexQueue {
   private queue: Map<string, QueueItem> = new Map()
   private debounceTimer: NodeJS.Timeout | null = null
@@ -21,6 +45,12 @@ export class MemoryIndexQueue {
     this.debounceMs = options.debounceMs ?? 2000
   }
 
+  /**
+   * Adds a file to the indexation queue with debouncing
+   * Multiple calls for the same path within debounce window are deduplicated
+   * @param {string} path - File path to index
+   * @param {Record<string, unknown>} [metadata] - Optional metadata
+   */
   enqueue(path: string, metadata?: Record<string, unknown>): void {
     this.queue.set(path, { path, metadata })
 
@@ -33,6 +63,12 @@ export class MemoryIndexQueue {
     }, this.debounceMs)
   }
 
+  /**
+   * Processes all pending files in the queue
+   * Connects to MCP, reads files, and indexes them
+   * Logs success/failure counts
+   * @returns {Promise<void>}
+   */
   async processQueue(): Promise<void> {
     if (this.processing) {
       return
@@ -113,6 +149,9 @@ export class MemoryIndexQueue {
     }
   }
 
+  /**
+   * Clears all pending items from the queue
+   */
   clear(): void {
     this.queue.clear()
 
@@ -122,10 +161,18 @@ export class MemoryIndexQueue {
     }
   }
 
+  /**
+   * Returns the number of pending items in queue
+   * @returns {number} Queue size
+   */
   getSize(): number {
     return this.queue.size
   }
 
+  /**
+   * Returns list of pending file paths
+   * @returns {string[]} Array of file paths
+   */
   getPending(): string[] {
     return Array.from(this.queue.keys())
   }
