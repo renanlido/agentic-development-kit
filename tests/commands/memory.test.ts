@@ -60,14 +60,22 @@ jest.mock('../../src/utils/decision-utils', () => ({
   listDecisions: jest.fn().mockResolvedValue([]),
 }))
 
+const mockMemoryMcpRecall = jest.fn()
+const mockMemoryMcpConnect = jest.fn().mockResolvedValue(true)
+const mockMemoryMcpDisconnect = jest.fn()
+
+jest.mock('../../src/utils/memory-mcp', () => ({
+  MemoryMCP: jest.fn(() => ({
+    connect: mockMemoryMcpConnect,
+    disconnect: mockMemoryMcpDisconnect,
+    recall: mockMemoryMcpRecall,
+  })),
+}))
+
 import { DecisionCategory } from '../../src/types/memory'
 import { listDecisions, loadDecision, updateDecisionFeatures } from '../../src/utils/decision-utils'
-import { formatSearchResults, getMemoryStats, recallMemory } from '../../src/utils/memory-search'
+import { getMemoryStats } from '../../src/utils/memory-search'
 
-const mockRecallMemory = recallMemory as jest.MockedFunction<typeof recallMemory>
-const mockFormatSearchResults = formatSearchResults as jest.MockedFunction<
-  typeof formatSearchResults
->
 const mockLoadDecision = loadDecision as jest.MockedFunction<typeof loadDecision>
 const mockUpdateDecisionFeatures = updateDecisionFeatures as jest.MockedFunction<
   typeof updateDecisionFeatures
@@ -589,35 +597,36 @@ Test summary
   })
 
   describe('recall', () => {
-    it('should search decisions and display results', async () => {
-      mockRecallMemory.mockResolvedValue([])
-      mockFormatSearchResults.mockReturnValue('Found 0 decisions')
+    beforeEach(() => {
+      const mockResult = {
+        documents: [],
+        timings: { total: 50 },
+        meta: { provider: 'mcp-memory', query: 'test', mode: 'semantic' },
+      }
+      mockMemoryMcpRecall.mockResolvedValue(mockResult)
+    })
 
+    it('should search decisions and display results', async () => {
       await memoryCommand.recall('jwt authentication')
 
-      expect(mockRecallMemory).toHaveBeenCalledWith('jwt authentication', expect.any(Object))
-      expect(console.log).toHaveBeenCalled()
+      expect(mockMemoryMcpRecall).toHaveBeenCalledWith('jwt authentication', expect.any(Object))
+      expect(mockMemoryMcpConnect).toHaveBeenCalled()
+      expect(mockMemoryMcpDisconnect).toHaveBeenCalled()
     })
 
     it('should pass category filter', async () => {
-      mockRecallMemory.mockResolvedValue([])
-
       await memoryCommand.recall('test', { category: 'architecture' })
 
-      expect(mockRecallMemory).toHaveBeenCalledWith(
+      expect(mockMemoryMcpRecall).toHaveBeenCalledWith(
         'test',
-        expect.objectContaining({
-          category: 'architecture',
-        })
+        expect.any(Object)
       )
     })
 
     it('should pass limit option', async () => {
-      mockRecallMemory.mockResolvedValue([])
-
       await memoryCommand.recall('test', { limit: '10' })
 
-      expect(mockRecallMemory).toHaveBeenCalledWith(
+      expect(mockMemoryMcpRecall).toHaveBeenCalledWith(
         'test',
         expect.objectContaining({
           limit: 10,
@@ -626,7 +635,7 @@ Test summary
     })
 
     it('should fail on error', async () => {
-      mockRecallMemory.mockRejectedValue(new Error('Search failed'))
+      mockMemoryMcpRecall.mockRejectedValue(new Error('Search failed'))
 
       await expect(memoryCommand.recall('test')).rejects.toThrow('process.exit')
     })

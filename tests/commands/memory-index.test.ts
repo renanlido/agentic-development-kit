@@ -3,13 +3,17 @@ import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals
 const mockMemoryMCP = {
   connect: jest.fn<() => Promise<boolean>>(),
   disconnect: jest.fn<() => Promise<void>>(),
-  index: jest.fn<
-    (content: string, metadata: Record<string, unknown>) => Promise<{
-      success: boolean
-      documentId?: string
-      error?: string
-    }>
-  >(),
+  index:
+    jest.fn<
+      (
+        content: string,
+        metadata: Record<string, unknown>
+      ) => Promise<{
+        success: boolean
+        documentId?: string
+        error?: string
+      }>
+    >(),
   isConnected: jest.fn<() => boolean>(),
 }
 
@@ -109,7 +113,9 @@ describe('MemoryCommand - index', () => {
           updatedAt: expect.any(String),
         })
       )
-      expect(mockLogger.success).toHaveBeenCalledWith(expect.stringContaining('adicionado ao indice'))
+      expect(mockLogger.success).toHaveBeenCalledWith(
+        expect.stringContaining('adicionado ao indice')
+      )
     })
 
     it('should fail when file does not exist', async () => {

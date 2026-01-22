@@ -4,16 +4,22 @@ import * as path from 'node:path'
 const pathExists = jest.fn<(path: string) => Promise<boolean>>()
 const readJson = jest.fn<(path: string) => Promise<unknown>>()
 const ensureDir = jest.fn<(path: string) => Promise<void>>()
-const writeJson = jest.fn<(path: string, data: unknown, options?: { spaces?: number }) => Promise<void>>()
+const writeJson =
+  jest.fn<(path: string, data: unknown, options?: { spaces?: number }) => Promise<void>>()
 
 jest.mock('fs-extra', () => ({
   pathExists: (...args: unknown[]) => pathExists(...(args as [string])),
   readJson: (...args: unknown[]) => readJson(...(args as [string])),
   ensureDir: (...args: unknown[]) => ensureDir(...(args as [string])),
-  writeJson: (...args: unknown[]) => writeJson(...(args as [string, unknown, { spaces?: number } | undefined])),
+  writeJson: (...args: unknown[]) =>
+    writeJson(...(args as [string, unknown, { spaces?: number } | undefined])),
 }))
 
-import { loadMemoryConfig, saveMemoryConfig, getMemoryConfigPath } from '../../src/utils/memory-config'
+import {
+  loadMemoryConfig,
+  saveMemoryConfig,
+  getMemoryConfigPath,
+} from '../../src/utils/memory-config'
 import type { MemoryConfig } from '../../src/types/mcp-memory'
 
 const mockedFs = {
@@ -164,7 +170,7 @@ describe('memory-config', () => {
       expect(mockedFs.writeJson).toHaveBeenCalledWith(
         expect.stringContaining('memory.json'),
         mockConfig,
-        { spaces: 2 },
+        { spaces: 2 }
       )
     })
 
@@ -224,7 +230,9 @@ describe('memory-config', () => {
 
       await saveMemoryConfig(customConfig)
 
-      expect(mockedFs.writeJson).toHaveBeenCalledWith(expect.any(String), customConfig, { spaces: 2 })
+      expect(mockedFs.writeJson).toHaveBeenCalledWith(expect.any(String), customConfig, {
+        spaces: 2,
+      })
     })
   })
 

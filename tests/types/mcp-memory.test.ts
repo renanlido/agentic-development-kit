@@ -244,7 +244,9 @@ describe('MCP Memory Types', () => {
     })
 
     it('should throw error on parse with invalid config', () => {
-      expect(() => MemoryConfigSchema.parse({ provider: 'invalid' } as unknown as MemoryConfigInput)).toThrow('Invalid MemoryConfig')
+      expect(() =>
+        MemoryConfigSchema.parse({ provider: 'invalid' } as unknown as MemoryConfigInput)
+      ).toThrow('Invalid MemoryConfig')
     })
 
     it('should reject non-object input', () => {
@@ -328,7 +330,9 @@ describe('MCP Memory Types', () => {
       })
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.errors).toContain('hybridSearch.weights.semantic must be a number between 0 and 1')
+        expect(result.errors).toContain(
+          'hybridSearch.weights.semantic must be a number between 0 and 1'
+        )
       }
     })
 
@@ -339,7 +343,9 @@ describe('MCP Memory Types', () => {
       })
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.errors).toContain('hybridSearch.weights.keyword must be a number between 0 and 1')
+        expect(result.errors).toContain(
+          'hybridSearch.weights.keyword must be a number between 0 and 1'
+        )
       }
     })
 

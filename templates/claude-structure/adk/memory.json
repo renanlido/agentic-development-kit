@@ -22,15 +22,6 @@
       "keyword": 0.3
     }
   },
-  "indexPatterns": [
-    ".claude/**/*.md",
-    ".claude/**/*.txt"
-  ],
-  "ignorePatterns": [
-    "**/.env*",
-    "**/credentials*",
-    "**/*.key",
-    "**/*.pem",
-    "**/secrets*"
-  ]
+  "indexPatterns": [".claude/**/*.md", ".claude/**/*.txt"],
+  "ignorePatterns": ["**/.env*", "**/credentials*", "**/*.key", "**/*.pem", "**/secrets*"]
 }

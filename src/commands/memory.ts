@@ -446,7 +446,7 @@ IMPORTANTE:
 
       const limit = options.limit ? Number.parseInt(options.limit, 10) : 5
       const threshold = options.threshold ? Number.parseFloat(options.threshold) : undefined
-      const hybrid = options.hybrid === 'false' ? false : true
+      const hybrid = options.hybrid !== 'false'
 
       const result = await mcp.recall(query, {
         limit,
@@ -476,7 +476,9 @@ IMPORTANTE:
       }
 
       console.log(
-        chalk.gray(`${result.documents.length} resultados | ${result.timings.total}ms | ${result.meta.mode}`)
+        chalk.gray(
+          `${result.documents.length} resultados | ${result.timings.total}ms | ${result.meta.mode}`
+        )
       )
       console.log()
     } catch (error) {
@@ -857,7 +859,9 @@ IMPORTANTE:
             indexed++
           }
         } catch (error) {
-          logger.warn(`Erro ao processar ${chalk.gray(filePath)}: ${error instanceof Error ? error.message : String(error)}`)
+          logger.warn(
+            `Erro ao processar ${chalk.gray(filePath)}: ${error instanceof Error ? error.message : String(error)}`
+          )
           failed++
           failures.push(filePath)
         }

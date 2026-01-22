@@ -116,7 +116,9 @@ export class MemoryConfigSchema {
     return validated.data
   }
 
-  static safeParse(input: unknown): { success: true; data: MemoryConfig } | { success: false; errors: string[] } {
+  static safeParse(
+    input: unknown
+  ): { success: true; data: MemoryConfig } | { success: false; errors: string[] } {
     const errors: string[] = []
 
     if (typeof input !== 'object' || input === null) {
@@ -138,35 +140,60 @@ export class MemoryConfigSchema {
     }
 
     const embeddingObj = (obj.embedding as Record<string, unknown> | undefined) ?? {}
-    if (embeddingObj.chunkSize !== undefined && (typeof embeddingObj.chunkSize !== 'number' || embeddingObj.chunkSize <= 0)) {
+    if (
+      embeddingObj.chunkSize !== undefined &&
+      (typeof embeddingObj.chunkSize !== 'number' || embeddingObj.chunkSize <= 0)
+    ) {
       errors.push('embedding.chunkSize must be a positive number')
     }
 
-    if (embeddingObj.overlap !== undefined && (typeof embeddingObj.overlap !== 'number' || embeddingObj.overlap < 0)) {
+    if (
+      embeddingObj.overlap !== undefined &&
+      (typeof embeddingObj.overlap !== 'number' || embeddingObj.overlap < 0)
+    ) {
       errors.push('embedding.overlap must be a non-negative number')
     }
 
     const retrievalObj = (obj.retrieval as Record<string, unknown> | undefined) ?? {}
-    if (retrievalObj.topK !== undefined && (typeof retrievalObj.topK !== 'number' || retrievalObj.topK <= 0)) {
+    if (
+      retrievalObj.topK !== undefined &&
+      (typeof retrievalObj.topK !== 'number' || retrievalObj.topK <= 0)
+    ) {
       errors.push('retrieval.topK must be a positive number')
     }
 
-    if (retrievalObj.finalK !== undefined && (typeof retrievalObj.finalK !== 'number' || retrievalObj.finalK <= 0)) {
+    if (
+      retrievalObj.finalK !== undefined &&
+      (typeof retrievalObj.finalK !== 'number' || retrievalObj.finalK <= 0)
+    ) {
       errors.push('retrieval.finalK must be a positive number')
     }
 
-    if (retrievalObj.threshold !== undefined && (typeof retrievalObj.threshold !== 'number' || retrievalObj.threshold < 0 || retrievalObj.threshold > 1)) {
+    if (
+      retrievalObj.threshold !== undefined &&
+      (typeof retrievalObj.threshold !== 'number' ||
+        retrievalObj.threshold < 0 ||
+        retrievalObj.threshold > 1)
+    ) {
       errors.push('retrieval.threshold must be a number between 0 and 1')
     }
 
     const hybridObj = (obj.hybridSearch as Record<string, unknown> | undefined) ?? {}
     const weightsObj = (hybridObj.weights as Record<string, unknown> | undefined) ?? {}
 
-    if (weightsObj.semantic !== undefined && (typeof weightsObj.semantic !== 'number' || weightsObj.semantic < 0 || weightsObj.semantic > 1)) {
+    if (
+      weightsObj.semantic !== undefined &&
+      (typeof weightsObj.semantic !== 'number' ||
+        weightsObj.semantic < 0 ||
+        weightsObj.semantic > 1)
+    ) {
       errors.push('hybridSearch.weights.semantic must be a number between 0 and 1')
     }
 
-    if (weightsObj.keyword !== undefined && (typeof weightsObj.keyword !== 'number' || weightsObj.keyword < 0 || weightsObj.keyword > 1)) {
+    if (
+      weightsObj.keyword !== undefined &&
+      (typeof weightsObj.keyword !== 'number' || weightsObj.keyword < 0 || weightsObj.keyword > 1)
+    ) {
       errors.push('hybridSearch.weights.keyword must be a number between 0 and 1')
     }
 
@@ -187,7 +214,7 @@ export class MemoryConfigSchema {
           maxSize: (storageObj.maxSize as string) ?? '500MB',
         },
         embedding: {
-          model: embeddingObj.model as string ?? 'nomic-embed-text-v1.5',
+          model: (embeddingObj.model as string) ?? 'nomic-embed-text-v1.5',
           chunkSize: (embeddingObj.chunkSize as number) ?? 512,
           overlap: (embeddingObj.overlap as number) ?? 100,
         },
@@ -203,8 +230,17 @@ export class MemoryConfigSchema {
             keyword: (weightsObj.keyword as number) ?? 0.3,
           },
         },
-        indexPatterns: (inputTyped.indexPatterns as string[]) ?? ['.claude/**/*.md', '.claude/**/*.txt'],
-        ignorePatterns: (inputTyped.ignorePatterns as string[]) ?? ['**/.env*', '**/credentials*', '**/*.key', '**/*.pem', '**/secrets*'],
+        indexPatterns: (inputTyped.indexPatterns as string[]) ?? [
+          '.claude/**/*.md',
+          '.claude/**/*.txt',
+        ],
+        ignorePatterns: (inputTyped.ignorePatterns as string[]) ?? [
+          '**/.env*',
+          '**/credentials*',
+          '**/*.key',
+          '**/*.pem',
+          '**/secrets*',
+        ],
       },
     }
   }
@@ -222,7 +258,8 @@ function isMemoryDocumentMetadata(obj: unknown): obj is MemoryDocumentMetadata {
     typeof obj.createdAt === 'string' &&
     typeof obj.updatedAt === 'string' &&
     (obj.title === undefined || typeof obj.title === 'string') &&
-    (obj.tags === undefined || (Array.isArray(obj.tags) && obj.tags.every((t) => typeof t === 'string'))) &&
+    (obj.tags === undefined ||
+      (Array.isArray(obj.tags) && obj.tags.every((t) => typeof t === 'string'))) &&
     (obj.feature === undefined || typeof obj.feature === 'string')
   )
 }
@@ -234,7 +271,8 @@ export function isMemoryDocument(obj: unknown): obj is MemoryDocument {
     typeof obj.id === 'string' &&
     typeof obj.content === 'string' &&
     isMemoryDocumentMetadata(obj.metadata) &&
-    (obj.embedding === undefined || (Array.isArray(obj.embedding) && obj.embedding.every((e) => typeof e === 'number')))
+    (obj.embedding === undefined ||
+      (Array.isArray(obj.embedding) && obj.embedding.every((e) => typeof e === 'number')))
   )
 }
 
@@ -249,7 +287,7 @@ export function isMemoryResult(obj: unknown): obj is MemoryResult {
         typeof doc.id === 'string' &&
         typeof doc.content === 'string' &&
         typeof doc.score === 'number' &&
-        isMemoryDocumentMetadata(doc.metadata),
+        isMemoryDocumentMetadata(doc.metadata)
     )
 
   const hasTimings = isObject(obj.timings) && typeof obj.timings.total === 'number'

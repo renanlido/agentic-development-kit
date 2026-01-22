@@ -1,7 +1,12 @@
 import Fuse from 'fuse.js'
 import { loadMemoryConfig } from './memory-config'
 import { logger } from './logger'
-import type { MemoryConfig, MemoryQueryOptions, MemoryResult, MemoryResultDocument } from '../types/mcp-memory'
+import type {
+  MemoryConfig,
+  MemoryQueryOptions,
+  MemoryResult,
+  MemoryResultDocument,
+} from '../types/mcp-memory'
 
 export interface IndexResult {
   success: boolean
@@ -61,7 +66,9 @@ export class MemoryMCP {
       this.connected = true
       return true
     } catch (error) {
-      logger.error(`Failed to connect to MCP: ${error instanceof Error ? error.message : String(error)}`)
+      logger.error(
+        `Failed to connect to MCP: ${error instanceof Error ? error.message : String(error)}`
+      )
       return false
     }
   }
@@ -94,7 +101,7 @@ export class MemoryMCP {
           })
 
           return { success: true, documentId }
-        }),
+        })
       )
 
       this.metrics.indexOperations++
@@ -128,7 +135,9 @@ export class MemoryMCP {
 
       return result
     } catch (error) {
-      logger.warn(`MCP recall failed, falling back to keyword search: ${error instanceof Error ? error.message : String(error)}`)
+      logger.warn(
+        `MCP recall failed, falling back to keyword search: ${error instanceof Error ? error.message : String(error)}`
+      )
 
       const fallbackResult = await this.keywordFallback(query, options)
 
@@ -144,9 +153,13 @@ export class MemoryMCP {
       indexOperations: this.metrics.indexOperations,
       recallOperations: this.metrics.recallOperations,
       averageIndexTime:
-        this.metrics.indexOperations > 0 ? this.metrics.totalIndexTime / this.metrics.indexOperations : 0,
+        this.metrics.indexOperations > 0
+          ? this.metrics.totalIndexTime / this.metrics.indexOperations
+          : 0,
       averageRecallTime:
-        this.metrics.recallOperations > 0 ? this.metrics.totalRecallTime / this.metrics.recallOperations : 0,
+        this.metrics.recallOperations > 0
+          ? this.metrics.totalRecallTime / this.metrics.recallOperations
+          : 0,
       failures: this.metrics.failures,
     }
   }
@@ -156,7 +169,11 @@ export class MemoryMCP {
     const embeddingStart = Date.now()
 
     if (this.documents.length === 0) {
-      return this.emptyResult(query, options?.hybrid === false ? 'semantic' : 'hybrid', Date.now() - startTime)
+      return this.emptyResult(
+        query,
+        options?.hybrid === false ? 'semantic' : 'hybrid',
+        Date.now() - startTime
+      )
     }
 
     const embeddingTime = Date.now() - embeddingStart
@@ -206,7 +223,10 @@ export class MemoryMCP {
     }
   }
 
-  private async keywordFallback(query: string, options?: MemoryQueryOptions): Promise<MemoryResult> {
+  private async keywordFallback(
+    query: string,
+    options?: MemoryQueryOptions
+  ): Promise<MemoryResult> {
     const startTime = Date.now()
 
     if (this.documents.length === 0) {
@@ -251,7 +271,11 @@ export class MemoryMCP {
     }
   }
 
-  private emptyResult(query: string, mode: 'semantic' | 'keyword' | 'hybrid', totalTime: number): MemoryResult {
+  private emptyResult(
+    query: string,
+    mode: 'semantic' | 'keyword' | 'hybrid',
+    totalTime: number
+  ): MemoryResult {
     return {
       documents: [],
       timings: {
@@ -287,7 +311,7 @@ export class MemoryMCP {
     return Promise.race([
       promise,
       new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error('Operation timeout after 5s')), this.TIMEOUT_MS),
+        setTimeout(() => reject(new Error('Operation timeout after 5s')), this.TIMEOUT_MS)
       ),
     ])
   }

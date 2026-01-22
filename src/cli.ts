@@ -367,7 +367,9 @@ memory
 
 memory
   .command('queue <paths...>')
-  .description('Adiciona arquivos à fila de indexação com debounce (processa automaticamente em 2s)')
+  .description(
+    'Adiciona arquivos à fila de indexação com debounce (processa automaticamente em 2s)'
+  )
   .option('-t, --tags <tags...>', 'Tags para categorizar o documento')
   .option('-f, --feature <feature>', 'Feature relacionada')
   .option('--title <title>', 'Título customizado do documento')

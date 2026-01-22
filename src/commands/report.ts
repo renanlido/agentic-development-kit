@@ -175,7 +175,7 @@ export class ReportCommand {
             lastUpdated: progress.lastUpdated,
           })
         } catch {
-          continue
+          // Skip feature if unable to load progress
         }
       }
     }

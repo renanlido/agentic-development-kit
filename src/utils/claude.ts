@@ -53,7 +53,9 @@ export async function executeClaudeCommand(
   } finally {
     try {
       fs.unlinkSync(tempFile)
-    } catch {}
+    } catch {
+      // Ignore error if temp file doesn't exist
+    }
   }
 }
 

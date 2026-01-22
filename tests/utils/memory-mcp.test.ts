@@ -157,7 +157,7 @@ describe('MemoryMCP', () => {
       const result = await mcp.index('Test content', {
         source: 'test.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       expect(result.success).toBe(true)
@@ -173,7 +173,7 @@ describe('MemoryMCP', () => {
       await mcp.index('Authentication documentation', {
         source: 'auth.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       const result = await mcp.recall('authentication')
@@ -224,7 +224,7 @@ describe('MemoryMCP', () => {
       await mcp.index('Test document', {
         source: 'test.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       const result = await mcp.recall('test')
@@ -250,7 +250,7 @@ describe('MemoryMCP', () => {
       await mcp.index('Test content', {
         source: 'test.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       const result = await mcp.recall('test')
@@ -266,8 +266,16 @@ describe('MemoryMCP', () => {
       const mcp = new MemoryMCP(mockConfig)
       await mcp.connect()
 
-      await mcp.index('Test 1', { source: 'test1.md', createdAt: '2026-01-21T10:00:00Z', updatedAt: '2026-01-21T10:00:00Z' })
-      await mcp.index('Test 2', { source: 'test2.md', createdAt: '2026-01-21T10:00:00Z', updatedAt: '2026-01-21T10:00:00Z' })
+      await mcp.index('Test 1', {
+        source: 'test1.md',
+        createdAt: '2026-01-21T10:00:00Z',
+        updatedAt: '2026-01-21T10:00:00Z',
+      })
+      await mcp.index('Test 2', {
+        source: 'test2.md',
+        createdAt: '2026-01-21T10:00:00Z',
+        updatedAt: '2026-01-21T10:00:00Z',
+      })
       await mcp.recall('test')
 
       const metrics = mcp.getMetrics()
@@ -307,7 +315,7 @@ describe('MemoryMCP', () => {
       await mcp.index('Authentication documentation', {
         source: 'auth.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       const result = await mcp.recall('authentication')
@@ -338,7 +346,7 @@ describe('MemoryMCP', () => {
       await mcp.index('Test document', {
         source: 'test.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       // Now recall should use keyword fallback
@@ -370,18 +378,18 @@ describe('MemoryMCP', () => {
       await mcpFallback.index('Document 1 about authentication', {
         source: 'doc1.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
       await mcpFallback.index('Document 2 about testing', {
         source: 'doc2.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       // Recall will trigger keyword fallback because connect fails
       const result = await mcpFallback.recall('authentication', {
         limit: 1,
-        threshold: 0.5
+        threshold: 0.5,
       })
 
       expect(result.documents.length).toBeLessThanOrEqual(1)
@@ -397,7 +405,7 @@ describe('MemoryMCP', () => {
       await mcp.index('Test', {
         source: 'test.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       const result = await mcp.recall('test')
@@ -415,7 +423,7 @@ describe('MemoryMCP', () => {
         tags: ['test', 'example'],
         feature: 'test-feature',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       expect(result.success).toBe(true)
@@ -428,7 +436,7 @@ describe('MemoryMCP', () => {
       await mcp.index('Semantic search test', {
         source: 'semantic.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       const result = await mcp.recall('semantic', { hybrid: false })
@@ -442,19 +450,19 @@ describe('MemoryMCP', () => {
       const result1 = await mcp.index('Doc 1', {
         source: 'doc1.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       const result2 = await mcp.index('Doc 2', {
         source: 'doc2.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       const result3 = await mcp.index('Doc 3', {
         source: 'doc3.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       expect(result1.documentId).not.toBe(result2.documentId)
@@ -483,7 +491,7 @@ describe('MemoryMCP', () => {
       await mcp.index('Test content', {
         source: 'test.md',
         createdAt: '2026-01-21T10:00:00Z',
-        updatedAt: '2026-01-21T10:00:00Z'
+        updatedAt: '2026-01-21T10:00:00Z',
       })
 
       const result = await mcp.recall('')
