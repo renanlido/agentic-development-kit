@@ -1,0 +1,38 @@
+[
+  {
+    "timestamp": "2026-01-22T02:25:05.211Z",
+    "fromPhase": "research",
+    "toPhase": "research",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-22T02:25:05.217Z",
+    "fromPhase": "prd",
+    "toPhase": "research",
+    "trigger": "adk feature research"
+  },
+  {
+    "timestamp": "2026-01-22T02:34:04.241Z",
+    "fromPhase": "tasks",
+    "toPhase": "tasks",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-22T02:34:04.249Z",
+    "fromPhase": "research",
+    "toPhase": "tasks",
+    "trigger": "adk feature tasks"
+  },
+  {
+    "timestamp": "2026-01-22T02:37:57.404Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "arquitetura",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-22T02:37:57.407Z",
+    "fromPhase": "tasks",
+    "toPhase": "arquitetura",
+    "trigger": "adk feature plan"
+  }
+]

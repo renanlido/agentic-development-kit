@@ -325,6 +325,15 @@ path: ${featurePath}
         }
       }
 
+      const currentBranch = execFileSync('git', ['branch', '--show-current'], {
+        encoding: 'utf-8',
+        stdio: 'pipe',
+      }).trim()
+
+      if (currentBranch === branchName) {
+        execFileSync('git', ['checkout', baseBranch], { stdio: 'pipe' })
+      }
+
       execFileSync('git', ['worktree', 'add', worktreeDir, branchName], { stdio: 'pipe' })
 
       await setupClaudeSymlink(worktreeDir, mainRepo)
