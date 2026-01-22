@@ -222,6 +222,7 @@ export async function setupClaudeSymlink(
     'plans',
     'templates',
     'scripts',
+    'docs',
   ]
 
   for (const subdir of subdirectoriesToLink) {

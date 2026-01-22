@@ -116,6 +116,7 @@ async function createCADDStructure(projectPath: string): Promise<void> {
     '.claude/reports',
     '.claude/daily',
     '.claude/analysis',
+    '.claude/docs',
   ]
 
   for (const dir of dirs) {
