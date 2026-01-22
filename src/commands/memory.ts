@@ -2,14 +2,14 @@ import path from 'node:path'
 import chalk from 'chalk'
 import fs from 'fs-extra'
 import ora from 'ora'
-import type { DecisionCategory, MemoryOptions, MemoryPhase, SearchMatch } from '../types/memory.js'
+import type { MemoryOptions, MemoryPhase, SearchMatch } from '../types/memory.js'
 import { MEMORY_LINE_LIMIT } from '../types/memory.js'
 import { executeClaudeCommand } from '../utils/claude.js'
 import { listDecisions, loadDecision, updateDecisionFeatures } from '../utils/decision-utils.js'
 import { getFeaturePath, getFeaturesBasePath } from '../utils/git-paths.js'
 import { logger } from '../utils/logger.js'
 import { MemoryMCP } from '../utils/memory-mcp.js'
-import { formatSearchResults, getMemoryStats, recallMemory } from '../utils/memory-search.js'
+import { getMemoryStats } from '../utils/memory-search.js'
 import {
   countLines,
   createDefaultMemory,
@@ -419,18 +419,62 @@ IMPORTANTE:
     return this.sync(options)
   }
 
-  async recall(query: string, options: { category?: string; limit?: string } = {}): Promise<void> {
-    const spinner = ora('Buscando decisões...').start()
+  async recall(
+    query: string,
+    options: {
+      category?: string
+      limit?: string
+      threshold?: string
+      hybrid?: string
+    } = {}
+  ): Promise<void> {
+    const spinner = ora('Buscando...').start()
 
     try {
-      const results = await recallMemory(query, {
-        category: options.category as DecisionCategory | undefined,
-        limit: options.limit ? Number.parseInt(options.limit, 10) : 5,
+      const mcp = new MemoryMCP()
+
+      const connected = await mcp.connect()
+      if (!connected) {
+        spinner.fail('Falha ao conectar ao MCP')
+        logger.error('Nao foi possivel estabelecer conexao com o servidor MCP')
+        process.exit(1)
+      }
+
+      const limit = options.limit ? Number.parseInt(options.limit, 10) : 5
+      const threshold = options.threshold ? Number.parseFloat(options.threshold) : undefined
+      const hybrid = options.hybrid === 'false' ? false : true
+
+      const result = await mcp.recall(query, {
+        limit,
+        threshold,
+        hybrid,
       })
+
+      await mcp.disconnect()
 
       spinner.stop()
 
-      console.log(formatSearchResults(results))
+      if (result.documents.length === 0) {
+        spinner.warn(`Nenhum resultado para "${query}"`)
+        return
+      }
+
+      console.log()
+      console.log(chalk.bold.cyan(`Resultados para: ${query}`))
+      console.log(chalk.gray('─'.repeat(60)))
+      console.log()
+
+      for (const doc of result.documents) {
+        const score = Math.round(doc.score * 100)
+        console.log(chalk.cyan(`${doc.metadata.source}`) + chalk.gray(` (${score}%)`))
+        console.log(chalk.yellow(`  ${doc.content.substring(0, 200)}...`))
+        console.log()
+      }
+
+      console.log(
+        chalk.gray(`${result.documents.length} resultados | ${result.timings.total}ms | ${result.meta.mode}`)
+      )
+      console.log()
     } catch (error) {
       spinner.fail('Erro na busca')
       logger.error(error instanceof Error ? error.message : String(error))

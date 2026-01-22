@@ -328,9 +328,11 @@ memory
 
 memory
   .command('recall <query>')
-  .description('Busca decisões por contexto usando fuzzy search')
-  .option('-c, --category <category>', 'Filtrar por categoria')
+  .description('Busca semântica em documentos indexados usando MCP Memory')
+  .option('-c, --category <category>', 'Filtrar por categoria (legacy)')
   .option('-l, --limit <limit>', 'Limite de resultados', '5')
+  .option('-t, --threshold <threshold>', 'Score mínimo (0-1)', '0.65')
+  .option('--hybrid <boolean>', 'Busca híbrida (semantic+keyword)', 'true')
   .action((query, options) => memoryCommand.recall(query, options))
 
 memory
