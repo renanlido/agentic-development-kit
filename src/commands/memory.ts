@@ -8,6 +8,7 @@ import { executeClaudeCommand } from '../utils/claude.js'
 import { listDecisions, loadDecision, updateDecisionFeatures } from '../utils/decision-utils.js'
 import { getFeaturePath, getFeaturesBasePath } from '../utils/git-paths.js'
 import { logger } from '../utils/logger.js'
+import { MemoryIndexQueue } from '../utils/memory-index-queue.js'
 import { MemoryMCP } from '../utils/memory-mcp.js'
 import { getMemoryStats } from '../utils/memory-search.js'
 import {
@@ -21,6 +22,9 @@ import {
   searchInContent,
   serializeMemoryContent,
 } from '../utils/memory-utils.js'
+
+// Singleton queue instance
+const indexQueue = new MemoryIndexQueue()
 
 class MemoryCommand {
   async save(feature: string, options: MemoryOptions = {}): Promise<void> {
@@ -477,6 +481,68 @@ IMPORTANTE:
       console.log()
     } catch (error) {
       spinner.fail('Erro na busca')
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async queue(
+    paths: string | string[],
+    options: { tags?: string[]; feature?: string; title?: string } = {}
+  ): Promise<void> {
+    try {
+      const filePaths = Array.isArray(paths) ? paths : [paths]
+
+      for (const filePath of filePaths) {
+        if (!(await fs.pathExists(filePath))) {
+          logger.warn(`Arquivo nao encontrado: ${chalk.gray(filePath)}`)
+          continue
+        }
+
+        const metadata: Record<string, unknown> = {}
+
+        if (options.tags) {
+          metadata.tags = options.tags
+        }
+
+        if (options.feature) {
+          metadata.feature = options.feature
+        }
+
+        if (options.title) {
+          metadata.title = options.title
+        }
+
+        indexQueue.enqueue(filePath, metadata)
+      }
+
+      const queueSize = indexQueue.getSize()
+      logger.success(`${queueSize} arquivo${queueSize > 1 ? 's' : ''} na fila de indexacao`)
+      logger.info('Processamento automatico em 2s (ou use: adk memory process-queue)')
+    } catch (error) {
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async processQueue(): Promise<void> {
+    const spinner = ora('Processando fila de indexacao...').start()
+
+    try {
+      const pending = indexQueue.getPending()
+
+      if (pending.length === 0) {
+        spinner.warn('Nenhum arquivo na fila')
+        return
+      }
+
+      spinner.text = `Processando ${pending.length} arquivo${pending.length > 1 ? 's' : ''}...`
+
+      await indexQueue.processQueue()
+
+      spinner.succeed('Fila processada')
+    } catch (error) {
+      spinner.fail('Erro ao processar fila')
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }

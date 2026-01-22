@@ -286,7 +286,7 @@ deploy
 const memory = program
   .command('memory')
   .description(
-    'Gerencia memoria especializada por feature (save, load, view, compact, search, sync, recall, link, unlink, export, status, index)'
+    'Gerencia memoria especializada por feature (save, load, view, compact, search, sync, recall, link, unlink, export, status, index, queue, process-queue)'
   )
 
 memory
@@ -364,6 +364,19 @@ memory
   .option('-f, --feature <feature>', 'Feature relacionada')
   .option('--title <title>', 'Título customizado do documento')
   .action((paths, options) => memoryCommand.index(paths, options))
+
+memory
+  .command('queue <paths...>')
+  .description('Adiciona arquivos à fila de indexação com debounce (processa automaticamente em 2s)')
+  .option('-t, --tags <tags...>', 'Tags para categorizar o documento')
+  .option('-f, --feature <feature>', 'Feature relacionada')
+  .option('--title <title>', 'Título customizado do documento')
+  .action((paths, options) => memoryCommand.queue(paths, options))
+
+memory
+  .command('process-queue')
+  .description('Processa imediatamente a fila de indexação pendente')
+  .action(() => memoryCommand.processQueue())
 
 // Comando: adk spec
 const spec = program
