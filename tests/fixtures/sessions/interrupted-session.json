@@ -1,0 +1,28 @@
+{
+  "id": "session-20260121-100000",
+  "feature": "test-feature",
+  "startedAt": "2026-01-21T10:00:00.000Z",
+  "lastActivity": "2026-01-21T12:30:00.000Z",
+  "currentStep": "Add tests",
+  "completedSteps": [
+    "Setup project structure",
+    "Create database schema",
+    "Implementing authentication"
+  ],
+  "pendingSteps": [
+    "Add tests",
+    "Deploy to staging"
+  ],
+  "contextSummary": "Session interrupted while adding tests. Authentication is complete.",
+  "checkpoints": [
+    {
+      "id": "checkpoint-001",
+      "createdAt": "2026-01-21T11:00:00.000Z",
+      "step": "Implementing authentication",
+      "trigger": "session_end",
+      "commitHash": "xyz789abc123",
+      "snapshotPath": ".claude/plans/features/test-feature/snapshots/checkpoint-001"
+    }
+  ],
+  "status": "interrupted"
+}

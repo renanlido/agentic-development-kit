@@ -1,0 +1,8 @@
+CURRENT: Working on something
+
+DONE:
+Some tasks done
+
+FILES: file1.ts, file2.ts
+
+This is a malformed document without proper sections
