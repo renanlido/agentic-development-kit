@@ -1,0 +1,21 @@
+{
+  "id": "session-20260121-140000",
+  "feature": "test-feature",
+  "startedAt": "2026-01-21T14:00:00.000Z",
+  "lastActivity": "2026-01-21T16:30:00.000Z",
+  "currentStep": "Implementing authentication",
+  "completedSteps": ["Setup project structure", "Create database schema"],
+  "pendingSteps": ["Implementing authentication", "Add tests", "Deploy to staging"],
+  "contextSummary": "Working on user authentication feature with JWT tokens",
+  "checkpoints": [
+    {
+      "id": "checkpoint-001",
+      "createdAt": "2026-01-21T15:00:00.000Z",
+      "step": "Create database schema",
+      "trigger": "step_complete",
+      "commitHash": "abc123def456",
+      "snapshotPath": ".claude/plans/features/test-feature/snapshots/checkpoint-001"
+    }
+  ],
+  "status": "active"
+}

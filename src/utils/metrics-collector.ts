@@ -1,6 +1,6 @@
-import fs from 'fs-extra'
 import path from 'node:path'
-import type { PhaseMetrics, AggregatedMetrics, TransitionEntry } from '../types/progress-sync'
+import fs from 'fs-extra'
+import type { AggregatedMetrics, PhaseMetrics, TransitionEntry } from '../types/progress-sync'
 import { parseTasksFile } from './task-parser'
 
 export class MetricsCollector {

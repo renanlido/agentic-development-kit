@@ -1,7 +1,7 @@
-import fs from 'fs-extra'
-import path from 'node:path'
-import os from 'node:os'
 import crypto from 'node:crypto'
+import os from 'node:os'
+import path from 'node:path'
+import fs from 'fs-extra'
 import type { TransitionEntry } from '../types/progress-sync'
 
 const MAX_HISTORY_ENTRIES = 50
@@ -49,7 +49,7 @@ export class HistoryTracker {
     try {
       return await fn()
     } finally {
-      resolve!()
+      resolve?.()
       if (this.locks.get(feature) === newLock) {
         this.locks.delete(feature)
       }

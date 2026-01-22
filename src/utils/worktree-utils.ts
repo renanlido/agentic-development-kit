@@ -203,24 +203,81 @@ export async function setupClaudeSymlink(
   const worktreeClaudePath = path.join(worktreePath, '.claude')
   const mainClaudePath = path.join(mainRepoPath, '.claude')
 
-  try {
-    const stats = await fs.lstat(worktreeClaudePath)
-
-    if (stats.isSymbolicLink()) {
-      const target = await fs.readlink(worktreeClaudePath)
-      if (target === mainClaudePath || path.resolve(worktreePath, target) === mainClaudePath) {
-        return
-      }
-    }
-
-    if (stats.isDirectory()) {
-      await fs.remove(worktreeClaudePath)
-    }
-  } catch {
-    // Path doesn't exist, which is fine
+  if (!(await fs.pathExists(mainClaudePath))) {
+    return
   }
 
-  await fs.ensureSymlink(mainClaudePath, worktreeClaudePath, 'dir')
+  await fs.ensureDir(worktreeClaudePath)
+
+  // IMPORTANT: When adding new directories to .claude/ structure (e.g., via init command),
+  // you MUST add them to this list so they are properly symlinked in worktrees.
+  // See CLAUDE.md section "Worktree Symlink Architecture" for details.
+  const subdirectoriesToLink = [
+    'agents',
+    'skills',
+    'commands',
+    'hooks',
+    'rules',
+    'memory',
+    'plans',
+    'templates',
+    'scripts',
+    'docs',
+  ]
+
+  for (const subdir of subdirectoriesToLink) {
+    const mainSubdir = path.join(mainClaudePath, subdir)
+    const worktreeSubdir = path.join(worktreeClaudePath, subdir)
+
+    if (await fs.pathExists(mainSubdir)) {
+      try {
+        const stats = await fs.lstat(worktreeSubdir)
+
+        if (stats.isSymbolicLink()) {
+          const target = await fs.readlink(worktreeSubdir)
+          if (target === mainSubdir || path.resolve(worktreeClaudePath, target) === mainSubdir) {
+            continue
+          }
+        }
+
+        if (stats.isDirectory() || stats.isSymbolicLink()) {
+          await fs.remove(worktreeSubdir)
+        }
+      } catch {
+        // Path doesn't exist, which is fine
+      }
+
+      await fs.ensureSymlink(mainSubdir, worktreeSubdir, 'dir')
+    }
+  }
+
+  const filesToLink = ['settings.json', 'README.md']
+
+  for (const file of filesToLink) {
+    const mainFile = path.join(mainClaudePath, file)
+    const worktreeFile = path.join(worktreeClaudePath, file)
+
+    if (await fs.pathExists(mainFile)) {
+      try {
+        const stats = await fs.lstat(worktreeFile)
+
+        if (stats.isSymbolicLink()) {
+          const target = await fs.readlink(worktreeFile)
+          if (target === mainFile || path.resolve(worktreeClaudePath, target) === mainFile) {
+            continue
+          }
+        }
+
+        if (stats.isFile() || stats.isSymbolicLink()) {
+          await fs.remove(worktreeFile)
+        }
+      } catch {
+        // File doesn't exist, which is fine
+      }
+
+      await fs.ensureSymlink(mainFile, worktreeFile, 'file')
+    }
+  }
 }
 
 export async function fixWorktreeSymlinks(

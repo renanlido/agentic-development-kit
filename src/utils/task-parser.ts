@@ -16,7 +16,9 @@ export type { TaskStatus } from '../types/progress-sync'
  */
 export function extractTaskStatus(line: string): TaskState['status'] {
   const match = line.match(CHECKBOX_REGEX)
-  if (!match) return 'pending'
+  if (!match) {
+    return 'pending'
+  }
 
   const checkboxChar = match[2].toLowerCase()
   switch (checkboxChar) {
@@ -26,7 +28,6 @@ export function extractTaskStatus(line: string): TaskState['status'] {
       return 'in_progress'
     case '!':
       return 'blocked'
-    case ' ':
     default:
       return 'pending'
   }
@@ -34,7 +35,9 @@ export function extractTaskStatus(line: string): TaskState['status'] {
 
 export function extractPriority(text: string): number | undefined {
   const match = text.match(PRIORITY_REGEX)
-  if (!match) return undefined
+  if (!match) {
+    return undefined
+  }
   return parseInt(match[1], 10)
 }
 
@@ -130,7 +133,7 @@ export function serializeTasksMarkdown(doc: TasksDocument): string {
     if (!tasksByPhase.has(phase)) {
       tasksByPhase.set(phase, [])
     }
-    tasksByPhase.get(phase)!.push(task)
+    tasksByPhase.get(phase)?.push(task)
   }
 
   for (const [phase, tasks] of tasksByPhase) {
@@ -165,7 +168,6 @@ function getCheckboxChar(status: TaskState['status']): string {
       return '~'
     case 'blocked':
       return '!'
-    case 'pending':
     default:
       return ' '
   }

@@ -8,7 +8,7 @@ function getWorktreeProgressPath(featureName: string): string | null {
 
   if (isInWorktree()) {
     const cwd = process.cwd()
-    if (cwd.includes('.worktrees/' + featureSlug) || cwd.includes('.worktrees\\' + featureSlug)) {
+    if (cwd.includes(`.worktrees/${featureSlug}`) || cwd.includes(`.worktrees\\${featureSlug}`)) {
       return path.join(cwd, '.claude', 'plans', 'features', featureName, 'progress.md')
     }
   }

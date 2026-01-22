@@ -2,8 +2,8 @@ import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { logger } from './logger'
 import { ModelType } from '../types/model'
+import { logger } from './logger'
 
 export interface ClaudeCommandOptions {
   model?: ModelType
@@ -12,8 +12,12 @@ export interface ClaudeCommandOptions {
 const VALID_MODELS = new Set<string>([ModelType.OPUS, ModelType.SONNET, ModelType.HAIKU])
 
 function validateModel(model: string | undefined): string | undefined {
-  if (!model) return undefined
-  if (VALID_MODELS.has(model)) return model
+  if (!model) {
+    return undefined
+  }
+  if (VALID_MODELS.has(model)) {
+    return model
+  }
   logger.warn(`Invalid model "${model}", ignoring`)
   return undefined
 }
@@ -53,7 +57,9 @@ export async function executeClaudeCommand(
   } finally {
     try {
       fs.unlinkSync(tempFile)
-    } catch {}
+    } catch {
+      // Ignore error if temp file doesn't exist
+    }
   }
 }
 

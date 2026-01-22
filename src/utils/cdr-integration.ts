@@ -1,15 +1,15 @@
-import type { PhaseType } from '../types/model'
-import type { CDRConfig, RetryResult, HealthProbe } from '../types/cdr'
+import type { CDRConfig, HealthProbe, RetryResult } from '../types/cdr'
 import { DEFAULT_CDR_CONFIG } from '../types/cdr'
+import type { PhaseType } from '../types/model'
+import { loadFallbackTemplate, validateFallbackTemplate } from './fallback-templates'
 import {
+  checkTokenPressure,
   startHealthProbe,
   stopHealthProbe,
   updateHealthMetrics,
-  checkTokenPressure,
 } from './health-probes'
-import { retryWithBackoff, createCheckpoint, restoreCheckpoint } from './recovery'
-import { loadFallbackTemplate, validateFallbackTemplate } from './fallback-templates'
 import { logger } from './logger'
+import { createCheckpoint, restoreCheckpoint, retryWithBackoff } from './recovery'
 
 export interface CDRPhaseOptions {
   feature: string
@@ -58,10 +58,10 @@ export async function executeWithCDR<T>(
       const durationMs = Date.now() - startTime
       const tokenEstimate = estimateTokenUsage(durationMs)
 
-      updateHealthMetrics(probe!.id, { durationMs, tokenEstimate })
+      updateHealthMetrics(probe?.id, { durationMs, tokenEstimate })
       options.onProgress?.({ durationMs, tokenEstimate })
 
-      if (checkTokenPressure(probe!.id)) {
+      if (checkTokenPressure(probe?.id)) {
         logger.warn('[CDR] Token pressure high, consider breaking task')
       }
     }, 10000)

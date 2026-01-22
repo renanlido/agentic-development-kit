@@ -1,0 +1,7 @@
+{
+  "id": "session-20260121-080000",
+  "feature": "test-feature",
+  "startedAt": "invalid-date",
+  "completedSteps": "this should be an array",
+  "status": "unknown-status"
+}

@@ -13,13 +13,13 @@ jest.mock('chalk', () => ({
   },
 }))
 
+import type { RetrievalOptions, RetrievalResult } from '../../src/utils/dynamic-context.js'
 import {
-  dynamicContextRetrieval,
   ContextCache,
-  extractKeywords,
   calculateRelevanceScore,
+  dynamicContextRetrieval,
+  extractKeywords,
 } from '../../src/utils/dynamic-context.js'
-import type { RetrievalResult, RetrievalOptions } from '../../src/utils/dynamic-context.js'
 
 describe('Dynamic Context Retrieval', () => {
   const testDir = path.join(process.cwd(), '.test-dynamic-context')

@@ -10,13 +10,13 @@ jest.mock('chalk', () => ({
   },
 }))
 
+import type { ActionContext, ActionResult, TaskValidation } from '../../src/utils/reflection.js'
 import {
-  validateAction,
+  ReflectionHistory,
   reflectOnResult,
   suggestCorrections,
-  ReflectionHistory,
+  validateAction,
 } from '../../src/utils/reflection.js'
-import type { ActionContext, ActionResult, TaskValidation } from '../../src/utils/reflection.js'
 
 describe('Reflection Pattern', () => {
   describe('validateAction', () => {

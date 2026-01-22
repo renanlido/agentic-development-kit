@@ -1,5 +1,5 @@
-import * as fs from 'fs-extra'
 import * as path from 'node:path'
+import * as fs from 'fs-extra'
 import type { TDDValidationResult } from '../types/hooks'
 
 export async function validateTDD(

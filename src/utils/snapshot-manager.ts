@@ -1,5 +1,5 @@
-import fs from 'fs-extra'
 import path from 'node:path'
+import fs from 'fs-extra'
 import type { SnapshotMeta } from '../types/progress-sync'
 
 const SNAPSHOT_FILES = ['progress.md', 'tasks.md', 'state.json']

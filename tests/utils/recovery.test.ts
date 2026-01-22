@@ -1,16 +1,16 @@
 import path from 'node:path'
 import fs from 'fs-extra'
-import {
-  retryWithBackoff,
-  calculateBackoff,
-  isRetryableError,
-  createCheckpoint,
-  restoreCheckpoint,
-  getCheckpoints,
-  clearCheckpoints,
-  getLatestCheckpoint,
-} from '../../src/utils/recovery'
 import { DEFAULT_RETRY_CONFIG } from '../../src/types/cdr'
+import {
+  calculateBackoff,
+  clearCheckpoints,
+  createCheckpoint,
+  getCheckpoints,
+  getLatestCheckpoint,
+  isRetryableError,
+  restoreCheckpoint,
+  retryWithBackoff,
+} from '../../src/utils/recovery'
 
 describe('recovery', () => {
   const testDir = path.join(process.cwd(), '.test-recovery')

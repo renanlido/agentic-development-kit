@@ -80,6 +80,14 @@ export function getFeaturesBasePath(): string {
 }
 
 export function getFeaturePath(featureName: string, ...segments: string[]): string {
+  if (isInWorktree()) {
+    const worktreeBase = process.cwd()
+    const localPath = path.join(worktreeBase, '.claude/plans/features', featureName, ...segments)
+    if (fs.existsSync(localPath)) {
+      return localPath
+    }
+  }
+
   return path.join(getFeaturesBasePath(), featureName, ...segments)
 }
 

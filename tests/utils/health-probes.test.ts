@@ -1,13 +1,13 @@
+import { DEFAULT_HEALTH_PROBE_CONFIG } from '../../src/types/cdr'
 import {
+  checkTokenPressure,
+  clearHealthProbes,
+  getAllHealthProbes,
+  getHealthProbe,
   startHealthProbe,
   stopHealthProbe,
-  getHealthProbe,
-  getAllHealthProbes,
-  clearHealthProbes,
   updateHealthMetrics,
-  checkTokenPressure,
 } from '../../src/utils/health-probes'
-import { DEFAULT_HEALTH_PROBE_CONFIG } from '../../src/types/cdr'
 
 describe('health-probes', () => {
   beforeEach(() => {

@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
-import fs from 'fs-extra'
-import path from 'node:path'
 import os from 'node:os'
+import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
+import fs from 'fs-extra'
 
 const mockOraStart = jest.fn()
 const mockOraSucceed = jest.fn()

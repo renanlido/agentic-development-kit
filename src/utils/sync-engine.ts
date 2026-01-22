@@ -1,15 +1,15 @@
-import fs from 'fs-extra'
 import path from 'node:path'
+import fs from 'fs-extra'
 import type {
+  Change,
+  ProgressConflictStrategy,
   ProgressSyncResult,
   SyncPreview,
-  ProgressConflictStrategy,
-  Change,
 } from '../types/progress-sync'
-import { StateManager } from './state-manager'
 import { HistoryTracker } from './history-tracker'
-import { SnapshotManager } from './snapshot-manager'
 import { detectInconsistencies, resolveInconsistencies } from './progress-conflict'
+import { SnapshotManager } from './snapshot-manager'
+import { StateManager } from './state-manager'
 
 export interface SyncEngineOptions {
   strategy?: ProgressConflictStrategy
@@ -101,7 +101,7 @@ export class SyncEngine {
         snapshotCreated,
         duration,
       }
-    } catch (error) {
+    } catch (_error) {
       const duration = Date.now() - startTime
       return {
         success: false,

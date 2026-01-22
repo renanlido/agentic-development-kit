@@ -14,13 +14,13 @@ jest.mock('chalk', () => ({
 import path from 'node:path'
 import fs from 'fs-extra'
 import {
+  createCDRWrapper,
   executeWithCDR,
   recoverPhase,
-  createCDRWrapper,
   validatePhaseHealth,
 } from '../../src/utils/cdr-integration'
-import { clearHealthProbes } from '../../src/utils/health-probes'
 import { initializeFallbackTemplates } from '../../src/utils/fallback-templates'
+import { clearHealthProbes } from '../../src/utils/health-probes'
 
 describe('cdr-integration', () => {
   const testDir = path.join(process.cwd(), '.test-cdr-integration')

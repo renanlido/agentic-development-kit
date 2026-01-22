@@ -2,13 +2,15 @@ import path from 'node:path'
 import chalk from 'chalk'
 import fs from 'fs-extra'
 import ora from 'ora'
-import type { DecisionCategory, MemoryOptions, MemoryPhase, SearchMatch } from '../types/memory.js'
+import type { MemoryOptions, MemoryPhase, SearchMatch } from '../types/memory.js'
 import { MEMORY_LINE_LIMIT } from '../types/memory.js'
 import { executeClaudeCommand } from '../utils/claude.js'
 import { listDecisions, loadDecision, updateDecisionFeatures } from '../utils/decision-utils.js'
 import { getFeaturePath, getFeaturesBasePath } from '../utils/git-paths.js'
 import { logger } from '../utils/logger.js'
-import { formatSearchResults, getMemoryStats, recallMemory } from '../utils/memory-search.js'
+import { MemoryIndexQueue } from '../utils/memory-index-queue.js'
+import { MemoryMCP } from '../utils/memory-mcp.js'
+import { getMemoryStats } from '../utils/memory-search.js'
 import {
   countLines,
   createDefaultMemory,
@@ -20,6 +22,9 @@ import {
   searchInContent,
   serializeMemoryContent,
 } from '../utils/memory-utils.js'
+
+// Singleton queue instance
+const indexQueue = new MemoryIndexQueue()
 
 class MemoryCommand {
   async save(feature: string, options: MemoryOptions = {}): Promise<void> {
@@ -418,20 +423,128 @@ IMPORTANTE:
     return this.sync(options)
   }
 
-  async recall(query: string, options: { category?: string; limit?: string } = {}): Promise<void> {
-    const spinner = ora('Buscando decisões...').start()
+  async recall(
+    query: string,
+    options: {
+      category?: string
+      limit?: string
+      threshold?: string
+      hybrid?: string
+    } = {}
+  ): Promise<void> {
+    const spinner = ora('Buscando...').start()
 
     try {
-      const results = await recallMemory(query, {
-        category: options.category as DecisionCategory | undefined,
-        limit: options.limit ? Number.parseInt(options.limit, 10) : 5,
+      const mcp = new MemoryMCP()
+
+      const connected = await mcp.connect()
+      if (!connected) {
+        spinner.fail('Falha ao conectar ao MCP')
+        logger.error('Nao foi possivel estabelecer conexao com o servidor MCP')
+        process.exit(1)
+      }
+
+      const limit = options.limit ? Number.parseInt(options.limit, 10) : 5
+      const threshold = options.threshold ? Number.parseFloat(options.threshold) : undefined
+      const hybrid = options.hybrid !== 'false'
+
+      const result = await mcp.recall(query, {
+        limit,
+        threshold,
+        hybrid,
       })
+
+      await mcp.disconnect()
 
       spinner.stop()
 
-      console.log(formatSearchResults(results))
+      if (result.documents.length === 0) {
+        spinner.warn(`Nenhum resultado para "${query}"`)
+        return
+      }
+
+      console.log()
+      console.log(chalk.bold.cyan(`Resultados para: ${query}`))
+      console.log(chalk.gray('─'.repeat(60)))
+      console.log()
+
+      for (const doc of result.documents) {
+        const score = Math.round(doc.score * 100)
+        console.log(chalk.cyan(`${doc.metadata.source}`) + chalk.gray(` (${score}%)`))
+        console.log(chalk.yellow(`  ${doc.content.substring(0, 200)}...`))
+        console.log()
+      }
+
+      console.log(
+        chalk.gray(
+          `${result.documents.length} resultados | ${result.timings.total}ms | ${result.meta.mode}`
+        )
+      )
+      console.log()
     } catch (error) {
       spinner.fail('Erro na busca')
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async queue(
+    paths: string | string[],
+    options: { tags?: string[]; feature?: string; title?: string } = {}
+  ): Promise<void> {
+    try {
+      const filePaths = Array.isArray(paths) ? paths : [paths]
+
+      for (const filePath of filePaths) {
+        if (!(await fs.pathExists(filePath))) {
+          logger.warn(`Arquivo nao encontrado: ${chalk.gray(filePath)}`)
+          continue
+        }
+
+        const metadata: Record<string, unknown> = {}
+
+        if (options.tags) {
+          metadata.tags = options.tags
+        }
+
+        if (options.feature) {
+          metadata.feature = options.feature
+        }
+
+        if (options.title) {
+          metadata.title = options.title
+        }
+
+        indexQueue.enqueue(filePath, metadata)
+      }
+
+      const queueSize = indexQueue.getSize()
+      logger.success(`${queueSize} arquivo${queueSize > 1 ? 's' : ''} na fila de indexacao`)
+      logger.info('Processamento automatico em 2s (ou use: adk memory process-queue)')
+    } catch (error) {
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async processQueue(): Promise<void> {
+    const spinner = ora('Processando fila de indexacao...').start()
+
+    try {
+      const pending = indexQueue.getPending()
+
+      if (pending.length === 0) {
+        spinner.warn('Nenhum arquivo na fila')
+        return
+      }
+
+      spinner.text = `Processando ${pending.length} arquivo${pending.length > 1 ? 's' : ''}...`
+
+      await indexQueue.processQueue()
+
+      spinner.succeed('Fila processada')
+    } catch (error) {
+      spinner.fail('Erro ao processar fila')
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }
@@ -680,6 +793,102 @@ IMPORTANTE:
       logger.info(`${decisions.length} decisões exportadas`)
     } catch (error) {
       spinner.fail('Erro ao exportar')
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async index(
+    paths: string | string[],
+    options: { tags?: string[]; feature?: string; title?: string } = {}
+  ): Promise<void> {
+    const spinner = ora('Indexando arquivos...').start()
+
+    try {
+      const filePaths = Array.isArray(paths) ? paths : [paths]
+      const mcp = new MemoryMCP()
+
+      const connected = await mcp.connect()
+      if (!connected) {
+        spinner.fail('Falha ao conectar ao MCP')
+        logger.error('Nao foi possivel estabelecer conexao com o servidor MCP')
+        process.exit(1)
+      }
+
+      let indexed = 0
+      let failed = 0
+      const failures: string[] = []
+
+      for (const filePath of filePaths) {
+        if (!(await fs.pathExists(filePath))) {
+          logger.warn(`Arquivo nao encontrado: ${chalk.gray(filePath)}`)
+          failed++
+          failures.push(filePath)
+          continue
+        }
+
+        try {
+          const content = await fs.readFile(filePath, 'utf-8')
+          const stat = await fs.stat(filePath)
+
+          const metadata: Record<string, unknown> = {
+            source: filePath,
+            createdAt: stat.mtime.toISOString(),
+            updatedAt: stat.mtime.toISOString(),
+          }
+
+          if (options.tags) {
+            metadata.tags = options.tags
+          }
+
+          if (options.feature) {
+            metadata.feature = options.feature
+          }
+
+          if (options.title) {
+            metadata.title = options.title
+          }
+
+          const result = await mcp.index(content, metadata)
+
+          if (!result.success) {
+            logger.warn(`Falha ao indexar ${chalk.gray(filePath)}: ${result.error}`)
+            failed++
+            failures.push(filePath)
+          } else {
+            indexed++
+          }
+        } catch (error) {
+          logger.warn(
+            `Erro ao processar ${chalk.gray(filePath)}: ${error instanceof Error ? error.message : String(error)}`
+          )
+          failed++
+          failures.push(filePath)
+        }
+      }
+
+      await mcp.disconnect()
+
+      if (indexed === 0) {
+        spinner.fail('Nenhum arquivo indexado')
+        if (failures.length > 0) {
+          logger.error(`Falhas: ${failures.join(', ')}`)
+        }
+        process.exit(1)
+      }
+
+      if (failed > 0) {
+        spinner.warn(`${indexed} de ${filePaths.length} arquivos indexados`)
+        logger.warn(`${failed} falhas`)
+      } else if (indexed === 1) {
+        spinner.succeed('Arquivo indexado com sucesso')
+        logger.success(`${chalk.cyan(filePaths[0])} adicionado ao indice`)
+      } else {
+        spinner.succeed('Arquivos indexados com sucesso')
+        logger.success(`${indexed} arquivos adicionados ao indice`)
+      }
+    } catch (error) {
+      spinner.fail('Erro ao indexar')
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }

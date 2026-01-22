@@ -17,14 +17,14 @@ jest.mock('../../src/utils/claude.js', () => ({
   executeClaudeCommand: jest.fn().mockResolvedValue('Compressed content'),
 }))
 
-import {
-  shouldCompress,
-  getCompressionConfig,
-  archiveMemory,
-  isNearLimit,
-  compressMemoryContent,
-} from '../../src/utils/memory-compression.js'
 import type { TieredMemory } from '../../src/types/context.js'
+import {
+  archiveMemory,
+  compressMemoryContent,
+  getCompressionConfig,
+  isNearLimit,
+  shouldCompress,
+} from '../../src/utils/memory-compression.js'
 
 describe('Memory Compression', () => {
   const testDir = path.join(process.cwd(), '.test-compression')

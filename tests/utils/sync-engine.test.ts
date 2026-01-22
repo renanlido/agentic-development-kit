@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
-import fs from 'fs-extra'
-import path from 'node:path'
 import os from 'node:os'
+import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
+import fs from 'fs-extra'
 
 describe('SyncEngine', () => {
   let tempDir: string
@@ -143,7 +143,7 @@ describe('SyncEngine', () => {
       // The implementation should handle errors gracefully
       try {
         await engine.sync('invalid-feature-!!!')
-      } catch (error) {
+      } catch (_error) {
         // Error should be caught and state rolled back
       }
 

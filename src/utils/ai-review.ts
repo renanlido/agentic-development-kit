@@ -130,7 +130,7 @@ export function formatReviewReport(consolidated: ConsolidatedReview, riskScore: 
 
   lines.push('## AI-on-AI Review')
   lines.push('')
-  lines.push('**Risk Score: ' + riskScore + '/100**')
+  lines.push(`**Risk Score: ${riskScore}/100**`)
   lines.push('')
 
   const totalFindings =
@@ -145,7 +145,7 @@ export function formatReviewReport(consolidated: ConsolidatedReview, riskScore: 
   }
 
   if (consolidated.agreements.length > 0) {
-    lines.push('### Agreements (' + consolidated.agreements.length + ' findings)')
+    lines.push(`### Agreements (${consolidated.agreements.length} findings)`)
     lines.push('')
     for (const agreement of consolidated.agreements) {
       lines.push(
@@ -164,7 +164,7 @@ export function formatReviewReport(consolidated: ConsolidatedReview, riskScore: 
   }
 
   if (consolidated.primaryOnly.length > 0) {
-    lines.push('### Primary-only (' + consolidated.primaryOnly.length + ' findings)')
+    lines.push(`### Primary-only (${consolidated.primaryOnly.length} findings)`)
     lines.push('')
     for (const finding of consolidated.primaryOnly) {
       lines.push(
@@ -183,47 +183,28 @@ export function formatReviewReport(consolidated: ConsolidatedReview, riskScore: 
   }
 
   if (consolidated.secondaryOnly.length > 0) {
-    lines.push('### Secondary-only (' + consolidated.secondaryOnly.length + ' findings)')
+    lines.push(`### Secondary-only (${consolidated.secondaryOnly.length} findings)`)
     lines.push('')
     for (const finding of consolidated.secondaryOnly) {
       lines.push(
-        '- **[' +
-          finding.severity.toUpperCase() +
-          ']** ' +
-          finding.message +
-          ' (`' +
-          finding.file +
-          ':' +
-          finding.line +
-          '`)'
+        `- **[${finding.severity.toUpperCase()}]** ${finding.message} (\`${finding.file}:${finding.line}\`)`
       )
     }
     lines.push('')
   }
 
   if (consolidated.disagreements.length > 0) {
-    lines.push('### Disagreements (' + consolidated.disagreements.length + ' items)')
+    lines.push(`### Disagreements (${consolidated.disagreements.length} items)`)
     lines.push('')
     for (const disagreement of consolidated.disagreements) {
       lines.push(
-        '- `' +
-          disagreement.primary.file +
-          ':' +
-          disagreement.primary.line +
-          '`: ' +
-          disagreement.reason
+        `- \`${disagreement.primary.file}:${disagreement.primary.line}\`: ${disagreement.reason}`
       )
       lines.push(
-        '  - Primary: **' +
-          disagreement.primary.severity.toUpperCase() +
-          '** - ' +
-          disagreement.primary.message
+        `  - Primary: **${disagreement.primary.severity.toUpperCase()}** - ${disagreement.primary.message}`
       )
       lines.push(
-        '  - Secondary: **' +
-          disagreement.secondary.severity.toUpperCase() +
-          '** - ' +
-          disagreement.secondary.message
+        `  - Secondary: **${disagreement.secondary.severity.toUpperCase()}** - ${disagreement.secondary.message}`
       )
     }
     lines.push('')

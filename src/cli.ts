@@ -286,7 +286,7 @@ deploy
 const memory = program
   .command('memory')
   .description(
-    'Gerencia memoria especializada por feature (save, load, view, compact, search, sync, recall, link, unlink, export, status)'
+    'Gerencia memoria especializada por feature (save, load, view, compact, search, sync, recall, link, unlink, export, status, index, queue, process-queue)'
   )
 
 memory
@@ -328,9 +328,11 @@ memory
 
 memory
   .command('recall <query>')
-  .description('Busca decisões por contexto usando fuzzy search')
-  .option('-c, --category <category>', 'Filtrar por categoria')
+  .description('Busca semântica em documentos indexados usando MCP Memory')
+  .option('-c, --category <category>', 'Filtrar por categoria (legacy)')
   .option('-l, --limit <limit>', 'Limite de resultados', '5')
+  .option('-t, --threshold <threshold>', 'Score mínimo (0-1)', '0.65')
+  .option('--hybrid <boolean>', 'Busca híbrida (semantic+keyword)', 'true')
   .action((query, options) => memoryCommand.recall(query, options))
 
 memory
@@ -354,6 +356,29 @@ memory
   .command('status')
   .description('Lista todas as memórias com estatísticas de uso')
   .action(() => memoryCommand.status())
+
+memory
+  .command('index <paths...>')
+  .description('Indexa arquivos no MCP Memory para busca semântica')
+  .option('-t, --tags <tags...>', 'Tags para categorizar o documento')
+  .option('-f, --feature <feature>', 'Feature relacionada')
+  .option('--title <title>', 'Título customizado do documento')
+  .action((paths, options) => memoryCommand.index(paths, options))
+
+memory
+  .command('queue <paths...>')
+  .description(
+    'Adiciona arquivos à fila de indexação com debounce (processa automaticamente em 2s)'
+  )
+  .option('-t, --tags <tags...>', 'Tags para categorizar o documento')
+  .option('-f, --feature <feature>', 'Feature relacionada')
+  .option('--title <title>', 'Título customizado do documento')
+  .action((paths, options) => memoryCommand.queue(paths, options))
+
+memory
+  .command('process-queue')
+  .description('Processa imediatamente a fila de indexação pendente')
+  .action(() => memoryCommand.processQueue())
 
 // Comando: adk spec
 const spec = program

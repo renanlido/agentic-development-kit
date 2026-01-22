@@ -1,9 +1,9 @@
 import type {
-  UnifiedFeatureState,
-  Inconsistency,
   Change,
-  ResolutionResult,
+  Inconsistency,
   ProgressConflictStrategy,
+  ResolutionResult,
+  UnifiedFeatureState,
 } from '../types/progress-sync'
 
 const PHASE_ORDER = [
