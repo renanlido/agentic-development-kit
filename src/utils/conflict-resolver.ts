@@ -127,79 +127,88 @@ export async function mergeParallelResults(
   strategy: MergeStrategy = DEFAULT_MERGE_STRATEGY
 ): Promise<MergeResult> {
   const mergeResults: BranchMergeResult[] = []
+  const originalBranch = await runGit('branch --show-current')
 
-  await runGit(`checkout ${strategy.targetBranch}`)
+  try {
+    await runGit(`checkout ${strategy.targetBranch}`)
 
-  const successfulResults = results.filter((r) => r.success)
+    const successfulResults = results.filter((r) => r.success)
 
-  for (const agentResult of successfulResults) {
-    try {
-      const fileConflicts = conflicts.filter((c) => c.agents.includes(agentResult.agent))
+    for (const agentResult of successfulResults) {
+      try {
+        const fileConflicts = conflicts.filter((c) => c.agents.includes(agentResult.agent))
 
-      const hasManualConflicts = fileConflicts.some((c) => c.type === 'manual-required')
+        const hasManualConflicts = fileConflicts.some((c) => c.type === 'manual-required')
 
-      if (hasManualConflicts && !strategy.autoMerge) {
+        if (hasManualConflicts && !strategy.autoMerge) {
+          mergeResults.push({
+            branch: agentResult.branch,
+            success: false,
+            autoResolved: false,
+            error: 'Manual conflict resolution required',
+          })
+          continue
+        }
+
+        if (strategy.preserveCommits) {
+          await runGit(`merge ${agentResult.branch} --no-ff`)
+        } else {
+          await runGit(`merge ${agentResult.branch} --squash`)
+          await runGit(`commit -m "merge: ${agentResult.agent} for ${feature}"`)
+        }
+
+        mergeResults.push({
+          branch: agentResult.branch,
+          success: true,
+          autoResolved: false,
+        })
+      } catch (error) {
+        const autoResolvable = conflicts.filter(
+          (c) => c.agents.includes(agentResult.agent) && c.type === 'auto-resolvable'
+        )
+
+        if (autoResolvable.length > 0 && strategy.autoMerge) {
+          try {
+            await runGit('add .')
+            await runGit(`commit -m "merge: ${agentResult.agent} (auto-resolved)"`)
+
+            mergeResults.push({
+              branch: agentResult.branch,
+              success: true,
+              autoResolved: true,
+            })
+            continue
+          } catch {
+            // Fall through to abort
+          }
+        }
+
+        await runGit('merge --abort').catch(() => {
+          // Intentionally empty - abort may fail if no merge in progress
+        })
+
         mergeResults.push({
           branch: agentResult.branch,
           success: false,
           autoResolved: false,
-          error: 'Manual conflict resolution required',
+          error: error instanceof Error ? error.message : String(error),
         })
-        continue
       }
-
-      if (strategy.preserveCommits) {
-        await runGit(`merge ${agentResult.branch} --no-ff`)
-      } else {
-        await runGit(`merge ${agentResult.branch} --squash`)
-        await runGit(`commit -m "merge: ${agentResult.agent} for ${feature}"`)
-      }
-
-      mergeResults.push({
-        branch: agentResult.branch,
-        success: true,
-        autoResolved: false,
-      })
-    } catch (error) {
-      const autoResolvable = conflicts.filter(
-        (c) => c.agents.includes(agentResult.agent) && c.type === 'auto-resolvable'
-      )
-
-      if (autoResolvable.length > 0 && strategy.autoMerge) {
-        try {
-          await runGit('add .')
-          await runGit(`commit -m "merge: ${agentResult.agent} (auto-resolved)"`)
-
-          mergeResults.push({
-            branch: agentResult.branch,
-            success: true,
-            autoResolved: true,
-          })
-          continue
-        } catch {
-          // Fall through to abort
-        }
-      }
-
-      await runGit('merge --abort').catch(() => {
-        // Intentionally empty - abort may fail if no merge in progress
-      })
-
-      mergeResults.push({
-        branch: agentResult.branch,
-        success: false,
-        autoResolved: false,
-        error: error instanceof Error ? error.message : String(error),
-      })
     }
-  }
 
-  const finalCommit = await runGit('log -1 --format=%H').catch(() => undefined)
+    const finalCommit = await runGit('log -1 --format=%H').catch(() => undefined)
 
-  return {
-    success: mergeResults.every((r) => r.success),
-    mergeResults,
-    finalCommit,
+    return {
+      success: mergeResults.every((r) => r.success),
+      mergeResults,
+      finalCommit,
+    }
+  } finally {
+    try {
+      await runGit(`checkout ${originalBranch}`)
+    } catch {
+      // Best effort to return to original branch
+    }
   }
 }
 
