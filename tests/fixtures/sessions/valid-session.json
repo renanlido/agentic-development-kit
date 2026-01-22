@@ -4,15 +4,8 @@
   "startedAt": "2026-01-21T14:00:00.000Z",
   "lastActivity": "2026-01-21T16:30:00.000Z",
   "currentStep": "Implementing authentication",
-  "completedSteps": [
-    "Setup project structure",
-    "Create database schema"
-  ],
-  "pendingSteps": [
-    "Implementing authentication",
-    "Add tests",
-    "Deploy to staging"
-  ],
+  "completedSteps": ["Setup project structure", "Create database schema"],
+  "pendingSteps": ["Implementing authentication", "Add tests", "Deploy to staging"],
   "contextSummary": "Working on user authentication feature with JWT tokens",
   "checkpoints": [
     {

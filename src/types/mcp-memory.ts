@@ -109,7 +109,7 @@ export interface MemoryConfig {
 
 export class MemoryConfigSchema {
   static parse(input: MemoryConfigInput): MemoryConfig {
-    const validated = this.safeParse(input)
+    const validated = MemoryConfigSchema.safeParse(input)
     if (!validated.success) {
       throw new Error(`Invalid MemoryConfig: ${validated.errors.join(', ')}`)
     }
@@ -251,7 +251,9 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function isMemoryDocumentMetadata(obj: unknown): obj is MemoryDocumentMetadata {
-  if (!isObject(obj)) return false
+  if (!isObject(obj)) {
+    return false
+  }
 
   return (
     typeof obj.source === 'string' &&
@@ -265,7 +267,9 @@ function isMemoryDocumentMetadata(obj: unknown): obj is MemoryDocumentMetadata {
 }
 
 export function isMemoryDocument(obj: unknown): obj is MemoryDocument {
-  if (!isObject(obj)) return false
+  if (!isObject(obj)) {
+    return false
+  }
 
   return (
     typeof obj.id === 'string' &&
@@ -277,7 +281,9 @@ export function isMemoryDocument(obj: unknown): obj is MemoryDocument {
 }
 
 export function isMemoryResult(obj: unknown): obj is MemoryResult {
-  if (!isObject(obj)) return false
+  if (!isObject(obj)) {
+    return false
+  }
 
   const hasDocuments =
     Array.isArray(obj.documents) &&

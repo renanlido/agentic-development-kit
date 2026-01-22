@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
-import fs from 'fs-extra'
-import path from 'node:path'
 import os from 'node:os'
+import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
+import fs from 'fs-extra'
 import type { LongRunningSession } from '../../src/types/session'
 
 describe('StateManager - Session Methods', () => {
@@ -189,7 +189,10 @@ describe('StateManager - Session Methods', () => {
         status: 'interrupted',
       }
 
-      await fs.writeJSON(path.join(sessionsPath, 'session-20260121-140000.json'), interruptedSession)
+      await fs.writeJSON(
+        path.join(sessionsPath, 'session-20260121-140000.json'),
+        interruptedSession
+      )
 
       const latest = await manager.getLatestSession(featureName)
 

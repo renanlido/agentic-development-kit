@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
-import fs from 'fs-extra'
-import path from 'node:path'
 import os from 'node:os'
+import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
+import fs from 'fs-extra'
 
 describe('Task-Complete Hook', () => {
   let tempDir: string
@@ -283,7 +283,7 @@ describe('Task-Complete Hook', () => {
         const isExecutable = (stats.mode & 0o111) !== 0
 
         expect(isExecutable).toBe(true)
-      } catch (error) {
+      } catch (_error) {
         console.warn('Permissions test not available on this platform')
       }
     })

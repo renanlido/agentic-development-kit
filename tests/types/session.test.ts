@@ -1,11 +1,11 @@
-import { describe, it, expect } from '@jest/globals'
+import { describe, expect, it } from '@jest/globals'
 import type {
-  LongRunningSession,
-  SessionStatus,
-  CheckpointRef,
   CheckpointReason,
-  SessionListItem,
+  CheckpointRef,
   HandoffDocument,
+  LongRunningSession,
+  SessionListItem,
+  SessionStatus,
 } from '../../src/types/session'
 
 describe('Session Types', () => {

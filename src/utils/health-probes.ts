@@ -1,6 +1,6 @@
-import type { PhaseType } from '../types/model.js'
-import type { HealthProbe, HealthStatus, HealthMetrics, HealthProbeConfig } from '../types/cdr.js'
+import type { HealthMetrics, HealthProbe, HealthProbeConfig, HealthStatus } from '../types/cdr.js'
 import { DEFAULT_HEALTH_PROBE_CONFIG } from '../types/cdr.js'
+import type { PhaseType } from '../types/model.js'
 
 interface InternalProbe {
   probe: HealthProbe
@@ -15,7 +15,7 @@ const TOKEN_ESTIMATE_MAX = 100000
 function generateId(): string {
   const timestamp = Date.now()
   const random = Math.random().toString(36).substring(2, 9)
-  return 'hp-' + timestamp + '-' + random
+  return `hp-${timestamp}-${random}`
 }
 
 function determineStatus(metrics: HealthMetrics, config: HealthProbeConfig): HealthStatus {
@@ -65,7 +65,7 @@ export function startHealthProbe(
 
   const intervalId = setInterval(() => {
     const internal = probes.get(probe.id)
-    if (internal && internal.callback) {
+    if (internal?.callback) {
       internal.probe.metrics.lastChecked = new Date().toISOString()
       internal.callback(internal.probe)
     }

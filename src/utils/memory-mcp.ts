@@ -1,12 +1,12 @@
 import Fuse from 'fuse.js'
-import { loadMemoryConfig } from './memory-config'
-import { logger } from './logger'
 import type {
   MemoryConfig,
   MemoryQueryOptions,
   MemoryResult,
   MemoryResultDocument,
 } from '../types/mcp-memory'
+import { logger } from './logger'
+import { loadMemoryConfig } from './memory-config'
 
 export interface IndexResult {
   success: boolean

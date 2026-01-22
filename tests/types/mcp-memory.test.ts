@@ -1,16 +1,16 @@
-import { describe, it, expect } from '@jest/globals'
+import { describe, expect, it } from '@jest/globals'
 import {
+  isMemoryDocument,
+  isMemoryResult,
+  type MemoryConfig,
+  type MemoryConfigInput,
+  MemoryConfigSchema,
   type MemoryDocument,
   type MemoryDocumentMetadata,
   type MemoryQuery,
   type MemoryQueryOptions,
   type MemoryResult,
   type MemoryResultDocument,
-  type MemoryConfig,
-  type MemoryConfigInput,
-  MemoryConfigSchema,
-  isMemoryDocument,
-  isMemoryResult,
 } from '../../src/types/mcp-memory'
 
 describe('MCP Memory Types', () => {

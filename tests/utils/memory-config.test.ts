@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
 import * as path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 const pathExists = jest.fn<(path: string) => Promise<boolean>>()
 const readJson = jest.fn<(path: string) => Promise<unknown>>()
@@ -15,12 +15,12 @@ jest.mock('fs-extra', () => ({
     writeJson(...(args as [string, unknown, { spaces?: number } | undefined])),
 }))
 
+import type { MemoryConfig } from '../../src/types/mcp-memory'
 import {
+  getMemoryConfigPath,
   loadMemoryConfig,
   saveMemoryConfig,
-  getMemoryConfigPath,
 } from '../../src/utils/memory-config'
-import type { MemoryConfig } from '../../src/types/mcp-memory'
 
 const mockedFs = {
   pathExists,

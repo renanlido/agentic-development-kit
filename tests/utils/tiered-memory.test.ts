@@ -13,13 +13,13 @@ jest.mock('chalk', () => ({
   },
 }))
 
+import type { MemoryHierarchy, MemoryTier, TieredMemory } from '../../src/types/context.js'
 import {
-  loadMemoryHierarchy,
-  flattenHierarchy,
   calculateFreshnessScore,
+  flattenHierarchy,
+  loadMemoryHierarchy,
   SessionMemoryCache,
 } from '../../src/utils/tiered-memory.js'
-import type { MemoryTier, TieredMemory, MemoryHierarchy } from '../../src/types/context.js'
 
 describe('Tiered Memory System', () => {
   const testDir = path.join(process.cwd(), '.test-tiered-memory')
@@ -65,8 +65,8 @@ describe('Tiered Memory System', () => {
         const hierarchy = await loadMemoryHierarchy()
 
         expect(hierarchy.project).toBeDefined()
-        expect(hierarchy.project!.tier).toBe('project')
-        expect(hierarchy.project!.content).toContain('Project level context')
+        expect(hierarchy.project?.tier).toBe('project')
+        expect(hierarchy.project?.content).toContain('Project level context')
       })
 
       it('should load feature memory when feature specified', async () => {
@@ -89,11 +89,11 @@ describe('Tiered Memory System', () => {
         const hierarchy = await loadMemoryHierarchy('test-feature')
 
         expect(hierarchy.project).toBeDefined()
-        expect(hierarchy.project!.metadata).toBeDefined()
-        expect(hierarchy.project!.metadata.lineCount).toBeGreaterThan(0)
-        expect(hierarchy.project!.metadata.updatedAt).toBeDefined()
-        expect(hierarchy.project!.metadata.freshnessScore).toBeGreaterThanOrEqual(0)
-        expect(hierarchy.project!.metadata.freshnessScore).toBeLessThanOrEqual(100)
+        expect(hierarchy.project?.metadata).toBeDefined()
+        expect(hierarchy.project?.metadata.lineCount).toBeGreaterThan(0)
+        expect(hierarchy.project?.metadata.updatedAt).toBeDefined()
+        expect(hierarchy.project?.metadata.freshnessScore).toBeGreaterThanOrEqual(0)
+        expect(hierarchy.project?.metadata.freshnessScore).toBeLessThanOrEqual(100)
       })
     })
 

@@ -1,6 +1,6 @@
-import { withRetry, calculateBackoff, isRetryableError } from '../../src/utils/retry'
-import { DEFAULT_RETRY_CONFIG } from '../../src/types/cdr'
 import type { RetryConfig } from '../../src/types/cdr'
+import { DEFAULT_RETRY_CONFIG } from '../../src/types/cdr'
+import { calculateBackoff, isRetryableError, withRetry } from '../../src/utils/retry'
 
 describe('retry utilities', () => {
   beforeEach(() => {

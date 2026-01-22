@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 const mockMemoryMCP = {
   connect: jest.fn<() => Promise<boolean>>(),
@@ -189,8 +189,12 @@ describe('MemoryCommand - index', () => {
     it('should index multiple files successfully', async () => {
       mockFs.pathExists.mockResolvedValue(true)
       mockFs.readFile.mockImplementation(async (path: string) => {
-        if (path === 'file1.md') return 'Content 1'
-        if (path === 'file2.md') return 'Content 2'
+        if (path === 'file1.md') {
+          return 'Content 1'
+        }
+        if (path === 'file2.md') {
+          return 'Content 2'
+        }
         return ''
       })
       mockFs.stat.mockResolvedValue({

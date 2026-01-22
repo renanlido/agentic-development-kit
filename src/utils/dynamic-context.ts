@@ -215,7 +215,9 @@ async function searchDecisions(keywords: string[]): Promise<RetrievedContext[]> 
   const files = await fs.readdir(decisionsPath)
 
   for (const file of files) {
-    if (!file.endsWith('.md')) continue
+    if (!file.endsWith('.md')) {
+      continue
+    }
 
     const filePath = path.join(decisionsPath, file)
     const content = await fs.readFile(filePath, 'utf-8')

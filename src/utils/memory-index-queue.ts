@@ -1,6 +1,6 @@
 import fs from 'fs-extra'
-import { MemoryMCP } from './memory-mcp.js'
 import { logger } from './logger.js'
+import { MemoryMCP } from './memory-mcp.js'
 
 interface QueueItem {
   path: string

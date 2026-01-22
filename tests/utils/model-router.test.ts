@@ -1,11 +1,11 @@
+import fs from 'node:fs'
+import { DEFAULT_MODEL_MAPPING, ModelType } from '../../src/types/model'
 import {
   getModelForPhase,
   getModelRouterConfig,
-  setModelRouterConfig,
   resetModelRouterConfig,
+  setModelRouterConfig,
 } from '../../src/utils/model-router'
-import { ModelType, DEFAULT_MODEL_MAPPING } from '../../src/types/model'
-import fs from 'node:fs'
 
 jest.mock('node:fs')
 const mockFs = fs as jest.Mocked<typeof fs>

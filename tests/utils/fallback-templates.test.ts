@@ -1,13 +1,13 @@
 import path from 'node:path'
 import fs from 'fs-extra'
-import {
-  loadFallbackTemplate,
-  getFallbackTemplates,
-  validateFallbackTemplate,
-  initializeFallbackTemplates,
-  getFallbackTemplatePath,
-} from '../../src/utils/fallback-templates'
 import type { PhaseType } from '../../src/types/model'
+import {
+  getFallbackTemplatePath,
+  getFallbackTemplates,
+  initializeFallbackTemplates,
+  loadFallbackTemplate,
+  validateFallbackTemplate,
+} from '../../src/utils/fallback-templates'
 
 describe('fallback-templates', () => {
   const testDir = path.join(process.cwd(), '.test-fallback')

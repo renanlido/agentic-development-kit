@@ -617,10 +617,7 @@ Test summary
     it('should pass category filter', async () => {
       await memoryCommand.recall('test', { category: 'architecture' })
 
-      expect(mockMemoryMcpRecall).toHaveBeenCalledWith(
-        'test',
-        expect.any(Object)
-      )
+      expect(mockMemoryMcpRecall).toHaveBeenCalledWith('test', expect.any(Object))
     })
 
     it('should pass limit option', async () => {
@@ -895,9 +892,15 @@ Test summary
   describe('status', () => {
     it('should display memory status table', async () => {
       mockFs.pathExists.mockImplementation(async (p: string) => {
-        if (p.includes('project-context.md')) return true
-        if (p.includes('features') && !p.includes('memory.md')) return true
-        if (p.includes('auth/memory.md')) return true
+        if (p.includes('project-context.md')) {
+          return true
+        }
+        if (p.includes('features') && !p.includes('memory.md')) {
+          return true
+        }
+        if (p.includes('auth/memory.md')) {
+          return true
+        }
         return false
       })
       mockFs.readFile.mockResolvedValue('line1\nline2\nline3')
@@ -922,7 +925,9 @@ Test summary
     it('should highlight memories near limit in output', async () => {
       const nearLimitContent = Array(850).fill('line').join('\n')
       mockFs.pathExists.mockImplementation(async (p: string) => {
-        if (p.includes('project-context.md')) return true
+        if (p.includes('project-context.md')) {
+          return true
+        }
         return false
       })
       mockFs.readFile.mockResolvedValue(nearLimitContent)
@@ -937,9 +942,15 @@ Test summary
 
     it('should show all memory levels', async () => {
       mockFs.pathExists.mockImplementation(async (p: string) => {
-        if (p.includes('project-context.md')) return true
-        if (p.includes('features') && !p.includes('/')) return true
-        if (p.includes('auth/memory.md')) return true
+        if (p.includes('project-context.md')) {
+          return true
+        }
+        if (p.includes('features') && !p.includes('/')) {
+          return true
+        }
+        if (p.includes('auth/memory.md')) {
+          return true
+        }
         return false
       })
       mockFs.readFile.mockResolvedValue('content')

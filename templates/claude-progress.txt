@@ -1,0 +1,14 @@
+CURRENT: [current task description] ([progress]% complete)
+
+DONE:
+[completed tasks list]
+
+IN PROGRESS:
+[tasks currently being worked on]
+
+NEXT:
+[numbered list of next tasks]
+
+FILES: [comma-separated list of modified files]
+
+ISSUES: [blocking issues or "None blocking"]

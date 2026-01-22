@@ -57,7 +57,7 @@ export function validateAction(action: string, context: ActionContext): TaskVali
 
   for (const pattern of DANGEROUS_PATTERNS) {
     if (pattern.test(action)) {
-      validation.warnings.push('Dangerous command detected: ' + action)
+      validation.warnings.push(`Dangerous command detected: ${action}`)
     }
   }
 
@@ -83,7 +83,7 @@ export function validateAction(action: string, context: ActionContext): TaskVali
 function extractFilePath(action: string): string | null {
   for (const pattern of FILE_ACTION_PATTERNS) {
     const match = action.match(pattern)
-    if (match && match[1]) {
+    if (match?.[1]) {
       return match[1]
     }
   }

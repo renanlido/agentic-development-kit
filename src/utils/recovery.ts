@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { RecoveryCheckpoint, CheckpointState, RetryConfig, RetryResult } from '../types/cdr'
+import type { CheckpointState, RecoveryCheckpoint, RetryConfig, RetryResult } from '../types/cdr'
 import { DEFAULT_RETRY_CONFIG } from '../types/cdr'
 import type { PhaseType } from '../types/model'
 
@@ -9,7 +9,7 @@ const MAX_CHECKPOINTS = 5
 
 export function calculateBackoff(attempt: number, config: RetryConfig): number {
   const effectiveAttempt = Math.max(0, attempt - 1)
-  const backoff = config.baseBackoffMs * Math.pow(2, effectiveAttempt)
+  const backoff = config.baseBackoffMs * 2 ** effectiveAttempt
   return Math.min(backoff, config.maxBackoffMs)
 }
 
@@ -158,9 +158,7 @@ export function restoreCheckpoint(
         const stats = fs.statSync(filePath)
         checkpointsForPhase.push({ checkpoint, mtime: stats.mtime.getTime() })
       }
-    } catch {
-      continue
-    }
+    } catch {}
   }
 
   if (checkpointsForPhase.length === 0) {
@@ -186,9 +184,7 @@ export function getCheckpoints(feature: string): RecoveryCheckpoint[] {
     try {
       const content = fs.readFileSync(filePath, 'utf-8')
       checkpoints.push(JSON.parse(content) as RecoveryCheckpoint)
-    } catch {
-      continue
-    }
+    } catch {}
   }
 
   return checkpoints

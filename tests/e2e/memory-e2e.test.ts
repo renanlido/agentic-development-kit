@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals'
 import { execSync } from 'node:child_process'
-import fs from 'fs-extra'
-import path from 'node:path'
 import os from 'node:os'
+import path from 'node:path'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from '@jest/globals'
+import fs from 'fs-extra'
 
 describe('Memory E2E', () => {
   let testDir: string

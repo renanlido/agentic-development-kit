@@ -6,16 +6,17 @@ import inquirer from 'inquirer'
 import ora from 'ora'
 import { createClickUpProvider } from '../providers/clickup/index.js'
 import type { LocalFeature, ProviderSpecificConfig } from '../providers/types.js'
+import type { ModelType } from '../types/model'
 import { executeClaudeCommand } from '../utils/claude'
-import { getModelForPhase } from '../utils/model-router'
-import { ModelType } from '../types/model'
 import { getIntegrationConfig, getProviderConfig } from '../utils/config.js'
 import {
   getClaudePath as getClaudePathUtil,
   getFeaturePath as getFeaturePathUtil,
   getMainRepoPath as getMainRepoPathUtil,
 } from '../utils/git-paths'
+import { HistoryTracker } from '../utils/history-tracker'
 import { logger } from '../utils/logger'
+import { getModelForPhase } from '../utils/model-router'
 import {
   type FeatureProgress,
   isStepCompleted,
@@ -23,9 +24,8 @@ import {
   saveProgress,
   updateStepStatus,
 } from '../utils/progress'
-import { SyncEngine } from '../utils/sync-engine'
-import { HistoryTracker } from '../utils/history-tracker'
 import { parseSpecFromMarkdown, validateSpec } from '../utils/spec-utils'
+import { SyncEngine } from '../utils/sync-engine'
 import { loadTemplate } from '../utils/templates'
 import { setupClaudeSymlink } from '../utils/worktree-utils'
 import { memoryCommand } from './memory'
@@ -94,7 +94,7 @@ path: ${featurePath}
       const expectedBranch = `feature/${featureSlug}`
       const cwd = process.cwd()
 
-      if (cwd.includes('.worktrees/' + featureSlug) || cwd.includes('.worktrees\\' + featureSlug)) {
+      if (cwd.includes(`.worktrees/${featureSlug}`) || cwd.includes(`.worktrees\\${featureSlug}`)) {
         return true
       }
 
@@ -1834,7 +1834,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
           execFileSync('git', ['checkout', baseBranch], { cwd: mainRepo, stdio: 'pipe' })
           execFileSync('git', ['merge', featureBranch], { cwd: mainRepo, stdio: 'pipe' })
           spinner.succeed('Merge realizado')
-        } catch (error) {
+        } catch (_error) {
           spinner.warn('Merge manual necessário')
           console.log(
             chalk.yellow(`  Execute: git checkout ${baseBranch} && git merge ${featureBranch}`)

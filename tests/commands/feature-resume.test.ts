@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
-import fs from 'fs-extra'
-import path from 'node:path'
 import os from 'node:os'
+import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
+import fs from 'fs-extra'
 
 describe('Feature Resume Functionality', () => {
   let tempDir: string
@@ -262,7 +262,7 @@ describe('Feature Resume Functionality', () => {
       const { StateManager } = await import('../../src/utils/state-manager')
       const manager = new StateManager()
 
-      const latestWithSession = await manager.createSession(featureName)
+      await manager.createSession(featureName)
       const withSession = await manager.getLatestSession(featureName)
 
       expect(withSession).not.toBeNull()
@@ -278,7 +278,7 @@ describe('Feature Resume Functionality', () => {
       const { StateManager } = await import('../../src/utils/state-manager')
       const manager = new StateManager()
 
-      const sessionId = await manager.createSession(featureName)
+      await manager.createSession(featureName)
 
       const handoffPath = path.join(
         tempDir,

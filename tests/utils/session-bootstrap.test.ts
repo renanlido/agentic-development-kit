@@ -1,6 +1,6 @@
-import * as fs from 'fs-extra'
-import * as path from 'node:path'
 import * as os from 'node:os'
+import * as path from 'node:path'
+import * as fs from 'fs-extra'
 import { loadSessionContext } from '../../src/utils/session-bootstrap'
 
 describe('session-bootstrap', () => {

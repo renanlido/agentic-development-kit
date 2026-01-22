@@ -1,12 +1,12 @@
 import {
-  calculateOverallRiskScore,
-  trackTechnicalDebt,
+  type ConfidenceFactors,
   calculateConfidenceScore,
+  calculateOverallRiskScore,
+  type DebtItem,
   evaluateQualityGate,
   formatQualityReport,
-  type DebtItem,
-  type ConfidenceFactors,
   type QualityGateResult,
+  trackTechnicalDebt,
 } from '../../src/utils/quality-gates'
 
 describe('Quality Gates', () => {

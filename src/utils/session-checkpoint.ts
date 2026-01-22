@@ -1,5 +1,5 @@
-import * as fs from 'fs-extra'
 import * as path from 'node:path'
+import * as fs from 'fs-extra'
 import type { SessionCheckpointResult } from '../types/hooks'
 
 export async function createSessionCheckpoint(
@@ -51,7 +51,7 @@ export async function createSessionCheckpoint(
 
     result.duration = Date.now() - startTime
     return result
-  } catch (error) {
+  } catch (_error) {
     result.duration = Date.now() - startTime
     return result
   }

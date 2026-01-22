@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals'
-import fs from 'fs-extra'
-import path from 'node:path'
 import os from 'node:os'
+import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
+import fs from 'fs-extra'
 
 describe('Handoff Document System', () => {
   let tempDir: string
@@ -177,7 +177,9 @@ describe('Handoff Document System', () => {
         feature: featureName,
         currentPhase: 'implement',
         progress: 50,
-        tasks: [{ name: 'Task 1', status: 'blocked' as const, priority: 0, blockedBy: 'API issue' }],
+        tasks: [
+          { name: 'Task 1', status: 'blocked' as const, priority: 0, blockedBy: 'API issue' },
+        ],
         transitions: [],
         lastUpdated: new Date().toISOString(),
         lastSynced: new Date().toISOString(),

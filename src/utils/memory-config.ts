@@ -1,6 +1,6 @@
-import * as fs from 'fs-extra'
 import * as path from 'node:path'
-import { MemoryConfigSchema, type MemoryConfig, type MemoryConfigInput } from '../types/mcp-memory'
+import * as fs from 'fs-extra'
+import { type MemoryConfig, type MemoryConfigInput, MemoryConfigSchema } from '../types/mcp-memory'
 
 /**
  * Returns the path to the memory configuration file

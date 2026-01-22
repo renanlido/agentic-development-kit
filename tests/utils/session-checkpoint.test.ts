@@ -1,6 +1,6 @@
-import * as fs from 'fs-extra'
-import * as path from 'node:path'
 import * as os from 'node:os'
+import * as path from 'node:path'
+import * as fs from 'fs-extra'
 import { createSessionCheckpoint } from '../../src/utils/session-checkpoint'
 
 describe('session-checkpoint', () => {

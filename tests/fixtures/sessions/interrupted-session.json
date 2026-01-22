@@ -9,10 +9,7 @@
     "Create database schema",
     "Implementing authentication"
   ],
-  "pendingSteps": [
-    "Add tests",
-    "Deploy to staging"
-  ],
+  "pendingSteps": ["Add tests", "Deploy to staging"],
   "contextSummary": "Session interrupted while adding tests. Authentication is complete.",
   "checkpoints": [
     {

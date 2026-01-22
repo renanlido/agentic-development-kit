@@ -1,9 +1,9 @@
 import {
-  consolidateReviews,
+  type ConsolidatedReview,
   calculateRiskFromReviews,
+  consolidateReviews,
   formatReviewReport,
   type ReviewFinding,
-  type ConsolidatedReview,
 } from '../../src/utils/ai-review'
 
 describe('AI-on-AI Review', () => {
