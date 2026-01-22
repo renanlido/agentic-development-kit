@@ -74,6 +74,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/sync-state.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/post-write-index.sh"
           }
         ]
       }
