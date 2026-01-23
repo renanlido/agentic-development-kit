@@ -1,11 +1,14 @@
 import { TokenCounter } from '../../src/utils/token-counter'
-import type { TokenCountResult } from '../../src/types/compaction'
+
+const mockCountTokens = jest.fn()
 
 jest.mock('@anthropic-ai/sdk', () => ({
   __esModule: true,
   default: jest.fn().mockImplementation(() => ({
-    messages: {
-      countTokens: jest.fn(),
+    beta: {
+      messages: {
+        countTokens: mockCountTokens,
+      },
     },
   })),
 }))
@@ -22,6 +25,7 @@ describe('TokenCounter', () => {
   beforeEach(() => {
     tokenCounter = new TokenCounter()
     process.env.ANTHROPIC_API_KEY = 'test-key'
+    mockCountTokens.mockReset()
   })
 
   afterEach(() => {
@@ -41,9 +45,7 @@ describe('TokenCounter', () => {
     })
 
     it('should call API when cache miss', async () => {
-      const Anthropic = jest.requireMock('@anthropic-ai/sdk').default
-      const mockInstance = new Anthropic()
-      mockInstance.messages.countTokens.mockResolvedValue({ input_tokens: 150 })
+      mockCountTokens.mockResolvedValue({ input_tokens: 150 })
 
       const text = 'New text not in cache'
       const result = await tokenCounter.count(text)
@@ -55,9 +57,7 @@ describe('TokenCounter', () => {
     })
 
     it('should fallback to offline when API fails', async () => {
-      const Anthropic = jest.requireMock('@anthropic-ai/sdk').default
-      const mockInstance = new Anthropic()
-      mockInstance.messages.countTokens.mockRejectedValue(new Error('API unavailable'))
+      mockCountTokens.mockRejectedValue(new Error('API unavailable'))
 
       const text = 'Text when API is down'
       const result = await tokenCounter.count(text)
@@ -68,9 +68,7 @@ describe('TokenCounter', () => {
     })
 
     it('should apply adjustment factor in offline mode', async () => {
-      const Anthropic = jest.requireMock('@anthropic-ai/sdk').default
-      const mockInstance = new Anthropic()
-      mockInstance.messages.countTokens.mockRejectedValue(new Error('API down'))
+      mockCountTokens.mockRejectedValue(new Error('API down'))
 
       const tiktoken = jest.requireMock('tiktoken')
       const mockTokens = new Array(100)
@@ -90,7 +88,7 @@ describe('TokenCounter', () => {
       const CACHE_TTL = 100
       const text = 'TTL test text'
 
-      const counter = new TokenCounter()
+      const counter = new TokenCounter({ cacheTTL: CACHE_TTL })
       await counter.count(text)
 
       await new Promise((resolve) => setTimeout(resolve, CACHE_TTL + 50))
@@ -101,7 +99,7 @@ describe('TokenCounter', () => {
 
     it('should evict LRU entries when cache is full', async () => {
       const CACHE_MAX_SIZE = 3
-      const counter = new TokenCounter()
+      const counter = new TokenCounter({ cacheMaxSize: CACHE_MAX_SIZE })
 
       for (let i = 0; i < CACHE_MAX_SIZE + 2; i++) {
         await counter.count(`text-${i}`)
@@ -114,15 +112,13 @@ describe('TokenCounter', () => {
 
   describe('countViaAPI', () => {
     it('should call anthropic.messages.countTokens', async () => {
-      const Anthropic = jest.requireMock('@anthropic-ai/sdk').default
-      const mockInstance = new Anthropic()
-      mockInstance.messages.countTokens.mockResolvedValue({ input_tokens: 200 })
+      mockCountTokens.mockResolvedValue({ input_tokens: 200 })
 
       const counter = new TokenCounter()
       const text = 'API counting test'
       const result = await counter.count(text)
 
-      expect(mockInstance.messages.countTokens).toHaveBeenCalled()
+      expect(mockCountTokens).toHaveBeenCalled()
       expect(result.count).toBe(200)
     })
 
@@ -130,7 +126,7 @@ describe('TokenCounter', () => {
       const Anthropic = jest.requireMock('@anthropic-ai/sdk').default
       const mockInstance = new Anthropic()
       const apiError = new Error('API rate limit')
-      mockInstance.messages.countTokens.mockRejectedValue(apiError)
+      mockInstance.beta.messages.countTokens.mockRejectedValue(apiError)
 
       const counter = new TokenCounter()
       const text = 'API error test'
@@ -142,9 +138,7 @@ describe('TokenCounter', () => {
 
   describe('countOffline', () => {
     it('should return result with precision 0.88', async () => {
-      const Anthropic = jest.requireMock('@anthropic-ai/sdk').default
-      const mockInstance = new Anthropic()
-      mockInstance.messages.countTokens.mockRejectedValue(new Error('No API'))
+      mockCountTokens.mockRejectedValue(new Error('No API'))
 
       const counter = new TokenCounter()
       const text = 'Offline precision test'
@@ -155,9 +149,7 @@ describe('TokenCounter', () => {
     })
 
     it('should apply adjustment factor 0.92', async () => {
-      const Anthropic = jest.requireMock('@anthropic-ai/sdk').default
-      const mockInstance = new Anthropic()
-      mockInstance.messages.countTokens.mockRejectedValue(new Error('No API'))
+      mockCountTokens.mockRejectedValue(new Error('No API'))
 
       const tiktoken = jest.requireMock('tiktoken')
       const mockTokens = new Array(100)
@@ -172,9 +164,7 @@ describe('TokenCounter', () => {
     })
 
     it('should handle empty string', async () => {
-      const Anthropic = jest.requireMock('@anthropic-ai/sdk').default
-      const mockInstance = new Anthropic()
-      mockInstance.messages.countTokens.mockRejectedValue(new Error('No API'))
+      mockCountTokens.mockRejectedValue(new Error('No API'))
 
       const tiktoken = jest.requireMock('tiktoken')
       tiktoken.encoding_for_model.mockReturnValue({
@@ -188,9 +178,7 @@ describe('TokenCounter', () => {
     })
 
     it('should handle unicode text', async () => {
-      const Anthropic = jest.requireMock('@anthropic-ai/sdk').default
-      const mockInstance = new Anthropic()
-      mockInstance.messages.countTokens.mockRejectedValue(new Error('No API'))
+      mockCountTokens.mockRejectedValue(new Error('No API'))
 
       const tiktoken = jest.requireMock('tiktoken')
       const mockTokens = new Array(50)
@@ -249,9 +237,7 @@ describe('TokenCounter', () => {
 
   describe('Performance', () => {
     it('should count via API in less than 500ms', async () => {
-      const Anthropic = jest.requireMock('@anthropic-ai/sdk').default
-      const mockInstance = new Anthropic()
-      mockInstance.messages.countTokens.mockResolvedValue({ input_tokens: 100 })
+      mockCountTokens.mockResolvedValue({ input_tokens: 100 })
 
       const counter = new TokenCounter()
       const start = Date.now()
@@ -262,9 +248,7 @@ describe('TokenCounter', () => {
     })
 
     it('should count offline in less than 50ms', async () => {
-      const Anthropic = jest.requireMock('@anthropic-ai/sdk').default
-      const mockInstance = new Anthropic()
-      mockInstance.messages.countTokens.mockRejectedValue(new Error('No API'))
+      mockCountTokens.mockRejectedValue(new Error('No API'))
 
       const counter = new TokenCounter()
       const start = Date.now()

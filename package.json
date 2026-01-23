@@ -46,6 +46,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
     "dotenv": "^17.2.3",
@@ -54,6 +55,7 @@
     "inquirer": "^13.2.0",
     "ora": "^9.0.0",
     "simple-git": "^3.30.0",
+    "tiktoken": "^1.0.22",
     "zod": "^4.3.5"
   },
   "engines": {
