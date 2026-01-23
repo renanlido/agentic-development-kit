@@ -50,8 +50,8 @@ describe('Compaction Types', () => {
     it('should validate threshold range 0-1', () => {
       const invalidThresholds = [-0.1, 1.1, 2.0]
       for (const threshold of invalidThresholds) {
-        expect(threshold).not.toBeGreaterThanOrEqual(0)
-        expect(threshold).not.toBeLessThanOrEqual(1)
+        const isValid = threshold >= 0 && threshold <= 1
+        expect(isValid).toBe(false)
       }
     })
   })
@@ -67,6 +67,7 @@ describe('Compaction Types', () => {
         timestamp: new Date().toISOString(),
         canRevert: true,
         historyId: 'test-id',
+        items: [],
       }
       expect(result.savedTokens).toBe(result.originalTokens - result.compactedTokens)
       expect(result.canRevert).toBe(true)

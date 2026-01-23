@@ -331,7 +331,11 @@ path: ${featurePath}
       }).trim()
 
       if (currentBranch === branchName) {
-        execFileSync('git', ['checkout', baseBranch], { stdio: 'pipe' })
+        return {
+          success: true,
+          worktreePath: process.cwd(),
+          branch: branchName,
+        }
       }
 
       execFileSync('git', ['worktree', 'add', worktreeDir, branchName], { stdio: 'pipe' })
@@ -734,11 +738,11 @@ ${featureContext}
         await fs.writeFile(constraintsPath, constraintsContent)
       }
 
-      // Create git branch
+      // Create git branch (without checkout - repo stays on current branch)
       try {
-        execFileSync('git', ['checkout', '-b', `feature/${name}`], { stdio: 'ignore' })
+        execFileSync('git', ['branch', `feature/${name}`], { stdio: 'ignore' })
       } catch {
-        // Git not available or already on branch
+        // Git not available or branch already exists
       }
 
       spinner.succeed('Estrutura criada')
@@ -1268,25 +1272,29 @@ IMPORTANTE:
         const mainRepo = this.getMainRepoPath()
         const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
 
-        console.log()
-        console.log(chalk.cyan('📂 Configuração de Worktree'))
-        console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
-        console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
-        console.log(chalk.gray(`   Base: ${baseBranch}`))
-        console.log()
-
-        spinner.start('Criando worktree...')
-
         const result = await this.setupWorktree(name, baseBranch)
 
         if (result.success && result.worktreePath) {
-          spinner.succeed(`Worktree criado: ${result.worktreePath}`)
-          console.log()
-          console.log(chalk.yellow('Execute a implementação no worktree:'))
-          console.log(chalk.white(`  cd ${result.worktreePath}`))
-          console.log(chalk.white(`  adk feature implement ${name}`))
-          console.log()
-          return
+          const isCurrentDir = result.worktreePath === process.cwd()
+          if (isCurrentDir) {
+            console.log()
+            console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
+            console.log()
+          } else {
+            console.log()
+            console.log(chalk.cyan('📂 Configuração de Worktree'))
+            console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
+            console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
+            console.log(chalk.gray(`   Base: ${baseBranch}`))
+            console.log()
+            console.log(chalk.green(`✓ Worktree criado: ${result.worktreePath}`))
+            console.log()
+            console.log(chalk.yellow('Execute a implementação no worktree:'))
+            console.log(chalk.white(`  cd ${result.worktreePath}`))
+            console.log(chalk.white(`  adk feature implement ${name}`))
+            console.log()
+            return
+          }
         } else {
           spinner.fail(`Erro ao criar worktree: ${result.error}`)
           process.exit(1)
@@ -1420,25 +1428,29 @@ Não avance para próxima fase até atual estar completa.
           return
         }
 
-        console.log()
-        console.log(chalk.cyan('📂 Configuração de Worktree'))
-        console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
-        console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
-        console.log(chalk.gray(`   Base: ${baseBranch}`))
-        console.log()
-
-        spinner.start('Criando worktree...')
-
         const result = await this.setupWorktree(name, baseBranch)
 
         if (result.success && result.worktreePath) {
-          spinner.succeed(`Worktree criado: ${result.worktreePath}`)
-          console.log()
-          console.log(chalk.yellow('Execute o QA no worktree:'))
-          console.log(chalk.white(`  cd ${result.worktreePath}`))
-          console.log(chalk.white(`  adk feature qa ${name}`))
-          console.log()
-          return
+          const isCurrentDir = result.worktreePath === process.cwd()
+          if (isCurrentDir) {
+            console.log()
+            console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
+            console.log()
+          } else {
+            console.log()
+            console.log(chalk.cyan('📂 Configuração de Worktree'))
+            console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
+            console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
+            console.log(chalk.gray(`   Base: ${baseBranch}`))
+            console.log()
+            console.log(chalk.green(`✓ Worktree criado: ${result.worktreePath}`))
+            console.log()
+            console.log(chalk.yellow('Execute o QA no worktree:'))
+            console.log(chalk.white(`  cd ${result.worktreePath}`))
+            console.log(chalk.white(`  adk feature qa ${name}`))
+            console.log()
+            return
+          }
         } else {
           spinner.fail(`Erro ao criar worktree: ${result.error}`)
           process.exit(1)
@@ -1618,25 +1630,29 @@ Se encontrar issues CRITICAL ou HIGH, o status deve ser FAIL.
           return
         }
 
-        console.log()
-        console.log(chalk.cyan('📂 Configuração de Worktree'))
-        console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
-        console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
-        console.log(chalk.gray(`   Base: ${baseBranch}`))
-        console.log()
-
-        spinner.start('Criando worktree...')
-
         const result = await this.setupWorktree(name, baseBranch)
 
         if (result.success && result.worktreePath) {
-          spinner.succeed(`Worktree criado: ${result.worktreePath}`)
-          console.log()
-          console.log(chalk.yellow('Execute docs no worktree:'))
-          console.log(chalk.white(`  cd ${result.worktreePath}`))
-          console.log(chalk.white(`  adk feature docs ${name}`))
-          console.log()
-          return
+          const isCurrentDir = result.worktreePath === process.cwd()
+          if (isCurrentDir) {
+            console.log()
+            console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
+            console.log()
+          } else {
+            console.log()
+            console.log(chalk.cyan('📂 Configuração de Worktree'))
+            console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
+            console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
+            console.log(chalk.gray(`   Base: ${baseBranch}`))
+            console.log()
+            console.log(chalk.green(`✓ Worktree criado: ${result.worktreePath}`))
+            console.log()
+            console.log(chalk.yellow('Execute docs no worktree:'))
+            console.log(chalk.white(`  cd ${result.worktreePath}`))
+            console.log(chalk.white(`  adk feature docs ${name}`))
+            console.log()
+            return
+          }
         } else {
           spinner.fail(`Erro ao criar worktree: ${result.error}`)
           process.exit(1)
@@ -1829,17 +1845,13 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
           spinner.warn('PR já existe ou gh CLI não disponível')
         }
       } else {
-        spinner.text = 'Fazendo merge local...'
-        try {
-          execFileSync('git', ['checkout', baseBranch], { cwd: mainRepo, stdio: 'pipe' })
-          execFileSync('git', ['merge', featureBranch], { cwd: mainRepo, stdio: 'pipe' })
-          spinner.succeed('Merge realizado')
-        } catch (_error) {
-          spinner.warn('Merge manual necessário')
-          console.log(
-            chalk.yellow(`  Execute: git checkout ${baseBranch} && git merge ${featureBranch}`)
-          )
-        }
+        spinner.info('Merge local requer ação manual (para não alterar branch do repo principal)')
+        console.log()
+        console.log(chalk.cyan('Para fazer merge, execute no repo principal:'))
+        console.log(chalk.gray(`  cd ${mainRepo}`))
+        console.log(chalk.gray(`  git merge ${featureBranch}`))
+        console.log()
+        console.log(chalk.dim('Ou crie um PR com: adk feature finish --pr'))
       }
 
       if (useWorktree && (await fs.pathExists(worktreeDir))) {
@@ -2447,14 +2459,22 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
             worktreePath = result.worktreePath
             worktreeBranch = result.branch
 
-            console.log(chalk.green(`✓ Worktree criado: ${worktreePath}`))
-            console.log(chalk.gray(`  Branch: ${worktreeBranch}`))
-            console.log(chalk.gray(`  Base: ${baseBranch}`))
-            console.log()
-            console.log(chalk.yellow('As próximas etapas serão executadas no worktree.'))
-            console.log(
-              chalk.yellow('Múltiplos agentes podem trabalhar em paralelo em worktrees diferentes.')
-            )
+            const isCurrentDir = result.worktreePath === process.cwd()
+            if (isCurrentDir) {
+              console.log(chalk.green(`✓ Já está na branch da feature: ${worktreeBranch}`))
+              console.log(chalk.gray(`  Diretório: ${worktreePath}`))
+              console.log()
+              console.log(chalk.yellow('Continuando no diretório atual.'))
+            } else {
+              console.log(chalk.green(`✓ Worktree criado: ${worktreePath}`))
+              console.log(chalk.gray(`  Branch: ${worktreeBranch}`))
+              console.log(chalk.gray(`  Base: ${baseBranch}`))
+              console.log()
+              console.log(chalk.yellow('As próximas etapas serão executadas no worktree.'))
+              console.log(
+                chalk.yellow('Múltiplos agentes podem trabalhar em paralelo em worktrees diferentes.')
+              )
+            }
           } else {
             console.log(chalk.red(`Erro ao criar worktree: ${result.error}`))
             console.log(
@@ -2524,9 +2544,8 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
             console.log(chalk.white(`     git worktree remove ${worktreePath}`))
             console.log(chalk.white(`     git branch -d ${worktreeBranch}`))
           } else {
-            console.log(chalk.gray('  3. Volte ao repo principal e faça merge:'))
+            console.log(chalk.gray('  3. No repo principal, faça merge:'))
             console.log(chalk.white(`     cd ${mainRepoPath}`))
-            console.log(chalk.white(`     git checkout ${baseBranch}`))
             console.log(chalk.white(`     git merge ${worktreeBranch}`))
             console.log()
             console.log(chalk.gray('  4. Limpe o worktree:'))
