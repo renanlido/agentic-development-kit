@@ -19,6 +19,7 @@ interface LimitResult {
 interface PruningConfig {
   maxAge: number
   maxLines: number
+  basePath?: string
 }
 
 export class MemoryPruner {
@@ -28,11 +29,14 @@ export class MemoryPruner {
     this.config = {
       maxAge: config?.maxAge ?? 30 * 24 * 60 * 60 * 1000,
       maxLines: config?.maxLines ?? 500,
+      basePath: config?.basePath ?? process.cwd(),
     }
   }
 
   async pruneFeature(feature: string, dryRun = false): Promise<PruneResult> {
-    const featurePath = path.join(getFeaturePath(feature))
+    const featurePath = this.config.basePath
+      ? path.join(this.config.basePath, '.claude/plans/features', feature)
+      : getFeaturePath(feature)
     const filesIdentified: string[] = []
     const filesArchived: string[] = []
     let totalSaved = 0
@@ -56,15 +60,14 @@ export class MemoryPruner {
         continue
       }
 
-      const age = await this.getContentAge(filePath)
-      const ageInDays = age / (24 * 60 * 60 * 1000)
+      const ageInDays = await this.getContentAge(filePath)
 
       if (ageInDays > 30) {
         filesIdentified.push(filePath)
 
         if (!dryRun) {
           const archivePath = path.join(
-            process.cwd(),
+            this.config.basePath!,
             '.compaction',
             'archived',
             feature
@@ -90,7 +93,7 @@ export class MemoryPruner {
 
   async pruneProjectContext(dryRun = false): Promise<LimitResult> {
     const contextPath = path.join(
-      process.cwd(),
+      this.config.basePath!,
       '.claude',
       'memory',
       'project-context.md'
@@ -124,48 +127,57 @@ export class MemoryPruner {
       }
     }
 
-    const headers: Array<{ index: number; line: string }> = []
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].startsWith('#')) {
-        headers.push({ index: i, line: lines[i] })
-      }
-    }
-
-    const linesToArchive = linesBefore - this.config.maxLines
     const archivePath = path.join(
-      process.cwd(),
+      this.config.basePath!,
       '.compaction',
       'archived',
       'project-context'
     )
 
     await fs.ensureDir(archivePath)
-    const archivedContent = lines.slice(0, linesToArchive).join('\n')
-    const archiveFile = path.join(
-      archivePath,
-      `archive-${Date.now()}.md`
-    )
-    await fs.writeFile(archiveFile, archivedContent)
 
-    const remainingLines = lines.slice(linesToArchive)
+    const remainingLines: string[] = []
+    const archivedLines: string[] = []
+
+    for (let i = 0; i < lines.length; i++) {
+      const isHeader = lines[i].startsWith('#')
+
+      if (isHeader) {
+        remainingLines.push(lines[i])
+      } else {
+        if (remainingLines.length < this.config.maxLines) {
+          remainingLines.push(lines[i])
+        } else {
+          archivedLines.push(lines[i])
+        }
+      }
+    }
+
+    if (archivedLines.length > 0) {
+      const archiveFile = path.join(archivePath, `archive-${Date.now()}.md`)
+      await fs.writeFile(archiveFile, archivedLines.join('\n'))
+    }
+
     await fs.writeFile(contextPath, remainingLines.join('\n'))
 
     return {
       linesBefore,
       linesAfter: remainingLines.length,
-      archivedLines: linesToArchive,
+      archivedLines: archivedLines.length,
     }
   }
 
   private async getContentAge(file: string): Promise<number> {
     const stats = await fs.stat(file)
-    return Date.now() - stats.mtimeMs
+    const ageMs = Date.now() - stats.mtimeMs
+    return ageMs / (24 * 60 * 60 * 1000)
   }
 
   private async archiveContent(file: string, archivePath: string): Promise<void> {
     await fs.ensureDir(archivePath)
 
     const fileName = path.basename(file)
+    const fileNameWithoutExt = path.basename(file, path.extname(file))
     const content = await fs.readFile(file, 'utf-8')
 
     await fs.writeFile(path.join(archivePath, fileName), content)
@@ -177,7 +189,7 @@ export class MemoryPruner {
     }
 
     await fs.writeJson(
-      path.join(archivePath, `${fileName}.meta.json`),
+      path.join(archivePath, `${fileNameWithoutExt}.meta.json`),
       metadata,
       { spaces: 2 }
     )

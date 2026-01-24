@@ -518,27 +518,37 @@ ISSUES: ${issues}
   }
 
   parseHandoffDocument(content: string): HandoffDocument {
-    const sections = {
-      current: '',
-      done: [] as string[],
-      inProgress: [] as string[],
-      next: [] as string[],
-      files: [] as string[],
-      issues: '',
-    }
+    const featureMatch = content.match(/HANDOFF DOCUMENT:\s*(.+)/i) || content.match(/FEATURE:\s*(.+)/i)
+    const feature = featureMatch ? featureMatch[1].trim() : 'unknown'
 
-    const currentMatch = content.match(/CURRENT:\s*(.+)/i)
-    if (currentMatch) {
-      sections.current = currentMatch[1].trim()
-    }
+    const generatedMatch = content.match(/Generated:\s*(.+)/i)
+    const createdAt = generatedMatch ? generatedMatch[1].trim() : new Date().toISOString()
+
+    const sessionMatch = content.match(/Session:\s*(.+)/i)
+    const sessionId = sessionMatch ? sessionMatch[1].trim() : 'unknown'
+
+    const checkpointMatch = content.match(/Checkpoint:\s*(.+)/i)
+    const checkpointId = checkpointMatch ? checkpointMatch[1].trim() : 'unknown'
+
+    const currentMatch = content.match(/(?:CURRENT TASK|CURRENT):\s*(.+)/i)
+    const currentTask = currentMatch ? currentMatch[1].trim() : ''
+
+    const contextMatch = content.match(/CONTEXT FOR CONTINUATION:\s*(.+)/is)
+    const context = contextMatch ? contextMatch[1].trim() : ''
+
+    const done: string[] = []
+    const inProgress: string[] = []
+    const next: string[] = []
+    const files: string[] = []
+    const decisions: string[] = []
 
     const lines = content.split('\n')
-    let currentSection: 'none' | 'done' | 'inProgress' | 'next' = 'none'
+    let currentSection: 'none' | 'done' | 'inProgress' | 'next' | 'files' | 'decisions' = 'none'
 
     for (const line of lines) {
       const trimmed = line.trim()
 
-      if (trimmed.match(/^DONE:/i)) {
+      if (trimmed.match(/^(?:COMPLETED|DONE):/i)) {
         currentSection = 'done'
         continue
       }
@@ -546,11 +556,19 @@ ISSUES: ${issues}
         currentSection = 'inProgress'
         continue
       }
-      if (trimmed.match(/^NEXT:/i)) {
+      if (trimmed.match(/^(?:NEXT STEPS|NEXT):/i)) {
         currentSection = 'next'
         continue
       }
-      if (trimmed.match(/^(FILES|ISSUES):/i)) {
+      if (trimmed.match(/^FILES MODIFIED:/i)) {
+        currentSection = 'files'
+        continue
+      }
+      if (trimmed.match(/^DECISIONS MADE:/i)) {
+        currentSection = 'decisions'
+        continue
+      }
+      if (trimmed.match(/^(BLOCKING ISSUES|CONTEXT FOR CONTINUATION|===):/i) || trimmed.startsWith('===')) {
         currentSection = 'none'
         continue
       }
@@ -560,31 +578,61 @@ ISSUES: ${issues}
       }
 
       if (currentSection === 'done' && trimmed.startsWith('-')) {
-        sections.done.push(trimmed.replace(/^-\s*/, '').trim())
+        done.push(trimmed.replace(/^-\s*/, '').trim())
       } else if (currentSection === 'inProgress' && trimmed.startsWith('-')) {
-        sections.inProgress.push(trimmed.replace(/^-\s*/, '').trim())
-      } else if (currentSection === 'next' && trimmed.match(/^\d+\./)) {
-        sections.next.push(trimmed.replace(/^\d+\.\s*/, '').trim())
+        inProgress.push(trimmed.replace(/^-\s*/, '').trim())
+      } else if (currentSection === 'next' && trimmed.match(/^[\d.]+\s/)) {
+        next.push(trimmed.replace(/^[\d.]+\s*/, '').trim())
+      } else if (currentSection === 'files' && trimmed.startsWith('-')) {
+        files.push(trimmed.replace(/^-\s*/, '').trim())
+      } else if (currentSection === 'decisions' && trimmed.startsWith('-')) {
+        decisions.push(trimmed.replace(/^-\s*/, '').trim())
       }
     }
 
-    const filesMatch = content.match(/FILES:\s*([^\n]+)/i)
-    if (filesMatch) {
-      const filesText = filesMatch[1].trim()
+    const filesInlineMatch = content.match(/FILES:\s*([^\n]+)/i)
+    if (filesInlineMatch) {
+      const filesText = filesInlineMatch[1].trim()
       if (filesText && !filesText.match(/^ISSUES:/i)) {
-        sections.files = filesText
+        const inlineFiles = filesText
           .split(',')
           .map((f) => f.trim())
           .filter((f) => f)
+        files.push(...inlineFiles)
       }
     }
 
-    const issuesMatch = content.match(/ISSUES:\s*(.+)/i)
-    if (issuesMatch) {
-      sections.issues = issuesMatch[1].trim()
+    const issuesMatch = content.match(/(?:BLOCKING )?ISSUES:\s*(.+?)(?=\n\n|##|$)/is)
+    let issuesText = issuesMatch ? issuesMatch[1].trim() : ''
+    const issuesArray: string[] = []
+
+    if (issuesText && !issuesText.match(/none|None blocking/i)) {
+      issuesText.split('\n').forEach(line => {
+        const trimmed = line.trim().replace(/^-\s*/, '')
+        if (trimmed && !trimmed.match(/^##/)) {
+          issuesArray.push(trimmed)
+        }
+      })
     }
 
-    return sections
+    return {
+      feature,
+      createdAt,
+      sessionId,
+      checkpointId,
+      currentTask,
+      completed: done,
+      inProgress,
+      nextSteps: next,
+      filesModified: files,
+      issues: issuesArray,
+      decisions,
+      context,
+      current: currentTask,
+      done,
+      next,
+      files,
+    }
   }
 
   async createContextSummary(feature: string): Promise<string> {

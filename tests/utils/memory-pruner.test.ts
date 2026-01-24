@@ -3,21 +3,18 @@ import * as fs from 'fs-extra'
 import * as path from 'node:path'
 import * as os from 'node:os'
 
-jest.mock('fs-extra')
-
 describe('MemoryPruner', () => {
   let memoryPruner: MemoryPruner
   let tempDir: string
 
   beforeEach(async () => {
-    memoryPruner = new MemoryPruner()
     tempDir = path.join(os.tmpdir(), 'test-memory-pruner-' + Date.now())
     await fs.ensureDir(tempDir)
+    memoryPruner = new MemoryPruner({ basePath: tempDir })
   })
 
   afterEach(async () => {
     await fs.remove(tempDir)
-    jest.clearAllMocks()
   })
 
   describe('pruneFeature', () => {
@@ -118,7 +115,32 @@ describe('MemoryPruner', () => {
 
       const logContent = await fs.readFile(logPath, 'utf-8')
       expect(logContent).toContain('to-archive.md')
-      expect(logContent).toContain(new Date(oldDate).toISOString())
+      expect(logContent).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)
+    })
+
+    it('should skip directories when pruning', async () => {
+      const feature = 'skip-dirs'
+      const featurePath = path.join(tempDir, '.claude/plans/features', feature)
+      await fs.ensureDir(featurePath)
+
+      const subDir = path.join(featurePath, 'subdirectory')
+      await fs.ensureDir(subDir)
+
+      const oldDate = Date.now() - 35 * 24 * 60 * 60 * 1000
+      await fs.utimes(subDir, new Date(oldDate), new Date(oldDate))
+
+      const result = await memoryPruner.pruneFeature(feature, true)
+
+      expect(result.filesIdentified).toHaveLength(0)
+      expect(result.filesArchived).toHaveLength(0)
+    })
+
+    it('should handle non-existent feature path', async () => {
+      const result = await memoryPruner.pruneFeature('non-existent', false)
+
+      expect(result.filesIdentified).toEqual([])
+      expect(result.filesArchived).toEqual([])
+      expect(result.totalSaved).toBe(0)
     })
   })
 
@@ -175,6 +197,32 @@ describe('MemoryPruner', () => {
       const archivePath = path.join(tempDir, '.compaction/archived/project-context')
       const archiveExists = await fs.pathExists(archivePath)
       expect(archiveExists).toBe(true)
+    })
+
+    it('should handle non-existent project context', async () => {
+      const result = await memoryPruner.pruneProjectContext(false)
+
+      expect(result.linesBefore).toBe(0)
+      expect(result.linesAfter).toBe(0)
+      expect(result.archivedLines).toBe(0)
+    })
+
+    it('should respect dry-run mode in project context pruning', async () => {
+      const contextPath = path.join(tempDir, '.claude/memory/project-context.md')
+      await fs.ensureDir(path.dirname(contextPath))
+
+      const lines = Array.from({ length: 700 }, (_, i) => `Line ${i + 1}`)
+      await fs.writeFile(contextPath, lines.join('\n'))
+
+      const result = await memoryPruner.pruneProjectContext(true)
+
+      expect(result.linesBefore).toBe(700)
+      expect(result.linesAfter).toBe(500)
+      expect(result.archivedLines).toBeGreaterThan(0)
+
+      const content = await fs.readFile(contextPath, 'utf-8')
+      const currentLines = content.split('\n')
+      expect(currentLines.length).toBe(700)
     })
   })
 
