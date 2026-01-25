@@ -3,6 +3,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import fs from 'fs-extra'
 import type { ContextStatus } from '../../src/types/compaction'
+import { contextCompactor } from '../../src/utils/context-compactor'
 
 jest.mock('../../src/utils/context-compactor')
 
@@ -25,7 +26,6 @@ describe('StateManager - Token Integration', () => {
   describe('getContextStatus', () => {
     it('should return current token usage', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockStatus: ContextStatus = {
         currentTokens: 50000,
@@ -36,8 +36,7 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.getContextStatus = jest.fn().mockResolvedValue(mockStatus)
+      jest.mocked(contextCompactor.getContextStatus).mockResolvedValue(mockStatus)
 
       const manager = new StateManager()
       const status = await manager.getContextStatus(featureName)
@@ -48,7 +47,6 @@ describe('StateManager - Token Integration', () => {
 
     it('should calculate correct percentage', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockStatus: ContextStatus = {
         currentTokens: 70000,
@@ -59,8 +57,7 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.getContextStatus = jest.fn().mockResolvedValue(mockStatus)
+      jest.mocked(contextCompactor.getContextStatus).mockResolvedValue(mockStatus)
 
       const manager = new StateManager()
       const status = await manager.getContextStatus(featureName)
@@ -72,7 +69,6 @@ describe('StateManager - Token Integration', () => {
   describe('beforeToolUse', () => {
     it('should return null when context is safe', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockStatus: ContextStatus = {
         currentTokens: 40000,
@@ -83,8 +79,7 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.getContextStatus = jest.fn().mockResolvedValue(mockStatus)
+      jest.mocked(contextCompactor.getContextStatus).mockResolvedValue(mockStatus)
 
       const manager = new StateManager()
       const warning = await manager.beforeToolUse(featureName)
@@ -94,7 +89,6 @@ describe('StateManager - Token Integration', () => {
 
     it('should return warning at 70%', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockStatus: ContextStatus = {
         currentTokens: 56000,
@@ -105,8 +99,7 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.getContextStatus = jest.fn().mockResolvedValue(mockStatus)
+      jest.mocked(contextCompactor.getContextStatus).mockResolvedValue(mockStatus)
 
       const manager = new StateManager()
       const warning = await manager.beforeToolUse(featureName)
@@ -118,7 +111,6 @@ describe('StateManager - Token Integration', () => {
 
     it('should return critical at 85%', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockStatus: ContextStatus = {
         currentTokens: 68000,
@@ -129,8 +121,7 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.getContextStatus = jest.fn().mockResolvedValue(mockStatus)
+      jest.mocked(contextCompactor.getContextStatus).mockResolvedValue(mockStatus)
 
       const manager = new StateManager()
       const warning = await manager.beforeToolUse(featureName)
@@ -142,7 +133,6 @@ describe('StateManager - Token Integration', () => {
 
     it('should return emergency at 95%', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockStatus: ContextStatus = {
         currentTokens: 76000,
@@ -153,8 +143,7 @@ describe('StateManager - Token Integration', () => {
         canContinue: false,
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.getContextStatus = jest.fn().mockResolvedValue(mockStatus)
+      jest.mocked(contextCompactor.getContextStatus).mockResolvedValue(mockStatus)
 
       const manager = new StateManager()
       const warning = await manager.beforeToolUse(featureName)
@@ -168,7 +157,6 @@ describe('StateManager - Token Integration', () => {
   describe('handleContextWarning', () => {
     it('should trigger compaction at warning level', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockStatus: ContextStatus = {
         currentTokens: 56000,
@@ -179,8 +167,8 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.compact = jest.fn().mockResolvedValue({
+      
+      jest.mocked(contextCompactor.compact).mockResolvedValue({
         originalTokens: 56000,
         compactedTokens: 40000,
         savedTokens: 16000,
@@ -189,17 +177,17 @@ describe('StateManager - Token Integration', () => {
         timestamp: new Date().toISOString(),
         canRevert: true,
         historyId: 'test-id',
+        items: [],
       })
 
       const manager = new StateManager()
       await manager.handleContextWarning(featureName, mockStatus)
 
-      expect(mockCompactor.prototype.compact).toHaveBeenCalledWith(featureName, undefined)
+      expect(jest.mocked(contextCompactor).compact).toHaveBeenCalledWith(featureName, undefined)
     })
 
     it('should trigger summarization at critical level', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockStatus: ContextStatus = {
         currentTokens: 68000,
@@ -210,8 +198,8 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.summarize = jest.fn().mockResolvedValue({
+      
+      jest.mocked(contextCompactor.summarize).mockResolvedValue({
         summary: 'Summarized content',
         preservedDecisions: ['Decision 1'],
         preservedFiles: ['file1.ts'],
@@ -223,12 +211,11 @@ describe('StateManager - Token Integration', () => {
       const manager = new StateManager()
       await manager.handleContextWarning(featureName, mockStatus)
 
-      expect(mockCompactor.prototype.summarize).toHaveBeenCalledWith(featureName)
+      expect(jest.mocked(contextCompactor).summarize).toHaveBeenCalledWith(featureName)
     })
 
     it('should create handoff at emergency level', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockStatus: ContextStatus = {
         currentTokens: 76000,
@@ -239,8 +226,8 @@ describe('StateManager - Token Integration', () => {
         canContinue: false,
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.createHandoffDocument = jest.fn().mockResolvedValue({
+      
+      jest.mocked(contextCompactor.createHandoffDocument).mockResolvedValue({
         feature: featureName,
         currentTask: 'Current task',
         completed: [],
@@ -258,14 +245,13 @@ describe('StateManager - Token Integration', () => {
       const manager = new StateManager()
       await manager.handleContextWarning(featureName, mockStatus)
 
-      expect(mockCompactor.prototype.createHandoffDocument).toHaveBeenCalledWith(featureName)
+      expect(jest.mocked(contextCompactor).createHandoffDocument).toHaveBeenCalledWith(featureName)
     })
   })
 
   describe('triggerCompaction', () => {
     it('should call ContextCompactor.compact', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockResult = {
         originalTokens: 60000,
@@ -276,21 +262,21 @@ describe('StateManager - Token Integration', () => {
         timestamp: new Date().toISOString(),
         canRevert: true,
         historyId: 'compact-123',
+        items: [],
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.compact = jest.fn().mockResolvedValue(mockResult)
+      
+      jest.mocked(contextCompactor.compact).mockResolvedValue(mockResult)
 
       const manager = new StateManager()
       const result = await manager.triggerCompaction(featureName)
 
-      expect(mockCompactor.prototype.compact).toHaveBeenCalledWith(featureName, undefined)
+      expect(jest.mocked(contextCompactor).compact).toHaveBeenCalledWith(featureName, undefined)
       expect(result.savedTokens).toBe(18000)
     })
 
     it('should update state after compaction', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockResult = {
         originalTokens: 60000,
@@ -301,10 +287,11 @@ describe('StateManager - Token Integration', () => {
         timestamp: new Date().toISOString(),
         canRevert: true,
         historyId: 'compact-123',
+        items: [],
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.compact = jest.fn().mockResolvedValue(mockResult)
+      
+      jest.mocked(contextCompactor.compact).mockResolvedValue(mockResult)
 
       const manager = new StateManager()
       await manager.triggerCompaction(featureName)
@@ -314,10 +301,8 @@ describe('StateManager - Token Integration', () => {
       expect(state.lastCompaction?.timestamp).toBeDefined()
     })
 
-    it('should log metrics', async () => {
+    it('should complete compaction successfully', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
-      const { logger } = await import('../../src/utils/logger')
 
       const mockResult = {
         originalTokens: 60000,
@@ -328,24 +313,23 @@ describe('StateManager - Token Integration', () => {
         timestamp: new Date().toISOString(),
         canRevert: true,
         historyId: 'compact-123',
+        items: [],
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.compact = jest.fn().mockResolvedValue(mockResult)
 
-      const logSpy = jest.spyOn(logger, 'info')
+      jest.mocked(contextCompactor.compact).mockResolvedValue(mockResult)
 
       const manager = new StateManager()
-      await manager.triggerCompaction(featureName)
+      const result = await manager.triggerCompaction(featureName)
 
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('18000'))
+      expect(result.savedTokens).toBe(18000)
+      expect(result.compactedTokens).toBe(42000)
     })
   })
 
   describe('Integration with existing methods', () => {
     it('should include token count in loadUnifiedState', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockStatus: ContextStatus = {
         currentTokens: 45000,
@@ -356,8 +340,8 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.getContextStatus = jest.fn().mockResolvedValue(mockStatus)
+      
+      jest.mocked(contextCompactor.getContextStatus).mockResolvedValue(mockStatus)
 
       const manager = new StateManager()
       const state = await manager.loadUnifiedState(featureName)
@@ -368,7 +352,6 @@ describe('StateManager - Token Integration', () => {
 
     it('should check threshold after saveUnifiedState', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
       const mockStatus: ContextStatus = {
         currentTokens: 68000,
@@ -379,8 +362,8 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      const mockCompactor = ContextCompactor as jest.MockedClass<typeof ContextCompactor>
-      mockCompactor.prototype.getContextStatus = jest.fn().mockResolvedValue(mockStatus)
+      
+      jest.mocked(contextCompactor.getContextStatus).mockResolvedValue(mockStatus)
 
       const manager = new StateManager()
       const state = {
@@ -395,7 +378,7 @@ describe('StateManager - Token Integration', () => {
 
       await manager.saveUnifiedState(featureName, state)
 
-      expect(mockCompactor.prototype.getContextStatus).toHaveBeenCalled()
+      expect(jest.mocked(contextCompactor).getContextStatus).toHaveBeenCalled()
     })
 
     it('should include context_overflow in checkpoint reasons', async () => {

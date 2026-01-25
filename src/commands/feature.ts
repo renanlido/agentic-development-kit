@@ -3519,7 +3519,7 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
     }
   }
 
-  async status(name: string, options: { unified?: boolean } = {}): Promise<void> {
+  async status(name: string, options: { unified?: boolean; tokens?: boolean } = {}): Promise<void> {
     const spinner = ora('Carregando status...').start()
 
     try {
@@ -3566,17 +3566,158 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
           }
         }
 
+        if (options.tokens && state.tokenUsage) {
+          console.log(chalk.cyan('\n🔢 Token Usage:'))
+          console.log(`  Current: ${state.tokenUsage.currentTokens.toLocaleString()} tokens`)
+          console.log(`  Max: ${state.tokenUsage.maxTokens.toLocaleString()} tokens`)
+          console.log(`  Usage: ${state.tokenUsage.usagePercentage.toFixed(1)}%`)
+
+          let levelColor = chalk.green
+          if (state.tokenUsage.level === 'compact') levelColor = chalk.yellow
+          else if (state.tokenUsage.level === 'summarize') levelColor = chalk.yellow
+          else if (state.tokenUsage.level === 'handoff') levelColor = chalk.red
+
+          console.log(`  Level: ${levelColor(state.tokenUsage.level.toUpperCase())}`)
+          console.log(`  Last Checked: ${new Date(state.tokenUsage.lastChecked).toLocaleString('pt-BR')}`)
+
+          if (state.lastCompaction) {
+            console.log(chalk.cyan('\n📦 Last Compaction:'))
+            console.log(`  When: ${new Date(state.lastCompaction.timestamp).toLocaleString('pt-BR')}`)
+            console.log(`  Level: ${state.lastCompaction.level}`)
+            console.log(
+              `  Saved: ${state.lastCompaction.savedTokens.toLocaleString()} tokens (${state.lastCompaction.tokensBefore.toLocaleString()} → ${state.lastCompaction.tokensAfter.toLocaleString()})`
+            )
+          }
+        }
+
         return
       }
 
       const progress = await loadProgress(name)
-      spinner.succeed('Status carregado')
 
-      console.log(chalk.cyan(`\n📊 Feature: ${name}`))
-      console.log(`Fase: ${progress.currentPhase}`)
-      console.log(`Última atualização: ${progress.lastUpdated}`)
+      if (options.tokens) {
+        const { StateManager } = await import('../utils/state-manager')
+        const manager = new StateManager()
+        const status = await manager.getContextStatus(name)
+
+        spinner.succeed('Status carregado')
+
+        console.log(chalk.cyan(`\n📊 Feature: ${name}`))
+        console.log(`Fase: ${progress.currentPhase}`)
+        console.log(`Última atualização: ${progress.lastUpdated}`)
+
+        console.log(chalk.cyan('\n🔢 Token Usage:'))
+        console.log(`  Current: ${status.currentTokens.toLocaleString()} tokens (${status.usagePercentage.toFixed(1)}%)`)
+        console.log(`  Max: ${status.maxTokens.toLocaleString()} tokens`)
+
+        let levelColor = chalk.green
+        if (status.level === 'compact') levelColor = chalk.yellow
+        else if (status.level === 'summarize') levelColor = chalk.yellow
+        else if (status.level === 'handoff') levelColor = chalk.red
+
+        console.log(`  Level: ${levelColor(status.level.toUpperCase())} (${status.recommendation})`)
+        console.log(`  Can Continue: ${status.canContinue ? chalk.green('Yes') : chalk.red('No')}`)
+      } else {
+        spinner.succeed('Status carregado')
+
+        console.log(chalk.cyan(`\n📊 Feature: ${name}`))
+        console.log(`Fase: ${progress.currentPhase}`)
+        console.log(`Última atualização: ${progress.lastUpdated}`)
+      }
     } catch (error) {
       spinner.fail('Falha ao carregar status')
+      logger.error(error instanceof Error ? error.message : String(error))
+      process.exit(1)
+    }
+  }
+
+  async compact(
+    name: string,
+    options: { dryRun?: boolean; level?: string; revert?: string } = {}
+  ): Promise<void> {
+    const spinner = ora('Processando compactação...').start()
+
+    try {
+      const featurePath = this.getFeaturePath(name)
+
+      if (!(await fs.pathExists(featurePath))) {
+        spinner.fail(`Feature "${name}" não encontrada`)
+        logger.error(`Feature "${name}" não encontrada`)
+        process.exit(1)
+      }
+
+      const { StateManager } = await import('../utils/state-manager')
+      const manager = new StateManager()
+
+      if (options.revert) {
+        const { contextCompactor } = await import('../utils/context-compactor')
+        const success = await contextCompactor.revertCompaction(name, options.revert)
+
+        if (success) {
+          spinner.succeed(`Compactação ${options.revert} revertida com sucesso`)
+        } else {
+          spinner.fail('Falha ao reverter compactação (pode ter expirado)')
+          process.exit(1)
+        }
+        return
+      }
+
+      const status = await manager.getContextStatus(name)
+
+      spinner.info(`Token usage atual: ${status.currentTokens.toLocaleString()} (${status.usagePercentage.toFixed(1)}%)`)
+
+      if (options.dryRun) {
+        spinner.info('Modo dry-run: nenhuma mudança será aplicada')
+
+        console.log(chalk.cyan('\n📊 Simulação de Compactação'))
+        console.log(`Feature: ${name}`)
+        console.log(`Current: ${status.currentTokens.toLocaleString()} tokens`)
+        console.log(`Level: ${status.level}`)
+        console.log(`Recommendation: ${status.recommendation}`)
+
+        if (status.level === 'raw') {
+          console.log(chalk.green('\nℹ️  Contexto está OK, compactação não necessária'))
+        } else {
+          console.log(
+            chalk.yellow(
+              '\n⚠️  Compactação recomendada. Execute sem --dry-run para aplicar.'
+            )
+          )
+        }
+
+        spinner.succeed('Simulação completa')
+        return
+      }
+
+      const levelToUse = options.level as 'compact' | 'summarize' | 'handoff' | undefined
+
+      if (levelToUse && !['compact', 'summarize', 'handoff'].includes(levelToUse)) {
+        spinner.fail('Level inválido. Use: compact, summarize ou handoff')
+        process.exit(1)
+      }
+
+      spinner.text = 'Compactando contexto...'
+
+      const result = await manager.triggerCompaction(name, levelToUse)
+
+      spinner.succeed('Compactação completa')
+
+      console.log(chalk.cyan('\n✨ Resultado da Compactação'))
+      console.log(`Original: ${result.originalTokens.toLocaleString()} tokens`)
+      console.log(`Compactado: ${result.compactedTokens.toLocaleString()} tokens`)
+      console.log(chalk.green(`Economizados: ${result.savedTokens.toLocaleString()} tokens`))
+      console.log(`Itens compactados: ${result.itemsCompacted}`)
+      console.log(`Level: ${result.level}`)
+
+      if (result.canRevert) {
+        console.log(
+          chalk.yellow(
+            `\nℹ️  Pode reverter em até 24h com: adk feature compact ${name} --revert ${result.historyId}`
+          )
+        )
+      }
+    } catch (error) {
+      spinner.fail('Falha na compactação')
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }

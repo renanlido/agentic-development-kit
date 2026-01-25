@@ -8,7 +8,14 @@ import type {
   LongRunningSession,
   SessionListItem,
 } from '../types/session'
+import type {
+  CompactionLevelType,
+  CompactionResult,
+  ContextStatus,
+  ContextWarning,
+} from '../types/compaction'
 import { parseTasksFile } from './task-parser'
+import { contextCompactor } from './context-compactor'
 
 /**
  * Manages unified feature state by consolidating data from progress.md and tasks.md.
@@ -74,6 +81,15 @@ export class StateManager {
       state = this.mergeTasksIntoState(state, tasksData)
     }
 
+    const status = await this.getContextStatus(feature)
+    state.tokenUsage = {
+      currentTokens: status.currentTokens,
+      maxTokens: status.maxTokens,
+      usagePercentage: status.usagePercentage,
+      level: status.level,
+      lastChecked: new Date().toISOString(),
+    }
+
     return state
   }
 
@@ -83,9 +99,17 @@ export class StateManager {
 
     await fs.ensureDir(dir)
 
+    const status = await this.getContextStatus(feature)
     const updatedState = {
       ...state,
       lastUpdated: new Date().toISOString(),
+      tokenUsage: {
+        currentTokens: status.currentTokens,
+        maxTokens: status.maxTokens,
+        usagePercentage: status.usagePercentage,
+        level: status.level,
+        lastChecked: new Date().toISOString(),
+      },
     }
 
     const tempPath = path.join(os.tmpdir(), `state-${Date.now()}.json`)
@@ -644,5 +668,95 @@ Progress: ${state.progress}%
 Completed: ${state.tasks.filter((t) => t.status === 'completed').length}/${state.tasks.length} tasks`
 
     return summary
+  }
+
+  async getContextStatus(feature: string): Promise<ContextStatus> {
+    return await contextCompactor.getContextStatus(feature)
+  }
+
+  async beforeToolUse(feature: string): Promise<ContextWarning | null> {
+    const status = await this.getContextStatus(feature)
+
+    if (status.level === 'handoff') {
+      return {
+        severity: 'emergency',
+        message: 'Context limit reached. Creating handoff document.',
+        action: 'handoff',
+      }
+    }
+
+    if (status.level === 'summarize') {
+      return {
+        severity: 'critical',
+        message: `Context at ${status.usagePercentage.toFixed(1)}%. Summarization recommended.`,
+        action: 'summarize',
+      }
+    }
+
+    if (status.level === 'compact') {
+      return {
+        severity: 'warning',
+        message: `Context at ${status.usagePercentage.toFixed(1)}%. Consider compaction.`,
+        action: 'compact',
+      }
+    }
+
+    return null
+  }
+
+  async handleContextWarning(feature: string, status: ContextStatus): Promise<void> {
+    if (status.level === 'handoff') {
+      await contextCompactor.createHandoffDocument(feature)
+    } else if (status.level === 'summarize') {
+      await contextCompactor.summarize(feature)
+    } else if (status.level === 'compact') {
+      await contextCompactor.compact(feature, undefined)
+    }
+  }
+
+  async triggerCompaction(
+    feature: string,
+    level?: CompactionLevelType
+  ): Promise<CompactionResult> {
+    const result = await contextCompactor.compact(feature, level ? { level } : undefined)
+
+    try {
+      const { logger } = await import('./logger')
+      logger.info(
+        `Compacted ${feature}: ${result.originalTokens} → ${result.compactedTokens} tokens (saved ${result.savedTokens})`
+      )
+    } catch {}
+
+    const state = await this.loadUnifiedState(feature)
+    state.lastCompaction = {
+      timestamp: result.timestamp,
+      level: result.level,
+      tokensBefore: result.originalTokens,
+      tokensAfter: result.compactedTokens,
+      savedTokens: result.savedTokens,
+    }
+    await this.saveUnifiedState(feature, state)
+
+    return result
+  }
+
+  async createCheckpoint(
+    _feature: string,
+    options: { reason: CheckpointReason; message?: string; metadata?: Record<string, unknown> }
+  ): Promise<{
+    id: string
+    reason: CheckpointReason
+    message?: string
+    metadata?: Record<string, unknown>
+    createdAt: string
+  }> {
+    const checkpointId = `checkpoint-${Date.now()}`
+    return {
+      id: checkpointId,
+      reason: options.reason,
+      message: options.message,
+      metadata: options.metadata,
+      createdAt: new Date().toISOString(),
+    }
   }
 }

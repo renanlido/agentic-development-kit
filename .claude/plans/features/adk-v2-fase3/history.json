@@ -40,5 +40,17 @@
     "fromPhase": "qa",
     "toPhase": "implementacao",
     "trigger": "manual rollback - implementacao incompleta (Fase 3 pendente)"
+  },
+  {
+    "timestamp": "2026-01-25T00:39:02.261Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-25T00:39:02.266Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
   }
 ]

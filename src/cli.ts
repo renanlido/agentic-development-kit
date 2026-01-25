@@ -14,6 +14,7 @@ import { syncCommand } from './commands/sync.js'
 import { toolCommand } from './commands/tool.js'
 import { updateCommand } from './commands/update.js'
 import { workflowCommand } from './commands/workflow.js'
+import { contextCommand } from './commands/context.js'
 
 const program = new Command()
 
@@ -163,7 +164,16 @@ feature
   .command('status <name>')
   .description('Mostra status da feature')
   .option('--unified', 'Mostra estado consolidado (progress.md + tasks.md)')
+  .option('--tokens', 'Mostra informações de uso de tokens')
   .action((name, options) => featureCommand.status(name, options))
+
+feature
+  .command('compact <name>')
+  .description('Compacta contexto da feature')
+  .option('--dry-run', 'Simula compactação sem aplicar mudanças')
+  .option('--level <level>', 'Força nível de compactação: compact, summarize ou handoff')
+  .option('--revert <historyId>', 'Reverte compactação específica (até 24h)')
+  .action((name, options) => featureCommand.compact(name, options))
 
 feature
   .command('refine <name>')
@@ -379,6 +389,22 @@ memory
   .command('process-queue')
   .description('Processa imediatamente a fila de indexação pendente')
   .action(() => memoryCommand.processQueue())
+
+// Comando: adk context
+const context = program
+  .command('context')
+  .description('Gerencia contexto e tokens das features')
+
+context
+  .command('status [feature]')
+  .description('Mostra status de tokens (todas features ou uma específica)')
+  .action((feature) => contextCommand.status(feature))
+
+context
+  .command('prune <feature>')
+  .description('Arquiva conteúdo antigo da feature')
+  .option('--dry-run', 'Simula limpeza sem aplicar mudanças')
+  .action((feature, options) => contextCommand.prune(feature, options))
 
 // Comando: adk spec
 const spec = program

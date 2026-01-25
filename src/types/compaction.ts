@@ -133,3 +133,27 @@ export const COMPACTION_LEVELS: CompactionLevel[] = [
 ]
 
 export const MAX_TOKENS = 80000
+
+export type ContextWarningSeverity = 'warning' | 'critical' | 'emergency'
+export type ContextWarningAction = 'compact' | 'summarize' | 'handoff'
+
+export interface ContextWarning {
+  severity: ContextWarningSeverity
+  message: string
+  action: ContextWarningAction
+}
+
+export interface SummarizeResult {
+  summary: string
+  preservedDecisions: string[]
+  preservedFiles: string[]
+  informationLoss: boolean
+  tokensBefore: number
+  tokensAfter: number
+}
+
+export interface CompactOptions {
+  dryRun?: boolean
+  level?: CompactionLevelType
+  preservePatterns?: string[]
+}
