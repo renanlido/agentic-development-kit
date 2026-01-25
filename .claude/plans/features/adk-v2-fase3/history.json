@@ -22,5 +22,23 @@
     "fromPhase": "tasks",
     "toPhase": "arquitetura",
     "trigger": "adk feature plan"
+  },
+  {
+    "timestamp": "2026-01-24T23:42:28.516Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-24T23:42:28.525Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  },
+  {
+    "timestamp": "2026-01-25T00:00:00.000Z",
+    "fromPhase": "qa",
+    "toPhase": "implementacao",
+    "trigger": "manual rollback - implementacao incompleta (Fase 3 pendente)"
   }
 ]

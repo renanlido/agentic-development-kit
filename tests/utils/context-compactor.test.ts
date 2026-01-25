@@ -131,8 +131,6 @@ describe('ContextCompactor', () => {
 
   describe('compact', () => {
     it('should create backup before compaction', async () => {
-      mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue('snapshot-123')
-
       const feature = 'backup-test'
       await contextCompactor.compact(feature)
 
@@ -220,6 +218,13 @@ More regular content
       await fs.ensureDir(featurePath)
       await fs.writeFile(path.join(featurePath, 'progress.md'), originalContent)
 
+      const snapshotId = 'backup-' + Date.now()
+      mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue(snapshotId)
+
+      const snapshotPath = path.join(tempDir, '.claude/plans/features/.snapshots', feature, snapshotId)
+      await fs.ensureDir(snapshotPath)
+      await fs.copy(featurePath, snapshotPath)
+
       const compactionResult = await contextCompactor.compact(feature)
       expect(compactionResult.canRevert).toBe(true)
 
@@ -255,6 +260,19 @@ Critical: System failure
   describe('summarize', () => {
     it('should preserve decisions', async () => {
       const feature = 'decisions-test'
+      const featurePath = path.join(tempDir, '.claude/plans/features', feature)
+      await fs.ensureDir(featurePath)
+      const content = `
+## Decision: Use React for frontend
+Rationale: Better ecosystem
+
+Random verbose content that can be removed
+
+## Decision: Deploy to AWS
+Rationale: Cost effective
+`
+      await fs.writeFile(path.join(featurePath, 'progress.md'), content)
+
       const { executeClaudeCommand } = jest.requireMock('../../src/utils/claude')
       executeClaudeCommand.mockResolvedValue('Preserved decisions and key points')
 
@@ -266,6 +284,11 @@ Critical: System failure
 
     it('should preserve file list', async () => {
       const feature = 'files-test'
+      const featurePath = path.join(tempDir, '.claude/plans/features', feature)
+      await fs.ensureDir(featurePath)
+      await fs.writeJson(path.join(featurePath, 'state.json'), {
+        filesModified: ['src/app.ts', 'src/utils.ts', 'tests/app.test.ts'],
+      })
 
       const result = await contextCompactor.summarize(feature)
 
@@ -357,6 +380,13 @@ Critical: System failure
       await fs.ensureDir(featurePath)
       await fs.writeFile(path.join(featurePath, 'progress.md'), originalContent)
 
+      const snapshotId = 'backup-' + Date.now()
+      mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue(snapshotId)
+
+      const snapshotPath = path.join(tempDir, '.claude/plans/features/.snapshots', feature, snapshotId)
+      await fs.ensureDir(snapshotPath)
+      await fs.copy(featurePath, snapshotPath)
+
       const compactionResult = await contextCompactor.compact(feature)
 
       await fs.writeFile(path.join(featurePath, 'progress.md'), 'Modified content')
@@ -387,6 +417,17 @@ Critical: System failure
 
     it('should update history after revert', async () => {
       const feature = 'update-history-test'
+      const featurePath = path.join(tempDir, '.claude/plans/features', feature)
+      await fs.ensureDir(featurePath)
+      await fs.writeFile(path.join(featurePath, 'progress.md'), 'content')
+
+      const snapshotId = 'backup-' + Date.now()
+      mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue(snapshotId)
+
+      const snapshotPath = path.join(tempDir, '.claude/plans/features/.snapshots', feature, snapshotId)
+      await fs.ensureDir(snapshotPath)
+      await fs.copy(featurePath, snapshotPath)
+
       const compactionResult = await contextCompactor.compact(feature)
 
       await contextCompactor.revertCompaction(feature, compactionResult.historyId)
@@ -425,15 +466,31 @@ Critical: System failure
 
   describe('Offline Mode', () => {
     it('should work without API', async () => {
-      mockTokenCounter.count = jest.fn().mockResolvedValue({
-        count: 60000,
-        source: 'offline',
-        precision: 0.88,
-        timestamp: Date.now(),
-        cached: false,
+      const feature = 'offline-test'
+      const featurePath = path.join(tempDir, '.claude/plans/features', feature)
+      await fs.ensureDir(featurePath)
+      const content = `
+Some content here
+Read tool output: Verbose output to remove
+More content
+Glob results: file1, file2, file3
+Final content
+`
+      await fs.writeFile(path.join(featurePath, 'progress.md'), content)
+
+      let callCount = 0
+      mockTokenCounter.count = jest.fn().mockImplementation(async (text: string) => {
+        callCount++
+        const baseCount = text.length * 0.25
+        return {
+          count: Math.floor(baseCount),
+          source: 'offline' as const,
+          precision: 0.88,
+          timestamp: Date.now(),
+          cached: false,
+        }
       })
 
-      const feature = 'offline-test'
       const result = await contextCompactor.compact(feature)
 
       expect(result).toBeDefined()
@@ -453,6 +510,17 @@ Critical: System failure
 
     it('should allow rollback within 24h', async () => {
       const feature = 'rollback-window-test'
+      const featurePath = path.join(tempDir, '.claude/plans/features', feature)
+      await fs.ensureDir(featurePath)
+      await fs.writeFile(path.join(featurePath, 'progress.md'), 'content')
+
+      const snapshotId = 'backup-' + Date.now()
+      mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue(snapshotId)
+
+      const snapshotPath = path.join(tempDir, '.claude/plans/features/.snapshots', feature, snapshotId)
+      await fs.ensureDir(snapshotPath)
+      await fs.copy(featurePath, snapshotPath)
+
       const compactionResult = await contextCompactor.compact(feature)
 
       const canRevert = await contextCompactor.revertCompaction(

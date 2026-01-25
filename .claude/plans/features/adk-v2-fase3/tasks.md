@@ -13,10 +13,10 @@
 - **Prioridade:** P0
 - **Dependencias:** nenhuma
 - **Acceptance Criteria:**
-  - [ ] `@anthropic-ai/sdk` instalado no package.json
-  - [ ] `tiktoken` instalado no package.json
-  - [ ] `npm run build` executa sem erros
-  - [ ] `npm run type-check` passa
+  - [x] `@anthropic-ai/sdk` instalado no package.json
+  - [x] `tiktoken` instalado no package.json
+  - [x] `npm run build` executa sem erros
+  - [x] `npm run type-check` passa
 
 ---
 
@@ -28,15 +28,15 @@
 - **Dependencias:** Task 0.1
 - **Arquivo:** `src/types/compaction.ts`
 - **Acceptance Criteria:**
-  - [ ] Interface `CompactionLevel` com levels: raw, compact, summarize, handoff
-  - [ ] Interface `CompactionResult` com originalTokens, compactedTokens, savedTokens, savedPercentage
-  - [ ] Interface `CompactedItem` com type, originalSize, compactedSize, canRevert
-  - [ ] Interface `TokenCountResult` com count, source, precision, timestamp, cached
-  - [ ] Interface `ContextStatus` com currentTokens, maxTokens, usagePercentage, level, recommendation
-  - [ ] Interface `CompactionConfig` com thresholds, tokenCounter, pruning, compaction sections
+  - [x] Interface `CompactionLevel` com levels: raw, compact, summarize, handoff
+  - [x] Interface `CompactionResult` com originalTokens, compactedTokens, savedTokens, savedPercentage
+  - [x] Interface `CompactedItem` com type, originalSize, compactedSize, canRevert
+  - [x] Interface `TokenCountResult` com count, source, precision, timestamp, cached
+  - [x] Interface `ContextStatus` com currentTokens, maxTokens, usagePercentage, level, recommendation
+  - [x] Interface `CompactionConfig` com thresholds, tokenCounter, pruning, compaction sections
   - [ ] Interface `HandoffDocument` expandida com CURRENT, DONE, IN_PROGRESS, NEXT, FILES, ISSUES
-  - [ ] Exportar DEFAULT_COMPACTION_CONFIG com valores padrao (70%, 85%, 95%)
-  - [ ] `npm run type-check` passa
+  - [x] Exportar DEFAULT_COMPACTION_CONFIG com valores padrao (70%, 85%, 95%)
+  - [x] `npm run type-check` passa
 
 ---
 
@@ -48,11 +48,11 @@
 - **Dependencias:** Task 1.1
 - **Arquivo:** `tests/utils/token-counter.test.ts`
 - **Acceptance Criteria:**
-  - [ ] Test suite `describe('TokenCounter')` criado
-  - [ ] Test: `countViaAPI()` retorna count e source='api' quando API disponivel
-  - [ ] Test: `countViaAPI()` retorna precision=1.0 para chamadas API
-  - [ ] Test: Mock de `@anthropic-ai/sdk` configurado
-  - [ ] Testes falham (RED phase)
+  - [x] Test suite `describe('TokenCounter')` criado
+  - [x] Test: `countViaAPI()` retorna count e source='api' quando API disponivel
+  - [x] Test: `countViaAPI()` retorna precision=1.0 para chamadas API
+  - [x] Test: Mock de `@anthropic-ai/sdk` configurado
+  - [x] Testes falham (RED phase)
 
 ### Task 2.2: Testes do TokenCounter - Cache
 - **Tipo:** Test
@@ -60,11 +60,11 @@
 - **Dependencias:** Task 2.1
 - **Arquivo:** `tests/utils/token-counter.test.ts`
 - **Acceptance Criteria:**
-  - [ ] Test: `getCached()` retorna cache hit quando conteudo ja foi contado
-  - [ ] Test: Cache retorna source='cache' e precision=0.95
-  - [ ] Test: Cache expira apos TTL (1 hora)
-  - [ ] Test: `invalidateCache()` limpa entradas especificas
-  - [ ] Testes falham (RED phase)
+  - [x] Test: `getCached()` retorna cache hit quando conteudo ja foi contado
+  - [x] Test: Cache retorna source='cache' e precision=0.95
+  - [x] Test: Cache expira apos TTL (1 hora)
+  - [x] Test: `invalidateCache()` limpa entradas especificas
+  - [x] Testes falham (RED phase)
 
 ### Task 2.3: Testes do TokenCounter - Fallback Offline
 - **Tipo:** Test
@@ -72,11 +72,11 @@
 - **Dependencias:** Task 2.2
 - **Arquivo:** `tests/utils/token-counter.test.ts`
 - **Acceptance Criteria:**
-  - [ ] Test: `countOffline()` usa tiktoken quando API falha
-  - [ ] Test: Fallback retorna source='offline' e precision=0.88
-  - [ ] Test: Fator de ajuste 0.92 aplicado ao resultado tiktoken
-  - [ ] Test: Fallback funciona mesmo sem conexao de rede
-  - [ ] Testes falham (RED phase)
+  - [x] Test: `countOffline()` usa tiktoken quando API falha
+  - [x] Test: Fallback retorna source='offline' e precision=0.88
+  - [x] Test: Fator de ajuste 0.92 aplicado ao resultado tiktoken
+  - [x] Test: Fallback funciona mesmo sem conexao de rede
+  - [x] Testes falham (RED phase)
 
 ### Task 2.4: Implementar TokenCounter Core
 - **Tipo:** Implementation
@@ -84,12 +84,12 @@
 - **Dependencias:** Task 2.3
 - **Arquivo:** `src/utils/token-counter.ts`
 - **Acceptance Criteria:**
-  - [ ] Classe `TokenCounter` exportada
-  - [ ] Metodo `count(text: string): Promise<TokenCountResult>`
-  - [ ] Metodo privado `countViaAPI()` usando `anthropic.messages.countTokens`
-  - [ ] Metodo privado `countOffline()` usando tiktoken
-  - [ ] Tratamento de erro quando API key ausente
-  - [ ] Todos os testes das Tasks 2.1-2.3 passam (GREEN phase)
+  - [x] Classe `TokenCounter` exportada
+  - [x] Metodo `count(text: string): Promise<TokenCountResult>`
+  - [x] Metodo privado `countViaAPI()` usando `anthropic.messages.countTokens`
+  - [x] Metodo privado `countOffline()` usando tiktoken
+  - [x] Tratamento de erro quando API key ausente
+  - [x] Todos os testes das Tasks 2.1-2.3 passam (GREEN phase)
 
 ### Task 2.5: Implementar TokenCounter Cache
 - **Tipo:** Implementation
@@ -97,12 +97,12 @@
 - **Dependencias:** Task 2.4
 - **Arquivo:** `src/utils/token-counter.ts`
 - **Acceptance Criteria:**
-  - [ ] Cache em memoria usando Map<hash, { count, timestamp }>
-  - [ ] Hash MD5 do conteudo como chave
-  - [ ] TTL configuravel (default 1 hora)
-  - [ ] Metodo `invalidateCache(hash?: string)`
-  - [ ] LRU eviction quando cache > 1000 entries
-  - [ ] Todos os testes de cache passam
+  - [x] Cache em memoria usando Map<hash, { count, timestamp }>
+  - [x] Hash MD5 do conteudo como chave
+  - [x] TTL configuravel (default 1 hora)
+  - [x] Metodo `invalidateCache(hash?: string)`
+  - [x] LRU eviction quando cache > 1000 entries
+  - [x] Todos os testes de cache passam
 
 ### Task 2.6: Testes de integracao TokenCounter
 - **Tipo:** Test
@@ -110,11 +110,11 @@
 - **Dependencias:** Task 2.5
 - **Arquivo:** `tests/utils/token-counter.test.ts`
 - **Acceptance Criteria:**
-  - [ ] Test: Fluxo completo API -> Cache -> API expira -> API novamente
-  - [ ] Test: Fluxo API fail -> Offline fallback
-  - [ ] Test: Performance < 500ms para API, < 50ms para offline
-  - [ ] Test: Precisao reportada corretamente em cada cenario
-  - [ ] Todos os testes passam
+  - [x] Test: Fluxo completo API -> Cache -> API expira -> API novamente
+  - [x] Test: Fluxo API fail -> Offline fallback
+  - [x] Test: Performance < 500ms para API, < 50ms para offline
+  - [x] Test: Precisao reportada corretamente em cada cenario
+  - [x] Todos os testes passam
 
 ---
 
@@ -234,10 +234,10 @@
 - **Dependencias:** Task 3.8
 - **Arquivo:** `templates/handoff-document.txt`
 - **Acceptance Criteria:**
-  - [ ] Template com secoes: CURRENT, DONE, IN_PROGRESS, NEXT, FILES, ISSUES
-  - [ ] Placeholders: [Feature Name], [Session ID], [Checkpoint ID], [Date]
-  - [ ] Formato plain-text otimizado (menos tokens que JSON)
-  - [ ] Instrucoes de uso no template
+  - [x] Template com secoes: CURRENT, DONE, IN_PROGRESS, NEXT, FILES, ISSUES
+  - [x] Placeholders: [Feature Name], [Session ID], [Checkpoint ID], [Date]
+  - [x] Formato plain-text otimizado (menos tokens que JSON)
+  - [x] Instrucoes de uso no template
 
 ---
 
@@ -249,13 +249,13 @@
 - **Dependencias:** Task 1.1
 - **Arquivo:** `tests/utils/memory-pruner.test.ts`
 - **Acceptance Criteria:**
-  - [ ] Test suite `describe('MemoryPruner')` criado
-  - [ ] Test: `getOldContent()` identifica conteudo > 30 dias
-  - [ ] Test: `archive()` move conteudo para `.compaction/archived/`
-  - [ ] Test: `archive()` cria log de arquivamento
-  - [ ] Test: `pruneProjectContext()` limita a 500 linhas
-  - [ ] Test: Threshold de dias configuravel
-  - [ ] Testes falham (RED phase)
+  - [x] Test suite `describe('MemoryPruner')` criado
+  - [x] Test: `getOldContent()` identifica conteudo > 30 dias
+  - [x] Test: `archive()` move conteudo para `.compaction/archived/`
+  - [x] Test: `archive()` cria log de arquivamento
+  - [x] Test: `pruneProjectContext()` limita a 500 linhas
+  - [x] Test: Threshold de dias configuravel
+  - [x] Testes falham (RED phase)
 
 ### Task 4.2: Implementar MemoryPruner
 - **Tipo:** Implementation
@@ -263,12 +263,12 @@
 - **Dependencias:** Task 4.1
 - **Arquivo:** `src/utils/memory-pruner.ts`
 - **Acceptance Criteria:**
-  - [ ] Classe `MemoryPruner` exportada
-  - [ ] Metodo `getOldContent(feature: string, days: number): Promise<string[]>`
-  - [ ] Metodo `archive(feature: string): Promise<void>`
-  - [ ] Metodo `pruneProjectContext(maxLines: number): Promise<void>`
-  - [ ] Log de arquivamento em `.compaction/archive-log.json`
-  - [ ] Todos os testes da Task 4.1 passam
+  - [x] Classe `MemoryPruner` exportada
+  - [x] Metodo `getOldContent(feature: string, days: number): Promise<string[]>`
+  - [x] Metodo `archive(feature: string): Promise<void>`
+  - [x] Metodo `pruneProjectContext(maxLines: number): Promise<void>`
+  - [x] Log de arquivamento em `.compaction/archive-log.json`
+  - [x] Todos os testes da Task 4.1 passam
 
 ---
 

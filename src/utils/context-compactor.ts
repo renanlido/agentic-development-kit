@@ -248,7 +248,9 @@ ${files.map((f) => `- ${f}`).join('\n')}
       checkpointId,
     }
 
-    const handoffPath = path.join(this.getFeaturePath(feature), 'handoff.md')
+    const featurePath = this.getFeaturePath(feature)
+    await fs.ensureDir(featurePath)
+    const handoffPath = path.join(featurePath, 'handoff.md')
     await fs.writeFile(
       handoffPath,
       `========================================
@@ -386,7 +388,7 @@ Use: adk feature continue ${feature} to resume
       itemsCompacted: result.itemsCompacted,
     }
 
-    const snapshotPath = path.join(this.getSnapshotsPath(), feature, snapshotId)
+    const snapshotPath = path.join(this.getSnapshotsPath(), '.snapshots', feature, snapshotId)
     await fs.writeJson(historyPath, { ...entry, revertPath: snapshotPath }, { spaces: 2 })
   }
 
