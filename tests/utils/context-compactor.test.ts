@@ -1,11 +1,6 @@
 import { ContextCompactor } from '../../src/utils/context-compactor'
 import { TokenCounter } from '../../src/utils/token-counter'
 import { SnapshotManager } from '../../src/utils/snapshot-manager'
-import type {
-  ContextStatus,
-  CompactionResult,
-  CompactionLevelType,
-} from '../../src/types/compaction'
 import * as fs from 'fs-extra'
 import * as path from 'node:path'
 import * as os from 'node:os'
@@ -25,15 +20,29 @@ describe('ContextCompactor', () => {
   beforeEach(async () => {
     tempDir = path.join(os.tmpdir(), 'test-compactor-' + Date.now())
     await fs.ensureDir(tempDir)
+    process.env.TEST_FEATURE_PATH = tempDir
 
     mockTokenCounter = new TokenCounter() as jest.Mocked<TokenCounter>
     mockSnapshotManager = new SnapshotManager() as jest.Mocked<SnapshotManager>
 
-    contextCompactor = new ContextCompactor()
+    mockSnapshotManager.createSnapshot = jest
+      .fn()
+      .mockResolvedValue('snapshot-' + Date.now())
+
+    mockTokenCounter.count = jest.fn().mockResolvedValue({
+      count: 1000,
+      source: 'offline',
+      precision: 0.88,
+      timestamp: Date.now(),
+      cached: false,
+    })
+
+    contextCompactor = new ContextCompactor(mockTokenCounter, mockSnapshotManager)
   })
 
   afterEach(async () => {
     await fs.remove(tempDir)
+    delete process.env.TEST_FEATURE_PATH
     jest.clearAllMocks()
   })
 
@@ -122,20 +131,12 @@ describe('ContextCompactor', () => {
 
   describe('compact', () => {
     it('should create backup before compaction', async () => {
-      mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue({
-        id: 'snapshot-123',
-        path: path.join(tempDir, 'snapshots/snapshot-123'),
-      })
+      mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue('snapshot-123')
 
       const feature = 'backup-test'
       await contextCompactor.compact(feature)
 
-      expect(mockSnapshotManager.createSnapshot).toHaveBeenCalledWith(
-        feature,
-        expect.objectContaining({
-          reason: 'pre_compaction',
-        })
-      )
+      expect(mockSnapshotManager.createSnapshot).toHaveBeenCalledWith(feature, 'pre_compaction')
     })
 
     it('should remove tool outputs', async () => {
@@ -253,22 +254,9 @@ Critical: System failure
 
   describe('summarize', () => {
     it('should preserve decisions', async () => {
-      const content = `
-## Decision: Use React for frontend
-Rationale: Better ecosystem
-
-Random verbose content that can be removed
-More verbose content
-Even more verbose content
-
-## Decision: Deploy to AWS
-Rationale: Cost effective
-`
       const feature = 'decisions-test'
       const { executeClaudeCommand } = jest.requireMock('../../src/utils/claude')
-      executeClaudeCommand.mockResolvedValue({
-        summary: 'Preserved decisions and key points',
-      })
+      executeClaudeCommand.mockResolvedValue('Preserved decisions and key points')
 
       const result = await contextCompactor.summarize(feature)
 
@@ -278,9 +266,6 @@ Rationale: Cost effective
 
     it('should preserve file list', async () => {
       const feature = 'files-test'
-      const stateData = {
-        filesModified: ['src/app.ts', 'src/utils.ts', 'tests/app.test.ts'],
-      }
 
       const result = await contextCompactor.summarize(feature)
 
@@ -351,20 +336,15 @@ Rationale: Cost effective
     })
 
     it('should create checkpoint', async () => {
-      mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue({
-        id: 'checkpoint-123',
-        path: path.join(tempDir, 'snapshots/checkpoint-123'),
-      })
+      mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue('checkpoint-123')
 
       const feature = 'checkpoint-test'
+      const featurePath = path.join(tempDir, '.claude/plans/features', feature)
+      await fs.ensureDir(featurePath)
+
       const handoff = await contextCompactor.createHandoffDocument(feature)
 
-      expect(mockSnapshotManager.createSnapshot).toHaveBeenCalledWith(
-        feature,
-        expect.objectContaining({
-          reason: 'context_overflow',
-        })
-      )
+      expect(mockSnapshotManager.createSnapshot).toHaveBeenCalledWith(feature, 'context_overflow')
       expect(handoff.checkpointId).toBe('checkpoint-123')
     })
   })
@@ -463,10 +443,7 @@ Rationale: Cost effective
 
   describe('Backup and Rollback', () => {
     it('should create backup before compaction', async () => {
-      mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue({
-        id: 'backup-123',
-        path: path.join(tempDir, 'backup'),
-      })
+      mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue('backup-123')
 
       const feature = 'backup-verify-test'
       await contextCompactor.compact(feature)
