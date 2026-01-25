@@ -69,6 +69,7 @@ projeto/
 | `validate-bash.sh` | PreToolUse (Bash) | Blocks dangerous commands |
 | `session-bootstrap.sh` | SessionStart | Auto-injects feature context |
 | `session-checkpoint.sh` | Stop | Creates recovery snapshot |
+| `pre-overflow.sh` | PreToolUse | Warns when context >90%, suggests compaction |
 
 Focus managed via `.claude/active-focus.md` and `constraints.md`.
 
@@ -126,6 +127,7 @@ Detailed docs in `.claude/docs/`:
 | MCP Memory System | [memory-mcp.md](.claude/docs/memory-mcp.md) |
 | ADK v2 Hooks | [hooks-v2.md](.claude/docs/hooks-v2.md) |
 | Worktree Symlinks | [worktree.md](.claude/docs/worktree.md) |
+| Context Compaction & Token Management | [context-compaction.md](.claude/docs/context-compaction.md) |
 
 ## Quick Reference
 
@@ -157,3 +159,26 @@ adk feature restore <name> --list    # View snapshots
 adk memory index <file>        # Index content
 adk memory recall "query"      # Semantic search
 ```
+
+### Context Management
+```bash
+adk feature status <name> --tokens        # View token usage and context level
+adk feature compact <name>                # Compact feature context
+adk feature compact <name> --dry-run      # Preview compaction without applying
+adk feature compact <name> --level compact  # Specify compaction level
+adk feature compact <name> --revert <id>  # Revert compaction (within 24h)
+adk context status [feature]              # View all features context status
+adk context prune <feature>               # Archive old content
+adk context prune <feature> --dry-run     # Preview pruning
+```
+
+**Compaction Levels:**
+- `compact`: Compress verbose sections (70-85% usage)
+- `summarize`: Create summary, archive details (85-95% usage)
+- `handoff`: Generate handoff document (95%+ usage)
+
+**When to use:**
+- Monitor token usage regularly with `--tokens` flag
+- Run compaction when context reaches 70%+ usage
+- Use dry-run to preview changes before applying
+- Revert if compaction causes issues (within 24h window)

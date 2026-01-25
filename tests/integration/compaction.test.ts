@@ -2,6 +2,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import fs from 'fs-extra'
+import { ContextCompactor } from '../../src/utils/context-compactor'
+// @ts-ignore - used in test blocks
+import { StateManager } from '../../src/utils/state-manager'
+// @ts-ignore - used in test blocks
+import { MemoryPruner } from '../../src/utils/memory-pruner'
+import { SnapshotManager } from '../../src/utils/snapshot-manager'
 
 describe('Compaction Integration', () => {
   let tempDir: string
@@ -23,9 +29,6 @@ describe('Compaction Integration', () => {
 
   describe('Full compaction flow', () => {
     it('should compact when reaching 70% threshold', async () => {
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
-      const { StateManager } = await import('../../src/utils/state-manager')
-
       const featurePath = path.join(tempDir, '.claude/plans/features', featureName)
       await fs.ensureDir(featurePath)
 
@@ -199,9 +202,6 @@ More regular content
     })
 
     it('should recover from interrupted compaction', async () => {
-      const { ContextCompactor } = await import('../../src/utils/context-compactor')
-      const { SnapshotManager } = await import('../../src/utils/snapshot-manager')
-
       const featurePath = path.join(tempDir, '.claude/plans/features', featureName)
       await fs.ensureDir(featurePath)
 
@@ -209,18 +209,15 @@ More regular content
       await fs.writeFile(path.join(featurePath, 'progress.md'), content)
 
       const snapshotManager = new SnapshotManager()
-      const snapshot = await snapshotManager.createSnapshot(featureName, {
-        reason: 'pre_compaction',
-        metadata: { test: true },
-      })
+      const snapshotId = await snapshotManager.createSnapshot(featureName, 'pre_compaction')
 
-      expect(snapshot.id).toBeDefined()
-      expect(snapshot.path).toBeDefined()
+      expect(snapshotId).toBeDefined()
+      expect(typeof snapshotId).toBe('string')
 
-      const canRestore = await snapshotManager.canRestore(featureName, snapshot.id)
-      expect(canRestore).toBe(true)
+      const snapshots = await snapshotManager.listSnapshots(featureName)
+      expect(snapshots.length).toBeGreaterThan(0)
 
-      await snapshotManager.restoreSnapshot(featureName, snapshot.id)
+      await snapshotManager.restoreSnapshot(featureName, snapshotId)
 
       const restoredContent = await fs.readFile(path.join(featurePath, 'progress.md'), 'utf-8')
       expect(restoredContent).toBe(content)
@@ -359,8 +356,8 @@ More regular content
       const pruner = new MemoryPruner()
 
       const dryRunResult = await pruner.pruneProjectContext(true)
-      expect(dryRunResult.dryRun).toBe(true)
       expect(dryRunResult.linesBefore).toBe(600)
+      expect(dryRunResult.linesAfter).toBe(600)
 
       const actualResult = await pruner.pruneProjectContext(false)
       expect(actualResult.linesAfter).toBeLessThanOrEqual(500)
