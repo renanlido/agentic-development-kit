@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process'
+import { spawnSync, execSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -26,9 +26,7 @@ export async function executeClaudeCommand(
   prompt: string,
   options: ClaudeCommandOptions = {}
 ): Promise<string> {
-  try {
-    execSync('which claude', { stdio: 'pipe' })
-  } catch {
+  if (!isClaudeInstalled()) {
     logger.error('Claude Code is not installed')
     logger.info('Install: https://github.com/anthropics/claude-code')
     process.exit(1)
@@ -40,15 +38,27 @@ export async function executeClaudeCommand(
     fs.writeFileSync(tempFile, prompt)
 
     const validatedModel = validateModel(options.model)
-    const modelFlag = validatedModel ? ` --model ${validatedModel}` : ''
-    const command = `claude --dangerously-skip-permissions${modelFlag} < ${tempFile}`
+    const args = ['--dangerously-skip-permissions']
+    if (validatedModel) {
+      args.push('--model', validatedModel)
+    }
 
-    logger.debug(`Executing: ${command}`)
+    logger.debug(`Executing: claude ${args.join(' ')} < ${tempFile}`)
 
-    execSync(command, {
+    const input = fs.readFileSync(tempFile, 'utf-8')
+    const result = spawnSync('claude', args, {
+      input,
       encoding: 'utf-8',
-      stdio: 'inherit',
+      stdio: ['pipe', 'inherit', 'inherit'],
     })
+
+    if (result.error) {
+      throw new Error(`Failed to start Claude: ${result.error.message}`)
+    }
+
+    if (result.status !== 0) {
+      throw new Error(`Claude exited with code ${result.status}`)
+    }
 
     return ''
   } catch (error) {
@@ -58,7 +68,6 @@ export async function executeClaudeCommand(
     try {
       fs.unlinkSync(tempFile)
     } catch {
-      // Ignore error if temp file doesn't exist
     }
   }
 }

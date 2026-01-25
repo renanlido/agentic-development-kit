@@ -2,6 +2,14 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
+function validateFeatureName(featureName: string): void {
+  if (!/^[a-zA-Z0-9_-]+$/.test(featureName)) {
+    throw new Error(
+      `Invalid feature name: "${featureName}". Use only alphanumeric characters, dashes, and underscores.`
+    )
+  }
+}
+
 function findGitRoot(startDir: string): string | null {
   let currentDir = startDir
 
@@ -42,7 +50,8 @@ export function getMainRepoPath(): string {
       return process.cwd()
     }
 
-    return path.dirname(gitCommonDir)
+    const absoluteGitDir = path.resolve(process.cwd(), gitCommonDir)
+    return path.dirname(absoluteGitDir)
   } catch {
     const gitRoot = findGitRoot(process.cwd())
     if (gitRoot) {
@@ -80,15 +89,39 @@ export function getFeaturesBasePath(): string {
 }
 
 export function getFeaturePath(featureName: string, ...segments: string[]): string {
+  validateFeatureName(featureName)
+
+  const mainBasePath = getFeaturesBasePath()
+  let resolvedPath: string
+  let usedWorktreeLocal = false
+
   if (isInWorktree()) {
     const worktreeBase = process.cwd()
     const localPath = path.join(worktreeBase, '.claude/plans/features', featureName, ...segments)
     if (fs.existsSync(localPath)) {
-      return localPath
+      resolvedPath = path.resolve(localPath)
+      usedWorktreeLocal = true
+    } else {
+      resolvedPath = path.resolve(path.join(mainBasePath, featureName, ...segments))
     }
+  } else {
+    resolvedPath = path.resolve(path.join(mainBasePath, featureName, ...segments))
   }
 
-  return path.join(getFeaturesBasePath(), featureName, ...segments)
+  const mainBaseResolved = path.resolve(mainBasePath)
+  let isValidPath = resolvedPath.startsWith(mainBaseResolved)
+
+  if (!isValidPath && usedWorktreeLocal) {
+    const worktreeBasePath = path.join(process.cwd(), '.claude/plans/features')
+    const worktreeBaseResolved = path.resolve(worktreeBasePath)
+    isValidPath = resolvedPath.startsWith(worktreeBaseResolved)
+  }
+
+  if (!isValidPath) {
+    throw new Error(`Path traversal detected: "${featureName}" resolves outside feature directory`)
+  }
+
+  return resolvedPath
 }
 
 export function getAgentsPath(): string {

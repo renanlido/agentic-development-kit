@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { encoding_for_model } from 'tiktoken'
+import { encoding_for_model, type Tiktoken } from 'tiktoken'
 import { createHash } from 'node:crypto'
 import type { TokenCountResult } from '../types/compaction.js'
 
@@ -7,6 +7,20 @@ interface CacheEntry {
   count: number
   timestamp: number
   hash: string
+  lastAccessed: number
+}
+
+let sharedEncoder: Tiktoken | null = null
+
+function getEncoder(): Tiktoken {
+  if (!sharedEncoder) {
+    sharedEncoder = encoding_for_model('gpt-4')
+  }
+  return sharedEncoder
+}
+
+export function resetEncoder(): void {
+  sharedEncoder = null
 }
 
 export class TokenCounter {
@@ -87,7 +101,7 @@ export class TokenCounter {
   }
 
   private countOffline(text: string): TokenCountResult {
-    const encoder = encoding_for_model('gpt-4')
+    const encoder = getEncoder()
     const tokens = encoder.encode(text)
     const rawCount = tokens.length
     const adjustedCount = Math.round(rawCount * this.ADJUSTMENT_FACTOR)
@@ -118,14 +132,24 @@ export class TokenCounter {
       return undefined
     }
 
+    entry.lastAccessed = Date.now()
     return entry
   }
 
   private setCache(hash: string, count: number): void {
     if (this.cache.size >= this.CACHE_MAX_SIZE) {
-      const firstKey = this.cache.keys().next().value
-      if (firstKey) {
-        this.cache.delete(firstKey)
+      let lruKey: string | null = null
+      let lruTime = Number.MAX_SAFE_INTEGER
+
+      for (const [key, entry] of this.cache.entries()) {
+        if (entry.lastAccessed < lruTime) {
+          lruTime = entry.lastAccessed
+          lruKey = key
+        }
+      }
+
+      if (lruKey) {
+        this.cache.delete(lruKey)
       }
     }
 
@@ -133,6 +157,7 @@ export class TokenCounter {
       count,
       timestamp: Date.now(),
       hash,
+      lastAccessed: Date.now(),
     })
   }
 

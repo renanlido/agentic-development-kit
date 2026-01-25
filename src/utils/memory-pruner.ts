@@ -66,19 +66,26 @@ export class MemoryPruner {
         filesIdentified.push(filePath)
 
         if (!dryRun) {
-          const archivePath = path.join(
-            this.config.basePath!,
-            '.compaction',
-            'archived',
-            feature
-          )
-          await this.archiveContent(filePath, archivePath)
-          filesArchived.push(filePath)
+          try {
+            const archivePath = path.join(
+              this.config.basePath!,
+              '.compaction',
+              'archived',
+              feature
+            )
+            await this.archiveContent(filePath, archivePath)
 
-          const fileSize = (await fs.stat(filePath)).size
-          totalSaved += fileSize
+            const fileSize = (await fs.stat(filePath)).size
+            totalSaved += fileSize
 
-          await fs.remove(filePath)
+            await fs.remove(filePath)
+            filesArchived.push(filePath)
+          } catch (error) {
+            console.warn(
+              `Failed to prune ${filePath}:`,
+              error instanceof Error ? error.message : String(error)
+            )
+          }
         }
       }
     }

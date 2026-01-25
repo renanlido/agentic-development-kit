@@ -14,6 +14,14 @@ import * as fs from 'fs-extra'
 import * as path from 'node:path'
 import crypto from 'node:crypto'
 
+function validateFeatureName(featureName: string): void {
+  if (!/^[a-zA-Z0-9_-]+$/.test(featureName)) {
+    throw new Error(
+      `Invalid feature name: "${featureName}". Use only alphanumeric characters, dashes, and underscores.`
+    )
+  }
+}
+
 interface CompactOptions {
   dryRun?: boolean
   level?: CompactionLevelType
@@ -150,7 +158,7 @@ export class ContextCompactor {
 
       compacted = await this.preserveCriticalContent(compacted)
 
-      await fs.writeFile(file, compacted)
+      await this.atomicWriteFile(file, compacted)
       const compactedSize = (await this.tokenCounter.count(compacted)).count
       compactedTokens += compactedSize
 
@@ -337,7 +345,8 @@ Use: adk feature continue ${feature} to resume
   ): Promise<{ content: string; items: CompactedItem[] }> {
     const items: CompactedItem[] = []
     const lines = content.split('\n')
-    const seen = new Map<string, number>()
+    const lineTokenCounts = new Map<string, number>()
+    const seen = new Map<string, { count: number; tokenCount: number }>()
     const result: string[] = []
 
     for (const line of lines) {
@@ -348,19 +357,23 @@ Use: adk feature continue ${feature} to resume
       }
 
       const hash = crypto.createHash('md5').update(trimmed).digest('hex')
-      const count = seen.get(hash) || 0
+      const existing = seen.get(hash)
 
-      if (count > 0 && trimmed.length > 10) {
-        const originalSize = (await this.tokenCounter.count(line)).count
-        items.push({
-          type: 'duplicate',
-          originalSize,
-          compactedSize: 0,
-          canRevert: true,
-        })
-      } else {
+      if (!existing) {
+        const tokenCount = (await this.tokenCounter.count(line)).count
+        lineTokenCounts.set(hash, tokenCount)
+        seen.set(hash, { count: 1, tokenCount })
         result.push(line)
-        seen.set(hash, count + 1)
+      } else {
+        existing.count++
+        if (trimmed.length > 10) {
+          items.push({
+            type: 'duplicate',
+            originalSize: existing.tokenCount,
+            compactedSize: 0,
+            canRevert: true,
+          })
+        }
       }
     }
 
@@ -444,8 +457,18 @@ Use: adk feature continue ${feature} to resume
   }
 
   private getFeaturePath(feature: string): string {
+    validateFeatureName(feature)
     const basePath = process.env.TEST_FEATURE_PATH || process.cwd()
-    return path.join(basePath, '.claude/plans/features', feature)
+    const featurePath = path.join(basePath, '.claude/plans/features', feature)
+
+    const resolvedPath = path.resolve(featurePath)
+    const expectedBase = path.resolve(path.join(basePath, '.claude/plans/features'))
+
+    if (!resolvedPath.startsWith(expectedBase)) {
+      throw new Error(`Path traversal detected: "${feature}" resolves outside feature directory`)
+    }
+
+    return resolvedPath
   }
 
   private getCompactionPath(): string {
@@ -456,6 +479,22 @@ Use: adk feature continue ${feature} to resume
   private getSnapshotsPath(): string {
     const basePath = process.env.TEST_FEATURE_PATH || process.cwd()
     return path.join(basePath, '.claude/plans/features')
+  }
+
+  private async atomicWriteFile(filePath: string, content: string): Promise<void> {
+    const tempFile = `${filePath}.tmp.${Date.now()}.${process.pid}`
+
+    try {
+      await fs.writeFile(tempFile, content, { flag: 'wx' })
+      await fs.rename(tempFile, filePath)
+    } catch (error) {
+      try {
+        await fs.remove(tempFile)
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw error
+    }
   }
 
   private generateHistoryId(): string {

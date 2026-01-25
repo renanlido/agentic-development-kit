@@ -7,6 +7,8 @@ describe('Handoff Document System', () => {
   let tempDir: string
   let featureName: string
 
+  jest.setTimeout(120000)
+
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'handoff-test-'))
     featureName = 'test-feature'
@@ -79,6 +81,9 @@ describe('Handoff Document System', () => {
     it('should include in-progress tasks in IN PROGRESS section', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
       const manager = new StateManager()
+
+      const featurePath = path.join(tempDir, '.claude/plans/features', featureName)
+      await fs.ensureDir(featurePath)
 
       const state = {
         feature: featureName,

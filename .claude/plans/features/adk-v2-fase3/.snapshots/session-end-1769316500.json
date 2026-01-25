@@ -1,0 +1,12 @@
+{
+  "id": "session-end-1769316500",
+  "feature": "adk-v2-fase3",
+  "reason": "session_end",
+  "timestamp": "2026-01-25T04:48:20Z",
+  "tasks": {
+    "completed": 61,
+    "total": 182,
+    "percentage": 33,
+    "canAdvanceToQA": false
+  }
+}
