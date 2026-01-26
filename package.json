@@ -10,6 +10,8 @@
     "build": "tsc",
     "dev": "tsx watch src/cli.ts",
     "start": "node dist/cli.js",
+    "adk3": "node dist/cli-v3.js",
+    "adk3:dev": "npx tsx src/cli-v3.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
