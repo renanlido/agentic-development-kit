@@ -284,24 +284,53 @@ export async function fixWorktreeSymlinks(
   mainRepoPath: string,
   config: WorktreeConfig = DEFAULT_WORKTREE_CONFIG
 ): Promise<{ fixed: number; errors: string[] }> {
-  const worktrees = await listWorktrees()
   let fixed = 0
   const errors: string[] = []
+  const processedPaths = new Set<string>()
 
-  for (const wt of worktrees) {
+  const gitWorktrees = await listWorktrees()
+  for (const wt of gitWorktrees) {
     if (wt.isMain) {
       continue
     }
 
-    if (!wt.path.includes(config.baseDir)) {
-      continue
-    }
+    processedPaths.add(wt.path)
 
     try {
       await setupClaudeSymlink(wt.path, mainRepoPath)
       fixed++
     } catch (error) {
       errors.push(`${wt.path}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  const worktreesDir = path.join(mainRepoPath, config.baseDir)
+  if (await fs.pathExists(worktreesDir)) {
+    const entries = await fs.readdir(worktreesDir)
+
+    for (const entry of entries) {
+      const entryPath = path.join(worktreesDir, entry)
+      const stats = await fs.stat(entryPath)
+
+      if (!stats.isDirectory()) {
+        continue
+      }
+
+      if (processedPaths.has(entryPath)) {
+        continue
+      }
+
+      const claudePath = path.join(entryPath, '.claude')
+      if (!(await fs.pathExists(claudePath))) {
+        continue
+      }
+
+      try {
+        await setupClaudeSymlink(entryPath, mainRepoPath)
+        fixed++
+      } catch (error) {
+        errors.push(`${entryPath}: ${error instanceof Error ? error.message : String(error)}`)
+      }
     }
   }
 
