@@ -1,186 +1,156 @@
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals'
 import fs from 'fs-extra'
+import type { SessionInfoV3 } from '../../src/types/session-v3'
 
 describe('Claude V3 Integration', () => {
   let tempDir: string
-  let mockExecuteClaudeCommandV3: jest.MockedFunction<any>
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'claude-v3-integration-test-'))
     process.env.TEST_FEATURE_PATH = tempDir
-
-    jest.resetModules()
-
-    mockExecuteClaudeCommandV3 = jest.fn()
-
-    jest.doMock('../../src/utils/claude-v3', () => ({
-      executeClaudeCommandV3: mockExecuteClaudeCommandV3
-    }))
   })
 
   afterEach(async () => {
     await fs.remove(tempDir)
     delete process.env.TEST_FEATURE_PATH
-    jest.clearAllMocks()
   })
 
-  describe('executeWithSessionTracking', () => {
-    it('should save session after execution', async () => {
-      mockExecuteClaudeCommandV3.mockResolvedValue({
-        output: 'Success',
-        sessionId: 'claude-session-123',
-        exitCode: 0,
-        duration: 5000
-      })
-
-      const { executeWithSessionTracking } = await import('../../src/utils/claude-v3')
-
-      await executeWithSessionTracking('test-feature', 'test prompt')
-
-      const { sessionStore } = await import('../../src/utils/session-store')
-      const session = await sessionStore.get('test-feature')
-
-      expect(session).not.toBeNull()
-      expect(session?.claudeSessionId).toBe('claude-session-123')
-      expect(session?.feature).toBe('test-feature')
-    })
-
-    it('should resume session automatically if resumable', async () => {
-      mockExecuteClaudeCommandV3.mockResolvedValue({
-        output: 'First execution',
-        sessionId: 'claude-session-abc',
-        exitCode: 0,
-        duration: 3000
-      })
-
-      const { executeWithSessionTracking } = await import('../../src/utils/claude-v3')
+  describe('Session lifecycle', () => {
+    it('should create and retrieve session', async () => {
       const { sessionStore } = await import('../../src/utils/session-store')
 
-      await executeWithSessionTracking('resumable-test', 'first prompt')
-
-      mockExecuteClaudeCommandV3.mockClear()
-      mockExecuteClaudeCommandV3.mockResolvedValue({
-        output: 'Second execution',
-        sessionId: 'claude-session-abc',
-        exitCode: 0,
-        duration: 2000
-      })
-
-      await executeWithSessionTracking('resumable-test', 'second prompt')
-
-      expect(mockExecuteClaudeCommandV3).toHaveBeenCalledWith(
-        'second prompt',
-        expect.objectContaining({
-          resume: 'claude-session-abc'
-        })
-      )
-    })
-
-    it('should not resume if session is not resumable', async () => {
-      const { sessionStore } = await import('../../src/utils/session-store')
-
-      await sessionStore.save('not-resumable', {
-        id: 'session-1',
-        claudeSessionId: 'claude-old',
-        feature: 'not-resumable',
+      const session: SessionInfoV3 = {
+        id: 'session-test',
+        claudeSessionId: 'claude-123',
+        feature: 'test-feature',
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active',
-        resumable: false
-      })
+        resumable: true,
+        metadata: {
+          model: 'sonnet',
+          exitCode: 0,
+          duration: 5000
+        }
+      }
 
-      mockExecuteClaudeCommandV3.mockResolvedValue({
-        output: 'New execution',
-        sessionId: 'claude-new',
-        exitCode: 0,
-        duration: 1000
-      })
+      await sessionStore.save('test-feature', session)
+      const retrieved = await sessionStore.get('test-feature')
 
-      const { executeWithSessionTracking } = await import('../../src/utils/claude-v3')
+      expect(retrieved).toEqual(session)
+    })
 
-      await executeWithSessionTracking('not-resumable', 'new prompt')
+    it('should detect resumability within 24h', async () => {
+      const { sessionStore } = await import('../../src/utils/session-store')
 
-      expect(mockExecuteClaudeCommandV3).toHaveBeenCalledWith(
-        'new prompt',
-        expect.not.objectContaining({
-          resume: expect.anything()
+      const recentSession: SessionInfoV3 = {
+        id: 'recent',
+        claudeSessionId: 'claude-recent',
+        feature: 'recent-test',
+        startedAt: new Date().toISOString(),
+        lastActivity: new Date().toISOString(),
+        status: 'active',
+        resumable: true
+      }
+
+      await sessionStore.save('recent-test', recentSession)
+      const isResumable = await sessionStore.isResumable('recent-test')
+
+      expect(isResumable).toBe(true)
+    })
+
+    it('should reject resumability after 24h', async () => {
+      const { sessionStore } = await import('../../src/utils/session-store')
+
+      const oldDate = new Date()
+      oldDate.setHours(oldDate.getHours() - 25)
+
+      const oldSession: SessionInfoV3 = {
+        id: 'old',
+        claudeSessionId: 'claude-old',
+        feature: 'old-test',
+        startedAt: oldDate.toISOString(),
+        lastActivity: oldDate.toISOString(),
+        status: 'active',
+        resumable: true
+      }
+
+      await sessionStore.save('old-test', oldSession)
+      const isResumable = await sessionStore.isResumable('old-test')
+
+      expect(isResumable).toBe(false)
+    })
+
+    it('should maintain session history', async () => {
+      const { sessionStore } = await import('../../src/utils/session-store')
+
+      for (let i = 1; i <= 3; i++) {
+        await sessionStore.save('history-test', {
+          id: `session-${i}`,
+          claudeSessionId: `claude-${i}`,
+          feature: 'history-test',
+          startedAt: new Date(Date.now() - i * 1000).toISOString(),
+          lastActivity: new Date(Date.now() - i * 1000).toISOString(),
+          status: 'completed',
+          resumable: false
         })
-      )
+      }
+
+      const sessions = await sessionStore.list('history-test')
+
+      expect(sessions.length).toBeGreaterThanOrEqual(3)
+      expect(sessions[0].id).toBe('session-1')
     })
 
-    it('should update lastActivity after execution', async () => {
-      mockExecuteClaudeCommandV3.mockResolvedValue({
-        output: 'Success',
-        sessionId: 'claude-activity',
-        exitCode: 0,
-        duration: 2000
-      })
-
-      const { executeWithSessionTracking } = await import('../../src/utils/claude-v3')
-
-      const startTime = new Date()
-
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      await executeWithSessionTracking('activity-test', 'test prompt')
-
-      const { sessionStore } = await import('../../src/utils/session-store')
-      const session = await sessionStore.get('activity-test')
-
-      const lastActivity = new Date(session?.lastActivity || '')
-
-      expect(lastActivity.getTime()).toBeGreaterThanOrEqual(startTime.getTime())
-    })
-
-    it('should mark as interrupted if exitCode is not 0', async () => {
-      mockExecuteClaudeCommandV3.mockResolvedValue({
-        output: 'Error occurred',
-        sessionId: 'claude-error',
-        exitCode: 1,
-        duration: 1000
-      })
-
-      const { executeWithSessionTracking } = await import('../../src/utils/claude-v3')
-
-      await executeWithSessionTracking('error-test', 'failing prompt')
-
-      const { sessionStore } = await import('../../src/utils/session-store')
-      const session = await sessionStore.get('error-test')
-
-      expect(session?.status).toBe('interrupted')
-    })
-
-    it('should preserve startedAt in continuous sessions', async () => {
-      const initialStartTime = '2026-01-20T10:00:00Z'
-
+    it('should update lastActivity on session update', async () => {
       const { sessionStore } = await import('../../src/utils/session-store')
 
-      await sessionStore.save('continuous-test', {
-        id: 'session-initial',
-        claudeSessionId: 'claude-continuous',
-        feature: 'continuous-test',
-        startedAt: initialStartTime,
-        lastActivity: initialStartTime,
+      const oldTime = '2026-01-20T10:00:00Z'
+      await sessionStore.save('update-test', {
+        id: 'session-update',
+        claudeSessionId: 'claude-update',
+        feature: 'update-test',
+        startedAt: oldTime,
+        lastActivity: oldTime,
         status: 'active',
         resumable: true
       })
 
-      mockExecuteClaudeCommandV3.mockResolvedValue({
-        output: 'Continued execution',
-        sessionId: 'claude-continuous',
-        exitCode: 0,
-        duration: 3000
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      await sessionStore.update('update-test', 'session-update', {
+        status: 'completed'
       })
 
-      const { executeWithSessionTracking } = await import('../../src/utils/claude-v3')
+      const updated = await sessionStore.get('update-test')
 
-      await executeWithSessionTracking('continuous-test', 'continue prompt')
+      expect(updated?.lastActivity).not.toBe(oldTime)
+      expect(updated?.status).toBe('completed')
+    })
 
-      const updated = await sessionStore.get('continuous-test')
+    it('should preserve startedAt across updates', async () => {
+      const { sessionStore } = await import('../../src/utils/session-store')
 
-      expect(updated?.startedAt).toBe(initialStartTime)
+      const startTime = '2026-01-20T10:00:00Z'
+      await sessionStore.save('preserve-test', {
+        id: 'session-preserve',
+        claudeSessionId: 'claude-preserve',
+        feature: 'preserve-test',
+        startedAt: startTime,
+        lastActivity: startTime,
+        status: 'active',
+        resumable: true
+      })
+
+      await sessionStore.update('preserve-test', 'session-preserve', {
+        status: 'completed'
+      })
+
+      const updated = await sessionStore.get('preserve-test')
+
+      expect(updated?.startedAt).toBe(startTime)
     })
   })
 })

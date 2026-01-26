@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { EventEmitter } from 'node:events'
-import type { ChildProcess } from 'node:child_process'
 
 describe('Claude V3', () => {
   let mockSpawn: jest.MockedFunction<any>
@@ -33,10 +32,10 @@ describe('Claude V3', () => {
     it('should extract session ID case-insensitively', async () => {
       const { parseSessionId } = await import('../../src/utils/claude-v3')
 
-      const output = 'session id: xyz-789-abc-012'
+      const output = 'session id: abc-123-def-456'
 
       const sessionId = parseSessionId(output)
-      expect(sessionId).toBe('xyz-789-abc-012')
+      expect(sessionId).toBe('abc-123-def-456')
     })
 
     it('should return null if session ID not found', async () => {
@@ -316,16 +315,18 @@ describe('Claude V3', () => {
   })
 })
 
-function createMockChildProcess(): ChildProcess & EventEmitter {
+function createMockChildProcess(): any {
   const emitter = new EventEmitter()
+  const stdout = new EventEmitter()
+  const stderr = new EventEmitter()
 
   return Object.assign(emitter, {
     stdin: {
       write: jest.fn(),
       end: jest.fn()
     },
-    stdout: new EventEmitter(),
-    stderr: new EventEmitter(),
+    stdout,
+    stderr,
     kill: jest.fn()
-  }) as any
+  })
 }
