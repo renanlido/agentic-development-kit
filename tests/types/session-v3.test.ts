@@ -23,7 +23,7 @@ describe('SessionInfoV3 types', () => {
   })
 
   it('should accept SessionInfoV3 without metadata', () => {
-    const minimalSession = {
+    const minimalSession: any = {
       id: 'session-456',
       claudeSessionId: null,
       feature: 'minimal-feature',

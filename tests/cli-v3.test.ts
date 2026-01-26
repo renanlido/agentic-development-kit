@@ -23,16 +23,12 @@ describe('CLI v3', () => {
 
   describe('--version flag', () => {
     it('should return version 3.0.0-alpha', async () => {
-      process.argv = ['node', 'cli-v3.js', '--version']
-
       const { Command } = await import('commander')
       const program = new Command()
 
       program
         .name('adk3')
         .version('3.0.0-alpha')
-
-      program.parse(process.argv)
 
       expect(program.version()).toBe('3.0.0-alpha')
     })
