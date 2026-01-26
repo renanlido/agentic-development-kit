@@ -4,7 +4,8 @@
   "description": "CLI toolkit para desenvolvimento agêntico com Claude Code usando framework CADD",
   "main": "dist/index.js",
   "bin": {
-    "adk": "./dist/cli.js"
+    "adk": "./dist/cli.js",
+    "adk3": "./dist/cli-v3.js"
   },
   "scripts": {
     "build": "tsc",

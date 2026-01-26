@@ -1,5 +1,5 @@
 # Foco Ativo
 
-feature: adk-v3-session-continuity
-status: arquitetura pronta
-path: .claude/plans/features/adk-v3-session-continuity/
+feature: adk-v3-session-continuity-2
+status: estrutura criada
+path: .claude/plans/features/adk-v3-session-continuity-2/

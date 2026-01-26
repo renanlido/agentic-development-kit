@@ -1386,15 +1386,15 @@ CRITICAL: TASK TRACKING
 Você DEVE atualizar tasks.md conforme progride. Isso é ESSENCIAL para continuidade.
 
 ANTES de começar uma task:
-  .claude/hooks/mark-task.sh ${name} "<task-pattern>" in_progress
+  ./.claude/hooks/mark-task.sh ${name} "<task-pattern>" in_progress
 
 APÓS completar uma task:
-  .claude/hooks/mark-task.sh ${name} "<task-pattern>" completed
+  ./.claude/hooks/mark-task.sh ${name} "<task-pattern>" completed
 
 Exemplo:
-  .claude/hooks/mark-task.sh ${name} "Task 1.1" in_progress
+  ./.claude/hooks/mark-task.sh ${name} "Task 1.1" in_progress
   # ... trabalha na task ...
-  .claude/hooks/mark-task.sh ${name} "Task 1.1" completed
+  ./.claude/hooks/mark-task.sh ${name} "Task 1.1" completed
 
 Use um pattern único da task (número, nome curto, etc). O script atualiza automaticamente.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1404,7 +1404,7 @@ Process:
 1. CHECK TASKS & START
    - Leia tasks.md para ver quais tasks estão pendentes [ ]
    - Encontre a primeira task pendente (não [x] ou [~])
-   - Marque como in_progress: .claude/hooks/mark-task.sh ${name} "<task-id>" in_progress
+   - Marque como in_progress: ./.claude/hooks/mark-task.sh ${name} "<task-id>" in_progress
 
 2. WRITE TESTS FIRST (TDD)
    - Escreva TODOS os testes da task atual
@@ -1423,10 +1423,10 @@ Process:
    - Coverage >= 80%?
    - Lint clean?
    - Performance OK?
-   - Marque como completed: .claude/hooks/mark-task.sh ${name} "<task-id>" completed
+   - Marque como completed: ./.claude/hooks/mark-task.sh ${name} "<task-id>" completed
 
 5. CREATE CHECKPOINT & PAUSE
-   - Execute: .claude/hooks/create-checkpoint.sh ${name} "<task-id>" "<breve-descricao>"
+   - Execute: ./.claude/hooks/create-checkpoint.sh ${name} "<task-id>" "<breve-descricao>"
    - O script criará automaticamente o checkpoint com:
      * Task completada
      * Arquivos modificados
@@ -2711,7 +2711,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
             console.log(chalk.gray(`   adk feature autopilot ${name}`))
             console.log()
             console.log(chalk.cyan('📋 Ou marque tasks manualmente:'))
-            console.log(chalk.gray(`   .claude/hooks/mark-task.sh ${name} "<pattern>" completed`))
+            console.log(chalk.gray(`   ./.claude/hooks/mark-task.sh ${name} "<pattern>" completed`))
             console.log()
             printProgress(progress)
             return
