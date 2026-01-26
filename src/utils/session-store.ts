@@ -92,6 +92,8 @@ export class SessionStore {
     const updated: SessionInfoV3 = {
       ...current,
       ...updates,
+      id: current.id,
+      startedAt: current.startedAt,
       lastActivity: new Date().toISOString()
     }
 
