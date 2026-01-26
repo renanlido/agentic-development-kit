@@ -412,4 +412,62 @@ describe('SessionStore', () => {
       expect(result).toBe(false)
     })
   })
+
+  describe('path traversal protection', () => {
+    it('should reject feature names with path traversal attempts', async () => {
+      const store = new SessionStore()
+      const maliciousNames = ['../../../etc', '..\\..\\..\\windows', 'test/../../../etc']
+
+      for (const name of maliciousNames) {
+        expect(() => store.getSessionsPath(name)).toThrow()
+      }
+    })
+
+    it('should reject feature names with directory separators', async () => {
+      const store = new SessionStore()
+      const invalidNames = ['test/feature', 'test\\feature']
+
+      for (const name of invalidNames) {
+        expect(() => store.getSessionsPath(name)).toThrow()
+      }
+    })
+
+    it('should allow valid feature names', async () => {
+      const store = new SessionStore()
+      const validNames = ['test-feature', 'test_feature', 'testfeature', 'test123']
+
+      for (const name of validNames) {
+        expect(() => store.getSessionsPath(name)).not.toThrow()
+      }
+    })
+  })
+
+  describe('session ID collision prevention', () => {
+    it('should generate unique IDs for concurrent saves', async () => {
+      const store = new SessionStore()
+      const sessionIds = new Set<string>()
+
+      const createSession = () => ({
+        id: `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        claudeSessionId: null,
+        feature: 'collision-test',
+        startedAt: new Date().toISOString(),
+        lastActivity: new Date().toISOString(),
+        status: 'active' as const,
+        resumable: true
+      })
+
+      const saves = Array.from({ length: 100 }, async () => {
+        const session = createSession()
+        sessionIds.add(session.id)
+        await store.save('collision-test', session)
+        return session.id
+      })
+
+      const ids = await Promise.all(saves)
+
+      expect(ids.length).toBe(100)
+      expect(sessionIds.size).toBe(100)
+    })
+  })
 })

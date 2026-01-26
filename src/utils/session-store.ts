@@ -3,6 +3,10 @@ import os from 'node:os'
 import path from 'node:path'
 import type { SessionInfoV3 } from '../types/session-v3.js'
 
+/**
+ * Stores and retrieves Claude session information for features.
+ * Provides atomic writes and 24-hour session resumability window.
+ */
 export class SessionStore {
   private getBasePath(): string {
     if (process.env.TEST_FEATURE_PATH) {
@@ -11,13 +15,24 @@ export class SessionStore {
     return process.cwd()
   }
 
+  private validateFeatureName(feature: string): void {
+    if (/[\/\\]|\.\./.test(feature)) {
+      throw new Error(`Invalid feature name: ${feature}`)
+    }
+  }
+
   getSessionsPath(feature: string): string {
+    this.validateFeatureName(feature)
     return path.join(
       this.getBasePath(),
       '.claude', 'plans', 'features', feature, 'sessions'
     )
   }
 
+  /**
+   * Saves session using atomic write pattern (temp file + move).
+   * Also saves copy to history directory.
+   */
   async save(feature: string, session: SessionInfoV3): Promise<void> {
     const sessionsPath = this.getSessionsPath(feature)
     await fs.ensureDir(sessionsPath)
@@ -54,6 +69,10 @@ export class SessionStore {
     return this.get(feature)
   }
 
+  /**
+   * Lists all sessions from history, ordered by startedAt (most recent first).
+   * Ignores corrupted files.
+   */
   async list(feature: string): Promise<SessionInfoV3[]> {
     const historyDir = path.join(this.getSessionsPath(feature), 'history')
 
@@ -80,6 +99,10 @@ export class SessionStore {
     )
   }
 
+  /**
+   * Updates existing session. Preserves id and startedAt, always updates lastActivity.
+   * Throws if session not found or sessionId doesn't match current session.
+   */
   async update(
     feature: string,
     sessionId: string,
@@ -110,6 +133,11 @@ export class SessionStore {
     }
   }
 
+  /**
+   * Checks if session is resumable based on:
+   * 1. Session exists and resumable flag is true
+   * 2. Last activity was less than 24 hours ago
+   */
   async isResumable(feature: string): Promise<boolean> {
     const session = await this.get(feature)
 

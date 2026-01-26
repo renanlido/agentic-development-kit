@@ -8,11 +8,30 @@ import { sessionStore } from './session-store.js'
 
 const SESSION_ID_PATTERN = /Session ID: ([a-f0-9-]+)/i
 
+/**
+ * Extracts Claude session ID from command output.
+ * Looks for pattern: "Session ID: <uuid>"
+ */
 export function parseSessionId(output: string): string | null {
   const match = output.match(SESSION_ID_PATTERN)
   return match ? match[1] : null
 }
 
+/**
+ * Executes Claude CLI command asynchronously with session ID capture.
+ *
+ * Features:
+ * - Uses spawn (async) instead of spawnSync for better control
+ * - Captures stdout/stderr while streaming to console
+ * - Extracts session ID automatically via --print-session-id
+ * - Supports session resume via --resume flag
+ * - Configurable timeout (default 5 minutes)
+ * - Streams output chunks to optional callback
+ *
+ * @param prompt - Text prompt to send to Claude
+ * @param options - Execution options (model, resume, timeout, etc)
+ * @returns Promise with output, sessionId, exitCode, and duration
+ */
 export async function executeClaudeCommandV3(
   prompt: string,
   options: ClaudeV3Options = {}
@@ -111,6 +130,21 @@ export function isClaudeInstalledV3(): boolean {
   }
 }
 
+/**
+ * Executes Claude with automatic session tracking and resume.
+ *
+ * Behavior:
+ * - Checks if existing session is resumable (< 24h)
+ * - If resumable, automatically adds --resume flag
+ * - Executes command and captures session ID
+ * - Saves/updates session info in SessionStore
+ * - Preserves session id and startedAt across resumes
+ *
+ * @param feature - Feature name for session storage
+ * @param prompt - Text prompt to send to Claude
+ * @param options - Execution options (merged with auto-resume)
+ * @returns Promise with command result including session ID
+ */
 export async function executeWithSessionTracking(
   feature: string,
   prompt: string,
@@ -128,8 +162,14 @@ export async function executeWithSessionTracking(
 
   const result = await executeClaudeCommandV3(prompt, options)
 
+  const generateSessionId = (): string => {
+    const timestamp = Date.now()
+    const randomPart = Math.random().toString(36).substring(2, 9)
+    return `session-${timestamp}-${randomPart}`
+  }
+
   const sessionInfo: SessionInfoV3 = {
-    id: `session-${Date.now()}`,
+    id: existingSession?.id || generateSessionId(),
     claudeSessionId: result.sessionId,
     feature,
     startedAt: existingSession?.startedAt || new Date().toISOString(),

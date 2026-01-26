@@ -1084,6 +1084,53 @@ src/
 
 ---
 
+## ADK v3 (Preview - Session Continuity)
+
+**Status:** Alpha / Desenvolvimento Isolado
+
+O ADK v3 introduz **session continuity** - rastreamento e retomada de sessões Claude entre fases de desenvolvimento, resolvendo o problema crítico de perda de contexto do v2.
+
+### Problema Resolvido
+
+No v2, cada comando (`feature research`, `feature plan`, etc) criava uma nova sessão Claude isolada, resultando em **0% de continuidade de contexto**. O v3 captura session IDs e permite retomada automática.
+
+### Como Testar
+
+```bash
+npm run build
+npm run adk3 -- feature status my-feature
+```
+
+**Importante:** v3 é isolado e não afeta comandos v2. Use apenas `npm run adk3` para testar.
+
+### Arquitetura v3
+
+```
+executeClaudeCommandV3 (spawn assíncrono)
+    ↓
+--print-session-id → parseSessionId()
+    ↓
+SessionStore.save() → .claude/plans/features/{name}/sessions/
+    ↓
+Resume automático quando < 24h de inatividade
+```
+
+### Funcionalidades
+
+- ✅ Captura automática de session ID via `--print-session-id`
+- ✅ Resume automático de sessões (janela de 24h)
+- ✅ Persistência em `.claude/plans/features/{name}/sessions/`
+- ✅ Comando `feature status` com histórico de sessões
+- ✅ Atomic writes para consistência de dados
+- 🚧 Prompts diferenciados (Initializer/Coding Agent) - Sprint 2
+- 🚧 Comando `feature work` com loop - Sprint 3
+
+### Documentação Completa
+
+Ver `.claude/plans/features/adk-v3-session-continuity/README.md`
+
+---
+
 ## Licenca
 
 MIT

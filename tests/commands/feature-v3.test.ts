@@ -100,4 +100,28 @@ describe('FeatureV3Command', () => {
       expect(session?.metadata?.model).toBe('sonnet')
     })
   })
+
+  describe('path traversal protection', () => {
+    it('should validate feature names via sessionStore', async () => {
+      const { SessionStore } = await import('../../src/utils/session-store')
+      const store = new SessionStore()
+
+      const maliciousNames = ['../../../etc', '..\\..\\..\\windows', 'test/feature', 'test\\feature']
+
+      for (const name of maliciousNames) {
+        expect(() => store.getSessionsPath(name)).toThrow('Invalid feature name')
+      }
+    })
+
+    it('should allow valid feature names', async () => {
+      const { SessionStore } = await import('../../src/utils/session-store')
+      const store = new SessionStore()
+
+      const validNames = ['test-feature', 'test_feature', 'test123']
+
+      for (const name of validNames) {
+        expect(() => store.getSessionsPath(name)).not.toThrow()
+      }
+    })
+  })
 })

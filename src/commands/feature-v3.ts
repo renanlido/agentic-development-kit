@@ -6,10 +6,18 @@ import { sessionStore } from '../utils/session-store.js'
 import { logger } from '../utils/logger.js'
 
 class FeatureV3Command {
+  private validateFeatureName(name: string): void {
+    if (/[\/\\]|\.\./.test(name)) {
+      throw new Error(`Invalid feature name: ${name}`)
+    }
+  }
+
   async status(name: string): Promise<void> {
     const spinner = ora(`Loading status for ${name}...`).start()
 
     try {
+      this.validateFeatureName(name)
+
       const featurePath = path.join(
         process.cwd(),
         '.claude', 'plans', 'features', name

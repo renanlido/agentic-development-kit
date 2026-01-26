@@ -171,6 +171,21 @@ describe('Session Integration Tests', () => {
       expect(secondSession?.startedAt).toBe(originalStartedAt)
     })
 
+    it('should preserve session ID across multiple executions', async () => {
+      await executeWithSessionTracking('test-feature', 'First prompt')
+      const firstSession = await sessionStore.get('test-feature')
+      const originalSessionId = firstSession?.id
+
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      await executeWithSessionTracking('test-feature', 'Second prompt')
+      const secondSession = await sessionStore.get('test-feature')
+
+      expect(secondSession?.id).toBe(originalSessionId)
+      expect(secondSession?.id).toBeDefined()
+      expect(secondSession?.id).not.toBeNull()
+    })
+
     it('should store execution metadata', async () => {
       await executeWithSessionTracking('test-feature', 'Test prompt', {
         model: 'opus'

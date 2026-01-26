@@ -267,6 +267,24 @@ describe('Claude V3', () => {
       expect(onOutput).toHaveBeenCalledWith('chunk1')
       expect(onOutput).toHaveBeenCalledWith('chunk2')
     })
+
+    it('should handle spawn errors', async () => {
+      const mockProcess = createMockChildProcess()
+
+      jest.doMock('node:child_process', () => ({
+        spawn: mockSpawn
+      }))
+
+      mockSpawn.mockReturnValue(mockProcess)
+
+      const { executeClaudeCommandV3 } = await import('../../src/utils/claude-v3')
+
+      const promise = executeClaudeCommandV3('test prompt')
+
+      mockProcess.emit('error', new Error('ENOENT: command not found'))
+
+      await expect(promise).rejects.toThrow('Failed to start Claude: ENOENT: command not found')
+    })
   })
 
   describe('isClaudeInstalledV3', () => {
