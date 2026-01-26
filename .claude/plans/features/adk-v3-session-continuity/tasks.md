@@ -138,7 +138,7 @@
   - [x] Testa extração de session ID de output válido
   - [x] Testa retorno null quando session ID ausente
   - [x] Testa diferentes formatos de output
-  - [ ] Testes falham (RED - TDD)
+  - [x] Testes falham (RED - TDD)
 
 ---
 
@@ -169,7 +169,7 @@
   - [x] Testa retorno de exitCode
   - [x] Testa timeout configurável
   - [x] Mock do child_process.spawn
-  - [ ] Testes falham (RED - TDD)
+  - [x] Testes falham (RED - TDD)
 
 ---
 
@@ -187,7 +187,7 @@
   - [x] Captura stderr
   - [x] Retorna exitCode
   - [x] Suporta timeout (default 5 min)
-  - [ ] Testes da Task 10 passam (GREEN - TDD)
+  - [x] Testes da Task 10 passam (GREEN - TDD)
 
 ---
 
@@ -201,7 +201,7 @@
   - [x] Testa que flag --print-session-id é adicionada
   - [x] Testa extração de session ID do output
   - [x] Testa que sessionId é incluído no resultado
-  - [ ] Testes falham (RED - TDD)
+  - [x] Testes falham (RED - TDD)
 
 ---
 
@@ -215,7 +215,7 @@
   - [x] Adiciona `--print-session-id` aos args
   - [x] Usa `parseSessionId()` para extrair ID
   - [x] Inclui sessionId no `ClaudeV3Result`
-  - [ ] Testes da Task 12 passam (GREEN - TDD)
+  - [x] Testes da Task 12 passam (GREEN - TDD)
 
 ---
 
@@ -229,7 +229,7 @@
   - [x] Testa que option `resume` adiciona flag --resume
   - [x] Testa que session ID é passado corretamente
   - [x] Testa erro quando sessão não existe
-  - [ ] Testes falham (RED - TDD)
+  - [x] Testes falham (RED - TDD)
 
 ---
 
@@ -243,7 +243,7 @@
   - [x] Option `resume?: string` em `ClaudeV3Options`
   - [x] Quando resume fornecido, adiciona `--resume <sessionId>`
   - [x] Erro claro se sessão não existir
-  - [ ] Testes da Task 14 passam (GREEN - TDD)
+  - [x] Testes da Task 14 passam (GREEN - TDD)
 
 ---
 
