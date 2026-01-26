@@ -22,16 +22,16 @@ ADK (Agentic Development Kit) is a CLI toolkit implementing the CADD framework (
 Read: .claude/plans/features/<name>/tasks.md
 
 # 2. Marcar como in_progress
-.claude/hooks/mark-task.sh <feature-name> "Task X.X" in_progress
+./.claude/hooks/mark-task.sh <feature-name> "Task X.X" in_progress
 
 # 3. Implementar (TDD)
 # ... código e testes ...
 
 # 4. Marcar como completed
-.claude/hooks/mark-task.sh <feature-name> "Task X.X" completed
+./.claude/hooks/mark-task.sh <feature-name> "Task X.X" completed
 
 # 5. CRIAR CHECKPOINT E PAUSAR
-.claude/hooks/create-checkpoint.sh <feature-name> "Task X.X" "descricao"
+./.claude/hooks/create-checkpoint.sh <feature-name> "Task X.X" "descricao"
 
 # O script mostrará:
 # ⚠️  PRÓXIMO PASSO: LIMPE O CONTEXTO
@@ -222,6 +222,12 @@ adk feature compact <name> --revert <id>  # Revert compaction (within 24h)
 adk context status [feature]              # View all features context status
 adk context prune <feature>               # Archive old content
 adk context prune <feature> --dry-run     # Preview pruning
+```
+
+### Worktree Management
+```bash
+adk feature fix-worktrees                 # Fix .claude symlinks in all worktrees
+                                          # Works with both git worktrees and .worktrees/ directories
 ```
 
 **Compaction Levels:**
