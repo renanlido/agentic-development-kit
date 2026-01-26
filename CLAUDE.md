@@ -6,6 +6,58 @@ This file provides guidance to Claude Code when working with this repository.
 
 ADK (Agentic Development Kit) is a CLI toolkit implementing the CADD framework (Context-Agentic Development & Delivery) for AI-assisted software development. It orchestrates Claude Code to automate the development lifecycle from planning to deployment.
 
+## 🚨 CRITICAL: Task Tracking + Context Cleanup
+
+**VOCÊ DEVE LER ISTO ANTES DE IMPLEMENTAR QUALQUER CÓDIGO:**
+
+### Workflow Obrigatório (COM CHECKPOINT)
+
+1. **ANTES**: Leia `tasks.md` e marque como in_progress
+2. **DURANTE**: Implemente seguindo TDD
+3. **APÓS**: Marque completed
+4. **🆕 CHECKPOINT**: Crie checkpoint e PAUSE para limpeza de contexto
+
+```bash
+# 1. Verificar tasks pendentes
+Read: .claude/plans/features/<name>/tasks.md
+
+# 2. Marcar como in_progress
+.claude/hooks/mark-task.sh <feature-name> "Task X.X" in_progress
+
+# 3. Implementar (TDD)
+# ... código e testes ...
+
+# 4. Marcar como completed
+.claude/hooks/mark-task.sh <feature-name> "Task X.X" completed
+
+# 5. CRIAR CHECKPOINT E PAUSAR
+.claude/hooks/create-checkpoint.sh <feature-name> "Task X.X" "descricao"
+
+# O script mostrará:
+# ⚠️  PRÓXIMO PASSO: LIMPE O CONTEXTO
+# 1. Ctrl+C para sair
+# 2. claude clear
+# 3. adk feature implement <feature-name>
+
+# IMPORTANTE: PARE AQUI! Não continue para próxima task.
+```
+
+### 🧹 Por Que Limpar Contexto?
+
+**Problema**: Contexto acumula código antigo, discussões, erros já corrigidos.
+**Resultado**: Claude erra mais, fica confuso, perde foco.
+**Solução**: Checkpoint + Context Clear entre tasks.
+
+### ❌ NÃO FAÇA
+- ❌ Implementar múltiplas tasks sem limpar contexto
+- ❌ Esquecer de criar checkpoint
+- ❌ Continuar após checkpoint sem limpar contexto
+- ❌ Implementar tasks que já estão [x]
+
+### ✅ Documentação Completa
+- `.claude/docs/implementation-workflow.md` - Workflow detalhado
+- `.claude/docs/context-cleanup-strategy.md` - Estratégia de checkpoint
+
 ## Commands
 
 ```bash

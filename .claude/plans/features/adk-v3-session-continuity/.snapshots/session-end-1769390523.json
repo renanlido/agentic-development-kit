@@ -1,0 +1,14 @@
+{
+  "id": "session-end-1769390523",
+  "feature": "adk-v3-session-continuity",
+  "reason": "session_end",
+  "timestamp": "2026-01-26T01:22:03Z",
+  "tasks": {
+    "completed": 0,
+    "total": 106,
+    "percentage": 0,
+    "canAdvanceToQA": false,
+    "inProgressTask": "",
+    "nextTask": ": Task 1: Criar estrutura de diretórios v3"
+  }
+}

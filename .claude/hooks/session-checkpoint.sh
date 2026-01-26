@@ -98,6 +98,32 @@ get_next_incomplete_task() {
   done < "$tasks_file"
 }
 
+get_current_in_progress_task() {
+  local tasks_file="$1"
+
+  if [ ! -f "$tasks_file" ]; then
+    return
+  fi
+
+  local current_fase=""
+  local current_task=""
+
+  while IFS= read -r line; do
+    if echo "$line" | grep -qE "^## Fase [0-9]+"; then
+      current_fase=$(echo "$line" | sed 's/## //')
+    fi
+
+    if echo "$line" | grep -qE "^### Task"; then
+      current_task=$(echo "$line" | sed 's/### //')
+    fi
+
+    if echo "$line" | grep -qE "^\s*- \[~\]" && [ -n "$current_task" ]; then
+      echo "$current_fase: $current_task"
+      return
+    fi
+  done < "$tasks_file"
+}
+
 get_current_phase() {
   local progress_file="$1"
 
@@ -116,6 +142,7 @@ PERCENTAGE=$(echo "$TASK_ANALYSIS" | cut -d'|' -f3)
 INCOMPLETE_FASES=$(echo "$TASK_ANALYSIS" | cut -d'|' -f4)
 
 NEXT_TASK=$(get_next_incomplete_task "$TASKS_FILE")
+IN_PROGRESS_TASK=$(get_current_in_progress_task "$TASKS_FILE")
 CURRENT_PHASE=$(get_current_phase "$PROGRESS_FILE")
 
 CAN_ADVANCE_TO_QA="false"
@@ -133,7 +160,9 @@ cat > "$SNAPSHOT_FILE" <<EOF
     "completed": $COMPLETED,
     "total": $TOTAL,
     "percentage": $PERCENTAGE,
-    "canAdvanceToQA": $CAN_ADVANCE_TO_QA
+    "canAdvanceToQA": $CAN_ADVANCE_TO_QA,
+    "inProgressTask": "${IN_PROGRESS_TASK:-}",
+    "nextTask": "${NEXT_TASK:-}"
   }
 }
 EOF
@@ -149,7 +178,10 @@ Current Phase: ${CURRENT_PHASE:-unknown}
 --- INCOMPLETE PHASES ---
 ${INCOMPLETE_FASES:-"None - all tasks complete!"}
 
---- NEXT STEP ---
+--- CURRENT TASK (IN PROGRESS) ---
+${IN_PROGRESS_TASK:-"None"}
+
+--- NEXT TASK (PENDING) ---
 ${NEXT_TASK:-"All tasks completed. Ready for QA."}
 
 --- QA READINESS ---

@@ -1,0 +1,12 @@
+{
+  "id": "session-end-1769381289",
+  "feature": "adk-v3-session-continuity",
+  "reason": "session_end",
+  "timestamp": "2026-01-25T22:48:09Z",
+  "tasks": {
+    "completed": 0,
+    "total": 0,
+    "percentage": 0,
+    "canAdvanceToQA": false
+  }
+}
