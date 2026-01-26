@@ -23,15 +23,17 @@ export class SessionStore {
     await fs.ensureDir(sessionsPath)
 
     const currentPath = path.join(sessionsPath, 'current.json')
-    const tempPath = path.join(os.tmpdir(), `session-${Date.now()}.json`)
+    const randomId = Math.random().toString(36).substring(2, 15)
+    const tempPath = path.join(os.tmpdir(), `session-${Date.now()}-${randomId}.json`)
 
     await fs.writeJSON(tempPath, session, { spaces: 2 })
-    await fs.move(tempPath, currentPath, { overwrite: true })
 
     const historyDir = path.join(sessionsPath, 'history')
     await fs.ensureDir(historyDir)
     const historyPath = path.join(historyDir, `${session.id}.json`)
-    await fs.copy(currentPath, historyPath)
+    await fs.copy(tempPath, historyPath)
+
+    await fs.move(tempPath, currentPath, { overwrite: true })
   }
 
   async get(feature: string): Promise<SessionInfoV3 | null> {

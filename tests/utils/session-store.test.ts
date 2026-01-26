@@ -22,6 +22,29 @@ describe('SessionStore', () => {
   })
 
   describe('save', () => {
+    it('should handle concurrent saves without race conditions', async () => {
+      const store = new SessionStore()
+
+      const createSession = (id: string) => ({
+        id,
+        claudeSessionId: `claude-${id}`,
+        feature: 'concurrent-test',
+        startedAt: new Date().toISOString(),
+        lastActivity: new Date().toISOString(),
+        status: 'active' as const,
+        resumable: true
+      })
+
+      const saves = Array.from({ length: 10 }, (_, i) =>
+        store.save('concurrent-test', createSession(`session-${i}`))
+      )
+
+      await expect(Promise.all(saves)).resolves.not.toThrow()
+
+      const sessions = await store.list('concurrent-test')
+      expect(sessions.length).toBe(10)
+    })
+
     it('should persist session to current.json', async () => {
       const store = new SessionStore()
       const session = {
