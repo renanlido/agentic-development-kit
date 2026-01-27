@@ -37,6 +37,7 @@
   "author": "Renan Oliveira",
   "license": "MIT",
   "devDependencies": {
+    "@babel/preset-env": "^7.28.6",
     "@biomejs/biome": "^2.3.11",
     "@types/fs-extra": "^11.0.4",
     "@types/inquirer": "^9.0.7",

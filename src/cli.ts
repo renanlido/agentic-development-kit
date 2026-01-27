@@ -95,6 +95,7 @@ feature
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
   .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
+  .option('--headless', 'Executa em modo headless (termina automaticamente)')
   .action((name, options) =>
     featureCommand.implement(name, { ...options, baseBranch: options.baseBranch })
   )
@@ -196,11 +197,13 @@ feature
   .option('-c, --context <file>', 'Arquivo de contexto adicional')
   .option('-d, --desc <description>', 'Descrição da feature (alternativa ao argumento posicional)')
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
+  .option('-l, --loop', 'Modo loop: executa tasks automaticamente até todas completarem')
   .action((name, description, options) =>
     featureCommand.autopilot(name, {
       ...options,
       description: options.desc || description,
       baseBranch: options.baseBranch,
+      loop: options.loop,
     })
   )
 

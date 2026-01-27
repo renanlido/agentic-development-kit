@@ -39,6 +39,8 @@ interface FeatureOptions {
   baseBranch?: string
   noSync?: boolean
   model?: string
+  loop?: boolean
+  headless?: boolean
 }
 
 interface QuickOptions {
@@ -1346,6 +1348,7 @@ IMPORTANTE: A implementação DEVE seguir a spec acima. Todos os acceptance crit
         : ''
 
       const checkpointPath = path.join(featurePath, '.task-checkpoint.md')
+      const hooksDir = path.join(process.cwd(), '.claude', 'hooks')
       let checkpointContext = ''
 
       if (await fs.pathExists(checkpointPath)) {
@@ -1386,15 +1389,15 @@ CRITICAL: TASK TRACKING
 Você DEVE atualizar tasks.md conforme progride. Isso é ESSENCIAL para continuidade.
 
 ANTES de começar uma task:
-  ./.claude/hooks/mark-task.sh ${name} "<task-pattern>" in_progress
+  ${hooksDir}/mark-task.sh ${name} "<task-pattern>" in_progress
 
 APÓS completar uma task:
-  ./.claude/hooks/mark-task.sh ${name} "<task-pattern>" completed
+  ${hooksDir}/mark-task.sh ${name} "<task-pattern>" completed
 
 Exemplo:
-  ./.claude/hooks/mark-task.sh ${name} "Task 1.1" in_progress
+  ${hooksDir}/mark-task.sh ${name} "Task 1.1" in_progress
   # ... trabalha na task ...
-  ./.claude/hooks/mark-task.sh ${name} "Task 1.1" completed
+  ${hooksDir}/mark-task.sh ${name} "Task 1.1" completed
 
 Use um pattern único da task (número, nome curto, etc). O script atualiza automaticamente.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1404,7 +1407,7 @@ Process:
 1. CHECK TASKS & START
    - Leia tasks.md para ver quais tasks estão pendentes [ ]
    - Encontre a primeira task pendente (não [x] ou [~])
-   - Marque como in_progress: ./.claude/hooks/mark-task.sh ${name} "<task-id>" in_progress
+   - Marque como in_progress: ${hooksDir}/mark-task.sh ${name} "<task-id>" in_progress
 
 2. WRITE TESTS FIRST (TDD)
    - Escreva TODOS os testes da task atual
@@ -1423,10 +1426,10 @@ Process:
    - Coverage >= 80%?
    - Lint clean?
    - Performance OK?
-   - Marque como completed: ./.claude/hooks/mark-task.sh ${name} "<task-id>" completed
+   - Marque como completed: ${hooksDir}/mark-task.sh ${name} "<task-id>" completed
 
 5. CREATE CHECKPOINT & PAUSE
-   - Execute: ./.claude/hooks/create-checkpoint.sh ${name} "<task-id>" "<breve-descricao>"
+   - Execute: ${hooksDir}/create-checkpoint.sh ${name} "<task-id>" "<breve-descricao>"
    - O script criará automaticamente o checkpoint com:
      * Task completada
      * Arquivos modificados
@@ -1452,7 +1455,7 @@ Não avance para próxima fase até todas as tasks estarem [x].
 
       spinner.text = 'Executando implementação com Claude Code...'
       const implModel = getModelForPhase('implement', options.model as ModelType | undefined)
-      await executeClaudeCommand(prompt, { model: implModel })
+      await executeClaudeCommand(prompt, { model: implModel, headless: options.headless, cwd: process.cwd() })
 
       spinner.text = 'Verificando progresso das tasks...'
       const taskStatus = await this.checkTasksCompletion(name)
@@ -2257,7 +2260,88 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
     return { completed, total, percentage, allDone }
   }
 
+  private async autopilotLoop(name: string, _options: FeatureOptions): Promise<void> {
+    const MAX_ITERATIONS = 50
+    const COOLDOWN_MS = 3000
+
+    let iteration = 0
+
+    console.log()
+    console.log(chalk.bold.magenta('🔁 ADK Autopilot Loop Mode'))
+    console.log(chalk.gray('━'.repeat(50)))
+    console.log(chalk.gray('Tasks serão executadas automaticamente em sequência'))
+    console.log(chalk.gray('Ctrl+C a qualquer momento para pausar'))
+    console.log()
+
+    const state = await this.getFeatureState(name)
+    if (!state.exists) {
+      logger.error(`Feature "${name}" não encontrada. Crie primeiro com: adk feature new ${name}`)
+      process.exit(1)
+    }
+
+    if (!state.hasTasks) {
+      logger.error(`Tasks não encontradas para "${name}". Execute primeiro: adk feature autopilot ${name}`)
+      process.exit(1)
+    }
+
+    const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
+    const mainRepo = this.getMainRepoPath()
+    const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
+    const worktreeExists = await fs.pathExists(worktreeDir)
+    const cwd = worktreeExists ? worktreeDir : process.cwd()
+
+    if (worktreeExists) {
+      console.log(chalk.cyan(`📂 Worktree: ${worktreeDir}`))
+      console.log()
+    }
+
+    while (iteration < MAX_ITERATIONS) {
+      iteration++
+
+      const taskStatus = await this.checkTasksCompletion(name)
+
+      console.log(chalk.cyan(`\n📊 Iteração ${iteration} - Tasks: ${taskStatus.completed}/${taskStatus.total} (${taskStatus.percentage}%)`))
+
+      if (taskStatus.allDone) {
+        console.log(chalk.green('\n✅ Todas as tasks completas!'))
+        console.log(chalk.gray(`Próximo passo: adk feature qa ${name}`))
+        return
+      }
+
+      console.log(chalk.gray(`\nExecutando: adk feature implement ${name} --phase All --headless`))
+
+      try {
+        execFileSync('adk', ['feature', 'implement', name, '--phase', 'All', '--headless'], {
+          stdio: 'inherit',
+          cwd,
+        })
+      } catch {
+        console.log(chalk.yellow('\n⚠️  Sessão de implementação encerrada'))
+
+        const updatedStatus = await this.checkTasksCompletion(name)
+        if (updatedStatus.allDone) {
+          console.log(chalk.green('\n✅ Todas as tasks completas!'))
+          return
+        }
+      }
+
+      console.log(chalk.gray(`\n⏳ Próxima task em ${COOLDOWN_MS / 1000}s... (Ctrl+C para pausar)`))
+      await this.sleep(COOLDOWN_MS)
+    }
+
+    console.log(chalk.yellow(`\n⚠️  Limite de ${MAX_ITERATIONS} iterações atingido`))
+    console.log(chalk.gray(`Verifique o progresso: adk feature status ${name}`))
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
   async autopilot(name: string, options: FeatureOptions = {}): Promise<void> {
+    if (options.loop) {
+      return this.autopilotLoop(name, options)
+    }
+
     console.log()
     console.log(chalk.bold.magenta('🚀 ADK Autopilot (Subprocess Mode)'))
     console.log(chalk.gray('━'.repeat(50)))

@@ -1,12 +1,17 @@
-import { spawnSync, execSync } from 'node:child_process'
+import { execSync, spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import * as readline from 'node:readline'
 import { ModelType } from '../types/model'
 import { logger } from './logger'
+import { parseAndDisplayStream } from './stream-parser'
 
 export interface ClaudeCommandOptions {
   model?: ModelType
+  headless?: boolean
+  showProgress?: boolean
+  cwd?: string
 }
 
 const VALID_MODELS = new Set<string>([ModelType.OPUS, ModelType.SONNET, ModelType.HAIKU])
@@ -32,6 +37,62 @@ export async function executeClaudeCommand(
     process.exit(1)
   }
 
+  if (options.headless) {
+    return executeHeadless(prompt, options)
+  }
+
+  return executeInteractive(prompt, options)
+}
+
+async function executeHeadless(prompt: string, options: ClaudeCommandOptions): Promise<string> {
+  const validatedModel = validateModel(options.model)
+  const args = ['-p', '--dangerously-skip-permissions', '--output-format', 'stream-json', '--verbose']
+
+  if (validatedModel) {
+    args.push('--model', validatedModel)
+  }
+
+  const showProgress = options.showProgress !== false
+
+  logger.debug(`Executing headless: claude ${args.join(' ')}`)
+
+  return new Promise((resolve, reject) => {
+    const child = spawn('claude', args, {
+      stdio: ['pipe', 'pipe', 'inherit'],
+      cwd: options.cwd || process.cwd(),
+    })
+
+    child.stdin.write(prompt)
+    child.stdin.end()
+
+    const rl = readline.createInterface({
+      input: child.stdout,
+      crlfDelay: Infinity,
+    })
+
+    rl.on('line', (line) => {
+      if (showProgress) {
+        parseAndDisplayStream(line)
+      }
+    })
+
+    child.on('close', (code) => {
+      rl.close()
+      if (code === 0) {
+        resolve('')
+      } else {
+        reject(new Error(`Claude exited with code ${code}`))
+      }
+    })
+
+    child.on('error', (err) => {
+      rl.close()
+      reject(new Error(`Failed to start Claude: ${err.message}`))
+    })
+  })
+}
+
+async function executeInteractive(prompt: string, options: ClaudeCommandOptions): Promise<string> {
   const tempFile = path.join(os.tmpdir(), `adk-prompt-${Date.now()}.txt`)
 
   try {
@@ -43,13 +104,14 @@ export async function executeClaudeCommand(
       args.push('--model', validatedModel)
     }
 
-    logger.debug(`Executing: claude ${args.join(' ')} < ${tempFile}`)
+    logger.debug(`Executing interactive: claude ${args.join(' ')} < ${tempFile}`)
 
     const input = fs.readFileSync(tempFile, 'utf-8')
     const result = spawnSync('claude', args, {
       input,
       encoding: 'utf-8',
       stdio: ['pipe', 'inherit', 'inherit'],
+      cwd: options.cwd || process.cwd(),
     })
 
     if (result.error) {
@@ -67,8 +129,7 @@ export async function executeClaudeCommand(
   } finally {
     try {
       fs.unlinkSync(tempFile)
-    } catch {
-    }
+    } catch {}
   }
 }
 

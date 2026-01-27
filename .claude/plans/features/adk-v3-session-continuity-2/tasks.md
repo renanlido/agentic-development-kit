@@ -14,17 +14,17 @@
 **File**: `src/types/feature-list-v3.ts`
 
 **Subtasks**:
-- [ ] Create `TestDefinition` interface with all required fields
-- [ ] Create `FeatureListData` interface
-- [ ] Create `FeatureListSummary` interface
-- [ ] Create `TestCategory` type alias
+- [~] Create `TestDefinition` interface with all required fields
+- [~] Create `FeatureListData` interface
+- [~] Create `FeatureListSummary` interface
+- [~] Create `TestCategory` type alias
 - [x] Add JSDoc documentation to all types
 - [x] Export all types from module
 
 **Test File**: `tests/types/feature-list-v3.test.ts`
-- [ ] TestDefinition type-checks correctly
-- [ ] FeatureListData type-checks correctly
-- [ ] All categories ('functional', 'ui', 'integration', 'e2e') compile
+- [x] TestDefinition type-checks correctly
+- [x] FeatureListData type-checks correctly
+- [x] All categories ('functional', 'ui', 'integration', 'e2e') compile
 
 **Acceptance Criteria**:
 - `npm run type-check` passes
@@ -40,9 +40,9 @@
 **Depends on**: None
 
 **Subtasks**:
-- [x] Create `ProjectType` type ('node' | 'python' | 'rust' | 'go' | 'docker' | 'unknown')
-- [x] Create `InitScriptOptions` interface
-- [x] Create `InitScriptResult` interface
+- [~] Create `ProjectType` type ('node' | 'python' | 'rust' | 'go' | 'docker' | 'unknown')
+- [~] Create `InitScriptOptions` interface
+- [~] Create `InitScriptResult` interface
 - [x] Add JSDoc documentation
 - [x] Export all types
 
@@ -58,33 +58,33 @@
 ---
 
 ### Task 1.3: Create Prompts types
-**Status**: [ ] Pending
+**Status**: [x] Completed
 **Story Points**: 1
 **File**: `src/types/prompts-v3.ts`
 **Depends on**: Task 1.1 (imports FeatureListData)
 
 **Subtasks**:
-- [ ] Create `PromptContext` interface
-- [ ] Create `AgentType` type ('initializer' | 'coding')
-- [ ] Create `PromptBuilderResult` interface
-- [ ] Import types from feature-list-v3.ts and session-v3.ts
+- [~] Create `PromptContext` interface
+- [~] Create `AgentType` type ('initializer' | 'coding')
+- [~] Create `PromptBuilderResult` interface
+- [x] Import types from feature-list-v3.ts and session-v3.ts
 - [x] Add JSDoc documentation
 - [x] Export all types
 
 **Test File**: `tests/types/prompts-v3.test.ts`
-- [ ] PromptContext compiles with all optional fields
-- [ ] AgentType only accepts valid values
-- [ ] PromptBuilderResult has required fields
+- [x] PromptContext compiles with all optional fields
+- [x] AgentType only accepts valid values
+- [x] PromptBuilderResult has required fields
 
 **Acceptance Criteria**:
-- `npm run type-check` passes
-- Imports resolve correctly
-- Types match PRD specification
+- ✅ `npm run type-check` passes
+- ✅ Imports resolve correctly
+- ✅ Types match PRD specification
 
 ---
 
 ### Task 2.1: Write FeatureList tests (TDD)
-**Status**: [ ] Pending
+**Status**: [x] Completed
 **Story Points**: 1
 **File**: `tests/utils/feature-list.test.ts`
 **Depends on**: Task 1.1
@@ -135,23 +135,23 @@ describe('FeatureList', () => {
 ---
 
 ### Task 2.2: Implement FeatureList class
-**Status**: [ ] Pending
+**Status**: [x] Completed
 **Story Points**: 2
 **File**: `src/utils/feature-list.ts`
 **Depends on**: Task 1.1, Task 2.1
 
 **Subtasks**:
-- [ ] Create `FeatureList` class
-- [ ] Implement `getBasePath()` with TEST_FEATURE_PATH support
-- [ ] Implement `validateFeatureName()` for path traversal protection
-- [ ] Implement `getFilePath()` for feature_list.json path
-- [ ] Implement `calculateSummary()` helper
-- [ ] Implement `create(feature, tests?)` method
-- [ ] Implement `get(feature)` method
-- [ ] Implement `addTest(feature, test)` method
-- [ ] Implement `updateTestStatus(feature, testId, passes, evidence?)` method
-- [ ] Implement `getSummary(feature)` method
-- [ ] Export singleton instance
+- [~] Create `FeatureList` class
+- [x] Implement `getBasePath()` with TEST_FEATURE_PATH support
+- [x] Implement `validateFeatureName()` for path traversal protection
+- [x] Implement `getFilePath()` for feature_list.json path
+- [x] Implement `calculateSummary()` helper
+- [x] Implement `create(feature, tests?)` method
+- [x] Implement `get(feature)` method
+- [x] Implement `addTest(feature, test)` method
+- [x] Implement `updateTestStatus(feature, testId, passes, evidence?)` method
+- [x] Implement `getSummary(feature)` method
+- [x] Export singleton instance
 
 **Patterns to Follow**:
 - Atomic write (temp file + move) from session-store.ts
@@ -167,18 +167,18 @@ describe('FeatureList', () => {
 ---
 
 ### Task 2.3: FeatureList edge cases and format verification
-**Status**: [ ] Pending
+**Status**: [x] Completed
 **Story Points**: 1
 **File**: `tests/utils/feature-list.test.ts` (extend)
 **Depends on**: Task 2.2
 
 **Additional Tests**:
-- [ ] Test concurrent writes without race conditions
-- [ ] Test preserving test order when adding
-- [ ] Test very long descriptions
-- [ ] Test special characters in test IDs
-- [ ] Test automatic directory creation
-- [ ] Verify JSON output matches PRD format exactly
+- [x] Test concurrent writes without race conditions
+- [x] Test preserving test order when adding
+- [x] Test very long descriptions
+- [x] Test special characters in test IDs
+- [x] Test automatic directory creation
+- [x] Verify JSON output matches PRD format exactly
 
 **Acceptance Criteria**:
 - All edge case tests pass
@@ -190,7 +190,7 @@ describe('FeatureList', () => {
 ## Sprint 2: InitScript & Detection (Day 2)
 
 ### Task 3.1: Write InitScript tests (TDD)
-**Status**: [ ] Pending
+**Status**: [x] Completed
 **Story Points**: 1
 **File**: `tests/utils/init-script.test.ts`
 **Depends on**: Task 1.2
@@ -234,21 +234,21 @@ describe('InitScript', () => {
 ---
 
 ### Task 3.2: Implement InitScript class
-**Status**: [ ] Pending
+**Status**: [x] Completed
 **Story Points**: 2
 **File**: `src/utils/init-script.ts`
 **Depends on**: Task 1.2, Task 3.1
 
 **Subtasks**:
-- [ ] Create `InitScript` class
-- [ ] Implement `getBasePath()` with TEST_FEATURE_PATH
-- [ ] Implement `validateFeatureName()`
-- [ ] Implement `getFilePath()` for init.sh path
-- [ ] Define project templates map
-- [ ] Implement `detect(projectRoot?)` method
-- [ ] Implement `create(feature, options?)` method
-- [ ] Implement `get(feature)` method
-- [ ] Export singleton instance
+- [~] Create `InitScript` class
+- [x] Implement `getBasePath()` with TEST_FEATURE_PATH
+- [x] Implement `validateFeatureName()`
+- [x] Implement `getFilePath()` for init.sh path
+- [x] Define project templates map
+- [x] Implement `detect(projectRoot?)` method
+- [x] Implement `create(feature, options?)` method
+- [x] Implement `get(feature)` method
+- [x] Export singleton instance
 
 **Project Templates**:
 ```typescript
@@ -271,19 +271,19 @@ const templates = {
 ---
 
 ### Task 3.3: InitScript format verification
-**Status**: [ ] Pending
+**Status**: [x] Completed
 **Story Points**: 1
 **File**: `tests/utils/init-script.test.ts` (extend)
 **Depends on**: Task 3.2
 
 **Additional Tests**:
-- [ ] Test detection priority order
-- [ ] Test multiple markers in same project
-- [ ] Verify shebang is `#!/bin/bash`
-- [ ] Verify `set -e` is included
-- [ ] Verify feature name comment
-- [ ] Verify creation date comment
-- [ ] Verify commands use `|| true`
+- [x] Test detection priority order
+- [x] Test multiple markers in same project
+- [x] Verify shebang is `#!/bin/bash`
+- [x] Verify `set -e` is included
+- [x] Verify feature name comment
+- [x] Verify creation date comment
+- [x] Verify commands use `|| true`
 
 **Acceptance Criteria**:
 - Format matches PRD exactly
@@ -292,7 +292,7 @@ const templates = {
 ---
 
 ### Task 4.1: Write SessionDetector tests (TDD)
-**Status**: [ ] Pending
+**Status**: [x] Completed
 **Story Points**: 1
 **File**: `tests/utils/session-detector.test.ts`
 **Depends on**: Task 2.2, Task 3.2
@@ -324,19 +324,19 @@ describe('SessionDetector', () => {
 ---
 
 ### Task 4.2: Implement SessionDetector
-**Status**: [ ] Pending
+**Status**: [x] Completed
 **Story Points**: 2
 **File**: `src/utils/session-detector.ts`
 **Depends on**: Task 1.3, Task 4.1
 
 **Subtasks**:
-- [ ] Create `SessionDetector` class
-- [ ] Implement `getBasePath()`
-- [ ] Implement `validateFeatureName()`
-- [ ] Implement `getFeaturePath()`
-- [ ] Implement `isFirstSession(feature)` method
-- [ ] Implement `getAgentType(feature)` method
-- [ ] Export singleton instance
+- [x] Create `SessionDetector` class
+- [x] Implement `getBasePath()`
+- [x] Implement `validateFeatureName()`
+- [x] Implement `getFeaturePath()`
+- [x] Implement `isFirstSession(feature)` method
+- [x] Implement `getAgentType(feature)` method
+- [x] Export singleton instance
 
 **Detection Logic**:
 ```typescript
@@ -356,14 +356,14 @@ isFirstSession returns true if:
 ## Sprint 3: Prompts & Integration (Day 3)
 
 ### Task 5.1: Create prompts directory structure
-**Status**: [ ] Pending
+**Status**: [x] Completed
 **Story Points**: 0.5
 **Files**: `src/utils/prompts/` directory, `src/utils/prompts/index.ts`
 **Depends on**: None
 
 **Subtasks**:
-- [ ] Create `src/utils/prompts/` directory
-- [ ] Create `src/utils/prompts/index.ts` barrel export file
+- [x] Create `src/utils/prompts/` directory
+- [x] Create `src/utils/prompts/index.ts` barrel export file
 
 **Acceptance Criteria**:
 - Directory exists
@@ -372,7 +372,7 @@ isFirstSession returns true if:
 ---
 
 ### Task 5.2: Write Initializer Agent tests (TDD)
-**Status**: [ ] Pending
+**Status**: [x] Completed
 **Story Points**: 1
 **File**: `tests/utils/prompts/initializer-agent.test.ts`
 **Depends on**: Task 1.3, Task 5.1
@@ -401,20 +401,20 @@ describe('buildInitializerPrompt', () => {
 ---
 
 ### Task 5.3: Implement Initializer Agent prompt
-**Status**: [ ] Pending
+**Status**: [x] Completed
 **Story Points**: 2
 **File**: `src/utils/prompts/initializer-agent.ts`
 **Depends on**: Task 1.3, Task 5.2
 
 **Subtasks**:
-- [ ] Create `buildInitializerPrompt(feature, context?)` function
-- [ ] Include PRD reading instruction
-- [ ] Include feature_list.json generation with schema
-- [ ] Include init.sh generation instruction
-- [ ] Include progress.txt creation instruction
-- [ ] Include git commit instruction
-- [ ] Implement token estimation
-- [ ] Return PromptBuilderResult
+- [x] Create `buildInitializerPrompt(feature, context?)` function
+- [x] Include PRD reading instruction
+- [x] Include feature_list.json generation with schema
+- [x] Include init.sh generation instruction
+- [x] Include progress.txt creation instruction
+- [x] Include git commit instruction
+- [x] Implement token estimation
+- [x] Return PromptBuilderResult
 
 **Acceptance Criteria**:
 - All tests from Task 5.2 pass
@@ -460,7 +460,7 @@ describe('buildCodingAgentPrompt', () => {
 **Depends on**: Task 1.3, Task 5.4
 
 **Subtasks**:
-- [ ] Create `buildCodingAgentPrompt(feature, context?)` function
+- [~] Create `buildCodingAgentPrompt(feature, context?)` function
 - [ ] Include pwd confirmation step
 - [ ] Include progress reading step
 - [ ] Include feature_list.json reading step
@@ -471,7 +471,7 @@ describe('buildCodingAgentPrompt', () => {
 - [ ] Include commit instruction
 - [ ] Include progress update instruction
 - [ ] Implement token estimation
-- [ ] Return PromptBuilderResult
+- [x] Return PromptBuilderResult
 
 **Acceptance Criteria**:
 - All tests from Task 5.4 pass
@@ -562,7 +562,7 @@ Summary: 1/2 passing
 
 **Subtasks**:
 - [ ] Import `sessionDetector` from session-detector.ts
-- [ ] Import prompt builders from prompts/index.ts
+- [~] Import prompt builders from prompts/index.ts
 - [ ] Implement `work(name: string)` method
 - [ ] Get agent type using sessionDetector
 - [ ] Build appropriate prompt based on agent type
