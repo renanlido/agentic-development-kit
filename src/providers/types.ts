@@ -65,6 +65,7 @@ export interface AdkConfig {
   providers: Record<string, ProviderSpecificConfig>
   hooks?: HooksConfig
   modelRouting?: ModelRoutingConfig
+  compaction?: import('../types/compaction.js').CompactionConfig
 }
 
 export interface ProviderSpecificConfig {

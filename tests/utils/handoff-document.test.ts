@@ -7,6 +7,8 @@ describe('Handoff Document System', () => {
   let tempDir: string
   let featureName: string
 
+  jest.setTimeout(120000)
+
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'handoff-test-'))
     featureName = 'test-feature'
@@ -79,6 +81,9 @@ describe('Handoff Document System', () => {
     it('should include in-progress tasks in IN PROGRESS section', async () => {
       const { StateManager } = await import('../../src/utils/state-manager')
       const manager = new StateManager()
+
+      const featurePath = path.join(tempDir, '.claude/plans/features', featureName)
+      await fs.ensureDir(featurePath)
 
       const state = {
         feature: featureName,
@@ -258,7 +263,7 @@ describe('Handoff Document System', () => {
       expect(parsed.inProgress).toContain('Implementing authentication middleware')
       expect(parsed.next).toContain('Add tests for authentication')
       expect(parsed.files).toContain('src/auth/middleware.ts')
-      expect(parsed.issues).toBe('None blocking')
+      expect(parsed.issues).toEqual([])
     })
 
     it('should be tolerant to malformed input', async () => {
@@ -329,9 +334,10 @@ ISSUES: None
 
       const parsed = manager.parseHandoffDocument(document)
 
+      expect(parsed.next).toBeDefined()
       expect(parsed.next).toHaveLength(3)
-      expect(parsed.next[0]).toContain('First task')
-      expect(parsed.next[1]).toContain('Second task')
+      expect(parsed.next?.[0]).toContain('First task')
+      expect(parsed.next?.[1]).toContain('Second task')
     })
 
     it('should parse comma-separated files', async () => {

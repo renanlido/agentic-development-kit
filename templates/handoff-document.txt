@@ -1,0 +1,39 @@
+========================================
+HANDOFF DOCUMENT: [FEATURE]
+Generated: [TIMESTAMP]
+Session: [SESSION_ID]
+Checkpoint: [CHECKPOINT_ID]
+========================================
+
+## CURRENT TASK
+[current task description] ([progress]% complete)
+
+## COMPLETED
+[- completed task 1]
+[- completed task 2]
+
+## IN PROGRESS
+[- task in progress 1]
+
+## NEXT STEPS
+[1. next task]
+[2. next task]
+
+## FILES MODIFIED
+[- file1.ts: description]
+[- file2.ts: description]
+
+## BLOCKING ISSUES
+[- issue description (if any)]
+[None blocking]
+
+## DECISIONS MADE
+[- decision 1: rationale]
+[- decision 2: rationale]
+
+## CONTEXT FOR CONTINUATION
+[Brief context about current state and what the next session needs to know]
+
+========================================
+Use: adk feature continue [FEATURE] to resume
+========================================

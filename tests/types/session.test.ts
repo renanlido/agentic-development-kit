@@ -152,12 +152,22 @@ describe('Session Types', () => {
   describe('HandoffDocument', () => {
     it('should accept valid handoff document structure', () => {
       const handoff: HandoffDocument = {
+        feature: 'test-feature',
+        createdAt: '2024-01-01T00:00:00Z',
+        sessionId: 'session-123',
+        checkpointId: 'checkpoint-456',
+        currentTask: 'Implementing authentication (60% complete)',
+        completed: ['Setup project', 'Create schema'],
+        inProgress: ['Auth middleware', 'Password hashing'],
+        nextSteps: ['Add tests', 'Deploy'],
+        filesModified: ['src/auth.ts', 'src/user.ts'],
+        issues: [],
+        decisions: [],
+        context: 'Authentication implementation in progress',
         current: 'Implementing authentication (60% complete)',
         done: ['Setup project', 'Create schema'],
-        inProgress: ['Auth middleware', 'Password hashing'],
         next: ['Add tests', 'Deploy'],
         files: ['src/auth.ts', 'src/user.ts'],
-        issues: 'None blocking',
       }
 
       expect(handoff.done).toHaveLength(2)
@@ -168,12 +178,22 @@ describe('Session Types', () => {
 
     it('should accept empty arrays in handoff document', () => {
       const handoff: HandoffDocument = {
+        feature: 'new-feature',
+        createdAt: '2024-01-01T00:00:00Z',
+        sessionId: 'session-789',
+        checkpointId: 'checkpoint-012',
+        currentTask: 'Starting new feature',
+        completed: [],
+        inProgress: [],
+        nextSteps: ['Task 1', 'Task 2'],
+        filesModified: [],
+        issues: [],
+        decisions: [],
+        context: 'New feature start',
         current: 'Starting new feature',
         done: [],
-        inProgress: [],
         next: ['Task 1', 'Task 2'],
         files: [],
-        issues: 'No issues',
       }
 
       expect(handoff.done).toHaveLength(0)

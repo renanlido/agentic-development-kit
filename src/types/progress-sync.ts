@@ -26,6 +26,20 @@ export interface UnifiedFeatureState {
   transitions: TransitionEntry[]
   lastUpdated: string
   lastSynced: string
+  tokenUsage?: {
+    currentTokens: number
+    maxTokens: number
+    usagePercentage: number
+    level: string
+    lastChecked: string
+  }
+  lastCompaction?: {
+    timestamp: string
+    level: string
+    tokensBefore: number
+    tokensAfter: number
+    savedTokens: number
+  }
 }
 
 export interface SnapshotData {

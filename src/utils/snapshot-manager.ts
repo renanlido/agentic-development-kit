@@ -4,6 +4,14 @@ import type { SnapshotMeta } from '../types/progress-sync'
 
 const SNAPSHOT_FILES = ['progress.md', 'tasks.md', 'state.json']
 
+function validateFeatureName(featureName: string): void {
+  if (!/^[a-zA-Z0-9_-]+$/.test(featureName)) {
+    throw new Error(
+      `Invalid feature name: "${featureName}". Use only alphanumeric characters, dashes, and underscores.`
+    )
+  }
+}
+
 /**
  * Creates and manages state snapshots at critical workflow points.
  *
@@ -19,11 +27,13 @@ export class SnapshotManager {
   }
 
   getSnapshotPath(feature: string): string {
+    validateFeatureName(feature)
     const basePath = this.getBasePath()
     return path.join(basePath, '.claude', 'plans', 'features', feature, '.snapshots')
   }
 
   private getFeaturePath(feature: string): string {
+    validateFeatureName(feature)
     const basePath = this.getBasePath()
     return path.join(basePath, '.claude', 'plans', 'features', feature)
   }

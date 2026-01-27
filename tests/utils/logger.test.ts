@@ -20,6 +20,8 @@ jest.mock('chalk', () => {
   }
 })
 
+jest.unmock('../../src/utils/logger')
+
 import { logger } from '../../src/utils/logger'
 
 describe('Logger', () => {

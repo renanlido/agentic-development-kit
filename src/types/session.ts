@@ -26,10 +26,12 @@ export type CheckpointReason =
   | 'manual'
   | 'step_complete'
   | 'context_warning'
+  | 'context_overflow'
   | 'error_recovery'
   | 'time_limit'
   | 'task_complete'
   | 'session_end'
+  | 'pre_compaction'
 
 export interface SessionListItem {
   id: string
@@ -43,10 +45,20 @@ export interface SessionListItem {
 }
 
 export interface HandoffDocument {
-  current: string
-  done: string[]
+  feature: string
+  createdAt: string
+  sessionId: string
+  checkpointId: string
+  currentTask: string
+  completed: string[]
   inProgress: string[]
-  next: string[]
-  files: string[]
-  issues: string
+  nextSteps: string[]
+  filesModified: string[]
+  issues: string[]
+  decisions: string[]
+  context: string
+  current?: string
+  done?: string[]
+  next?: string[]
+  files?: string[]
 }

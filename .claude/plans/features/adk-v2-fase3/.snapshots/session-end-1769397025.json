@@ -1,0 +1,14 @@
+{
+  "id": "session-end-1769397025",
+  "feature": "adk-v2-fase3",
+  "reason": "session_end",
+  "timestamp": "2026-01-26T03:10:25Z",
+  "tasks": {
+    "completed": 61,
+    "total": 182,
+    "percentage": 33,
+    "canAdvanceToQA": false,
+    "inProgressTask": "",
+    "nextTask": "Fase 1: Types (Foundation): Task 1.1: Criar tipos para compaction"
+  }
+}

@@ -36,7 +36,7 @@ export class HistoryTracker {
   private async withLock<T>(feature: string, fn: () => Promise<T>): Promise<T> {
     const existingLock = this.locks.get(feature)
 
-    let resolve: () => void
+    let resolve!: () => void
     const newLock = new Promise<void>((r) => {
       resolve = r
     })
@@ -49,7 +49,7 @@ export class HistoryTracker {
     try {
       return await fn()
     } finally {
-      resolve?.()
+      resolve()
       if (this.locks.get(feature) === newLock) {
         this.locks.delete(feature)
       }

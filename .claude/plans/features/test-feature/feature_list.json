@@ -1,0 +1,23 @@
+{
+  "feature": "test-feature",
+  "version": "1.0.0",
+  "createdAt": "2026-01-27T01:20:53.188Z",
+  "tests": [
+    {
+      "id": "test-723acd6e",
+      "description": "Test requirement",
+      "category": "ui",
+      "priority": "medium",
+      "steps": [],
+      "passes": false,
+      "lastTested": null,
+      "notes": ""
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "passing": 0,
+    "failing": 0,
+    "pending": 1
+  }
+}

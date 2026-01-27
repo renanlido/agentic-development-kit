@@ -58,12 +58,13 @@ export async function executeWithCDR<T>(
       const durationMs = Date.now() - startTime
       const tokenEstimate = estimateTokenUsage(durationMs)
 
-      updateHealthMetrics(probe?.id, { durationMs, tokenEstimate })
-      options.onProgress?.({ durationMs, tokenEstimate })
-
-      if (checkTokenPressure(probe?.id)) {
-        logger.warn('[CDR] Token pressure high, consider breaking task')
+      if (probe?.id) {
+        updateHealthMetrics(probe.id, { durationMs, tokenEstimate })
+        if (checkTokenPressure(probe.id)) {
+          logger.warn('[CDR] Token pressure high, consider breaking task')
+        }
       }
+      options.onProgress?.({ durationMs, tokenEstimate })
     }, 10000)
 
     const retryResult: RetryResult<T> = await retryWithBackoff(fn, config.retry)

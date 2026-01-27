@@ -1,0 +1,182 @@
+[
+  {
+    "timestamp": "2026-01-26T06:58:10.001Z",
+    "fromPhase": "research",
+    "toPhase": "research",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T06:58:10.010Z",
+    "fromPhase": "prd",
+    "toPhase": "research",
+    "trigger": "adk feature research"
+  },
+  {
+    "timestamp": "2026-01-26T06:58:57.075Z",
+    "fromPhase": "tasks",
+    "toPhase": "tasks",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T06:58:57.080Z",
+    "fromPhase": "research",
+    "toPhase": "tasks",
+    "trigger": "adk feature tasks"
+  },
+  {
+    "timestamp": "2026-01-26T13:33:02.040Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "arquitetura",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T13:33:02.051Z",
+    "fromPhase": "tasks",
+    "toPhase": "arquitetura",
+    "trigger": "adk feature plan"
+  },
+  {
+    "timestamp": "2026-01-26T17:33:32.289Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T17:33:32.295Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  },
+  {
+    "timestamp": "2026-01-26T17:43:05.425Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T17:43:05.430Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  },
+  {
+    "timestamp": "2026-01-26T17:53:26.531Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T17:53:26.534Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  },
+  {
+    "timestamp": "2026-01-26T17:53:59.431Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T17:53:59.435Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  },
+  {
+    "timestamp": "2026-01-26T18:01:25.334Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T18:01:25.339Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  },
+  {
+    "timestamp": "2026-01-26T18:23:43.918Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T18:23:43.921Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  },
+  {
+    "timestamp": "2026-01-26T19:47:42.949Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T19:47:42.968Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  },
+  {
+    "timestamp": "2026-01-26T20:35:36.575Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T20:35:36.587Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  },
+  {
+    "timestamp": "2026-01-26T20:45:53.419Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T20:45:53.423Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  },
+  {
+    "timestamp": "2026-01-26T22:01:37.495Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-26T22:01:37.499Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  },
+  {
+    "timestamp": "2026-01-27T00:08:34.412Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-27T00:08:34.417Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  },
+  {
+    "timestamp": "2026-01-27T01:09:40.133Z",
+    "fromPhase": "implementacao",
+    "toPhase": "implementacao",
+    "trigger": "sync"
+  },
+  {
+    "timestamp": "2026-01-27T01:09:40.184Z",
+    "fromPhase": "arquitetura",
+    "toPhase": "implementacao",
+    "trigger": "adk feature implement"
+  }
+]

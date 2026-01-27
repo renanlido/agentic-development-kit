@@ -8,7 +8,14 @@ import type {
   LongRunningSession,
   SessionListItem,
 } from '../types/session'
+import type {
+  CompactionLevelType,
+  CompactionResult,
+  ContextStatus,
+  ContextWarning,
+} from '../types/compaction'
 import { parseTasksFile } from './task-parser'
+import { contextCompactor } from './context-compactor'
 
 /**
  * Manages unified feature state by consolidating data from progress.md and tasks.md.
@@ -74,6 +81,15 @@ export class StateManager {
       state = this.mergeTasksIntoState(state, tasksData)
     }
 
+    const status = await this.getContextStatus(feature)
+    state.tokenUsage = {
+      currentTokens: status.currentTokens,
+      maxTokens: status.maxTokens,
+      usagePercentage: status.usagePercentage,
+      level: status.level,
+      lastChecked: new Date().toISOString(),
+    }
+
     return state
   }
 
@@ -83,9 +99,17 @@ export class StateManager {
 
     await fs.ensureDir(dir)
 
+    const status = await this.getContextStatus(feature)
     const updatedState = {
       ...state,
       lastUpdated: new Date().toISOString(),
+      tokenUsage: {
+        currentTokens: status.currentTokens,
+        maxTokens: status.maxTokens,
+        usagePercentage: status.usagePercentage,
+        level: status.level,
+        lastChecked: new Date().toISOString(),
+      },
     }
 
     const tempPath = path.join(os.tmpdir(), `state-${Date.now()}.json`)
@@ -518,27 +542,37 @@ ISSUES: ${issues}
   }
 
   parseHandoffDocument(content: string): HandoffDocument {
-    const sections = {
-      current: '',
-      done: [] as string[],
-      inProgress: [] as string[],
-      next: [] as string[],
-      files: [] as string[],
-      issues: '',
-    }
+    const featureMatch = content.match(/HANDOFF DOCUMENT:\s*(.+)/i) || content.match(/FEATURE:\s*(.+)/i)
+    const feature = featureMatch ? featureMatch[1].trim() : 'unknown'
 
-    const currentMatch = content.match(/CURRENT:\s*(.+)/i)
-    if (currentMatch) {
-      sections.current = currentMatch[1].trim()
-    }
+    const generatedMatch = content.match(/Generated:\s*(.+)/i)
+    const createdAt = generatedMatch ? generatedMatch[1].trim() : new Date().toISOString()
+
+    const sessionMatch = content.match(/Session:\s*(.+)/i)
+    const sessionId = sessionMatch ? sessionMatch[1].trim() : 'unknown'
+
+    const checkpointMatch = content.match(/Checkpoint:\s*(.+)/i)
+    const checkpointId = checkpointMatch ? checkpointMatch[1].trim() : 'unknown'
+
+    const currentMatch = content.match(/(?:CURRENT TASK|CURRENT):\s*(.+)/i)
+    const currentTask = currentMatch ? currentMatch[1].trim() : ''
+
+    const contextMatch = content.match(/CONTEXT FOR CONTINUATION:\s*(.+)/is)
+    const context = contextMatch ? contextMatch[1].trim() : ''
+
+    const done: string[] = []
+    const inProgress: string[] = []
+    const next: string[] = []
+    const files: string[] = []
+    const decisions: string[] = []
 
     const lines = content.split('\n')
-    let currentSection: 'none' | 'done' | 'inProgress' | 'next' = 'none'
+    let currentSection: 'none' | 'done' | 'inProgress' | 'next' | 'files' | 'decisions' = 'none'
 
     for (const line of lines) {
       const trimmed = line.trim()
 
-      if (trimmed.match(/^DONE:/i)) {
+      if (trimmed.match(/^(?:COMPLETED|DONE):/i)) {
         currentSection = 'done'
         continue
       }
@@ -546,11 +580,19 @@ ISSUES: ${issues}
         currentSection = 'inProgress'
         continue
       }
-      if (trimmed.match(/^NEXT:/i)) {
+      if (trimmed.match(/^(?:NEXT STEPS|NEXT):/i)) {
         currentSection = 'next'
         continue
       }
-      if (trimmed.match(/^(FILES|ISSUES):/i)) {
+      if (trimmed.match(/^FILES MODIFIED:/i)) {
+        currentSection = 'files'
+        continue
+      }
+      if (trimmed.match(/^DECISIONS MADE:/i)) {
+        currentSection = 'decisions'
+        continue
+      }
+      if (trimmed.match(/^(BLOCKING ISSUES|CONTEXT FOR CONTINUATION|===):/i) || trimmed.startsWith('===')) {
         currentSection = 'none'
         continue
       }
@@ -560,31 +602,61 @@ ISSUES: ${issues}
       }
 
       if (currentSection === 'done' && trimmed.startsWith('-')) {
-        sections.done.push(trimmed.replace(/^-\s*/, '').trim())
+        done.push(trimmed.replace(/^-\s*/, '').trim())
       } else if (currentSection === 'inProgress' && trimmed.startsWith('-')) {
-        sections.inProgress.push(trimmed.replace(/^-\s*/, '').trim())
-      } else if (currentSection === 'next' && trimmed.match(/^\d+\./)) {
-        sections.next.push(trimmed.replace(/^\d+\.\s*/, '').trim())
+        inProgress.push(trimmed.replace(/^-\s*/, '').trim())
+      } else if (currentSection === 'next' && trimmed.match(/^[\d.]+\s/)) {
+        next.push(trimmed.replace(/^[\d.]+\s*/, '').trim())
+      } else if (currentSection === 'files' && trimmed.startsWith('-')) {
+        files.push(trimmed.replace(/^-\s*/, '').trim())
+      } else if (currentSection === 'decisions' && trimmed.startsWith('-')) {
+        decisions.push(trimmed.replace(/^-\s*/, '').trim())
       }
     }
 
-    const filesMatch = content.match(/FILES:\s*([^\n]+)/i)
-    if (filesMatch) {
-      const filesText = filesMatch[1].trim()
+    const filesInlineMatch = content.match(/FILES:\s*([^\n]+)/i)
+    if (filesInlineMatch) {
+      const filesText = filesInlineMatch[1].trim()
       if (filesText && !filesText.match(/^ISSUES:/i)) {
-        sections.files = filesText
+        const inlineFiles = filesText
           .split(',')
           .map((f) => f.trim())
           .filter((f) => f)
+        files.push(...inlineFiles)
       }
     }
 
-    const issuesMatch = content.match(/ISSUES:\s*(.+)/i)
-    if (issuesMatch) {
-      sections.issues = issuesMatch[1].trim()
+    const issuesMatch = content.match(/(?:BLOCKING )?ISSUES:\s*(.+?)(?=\n\n|##|$)/is)
+    let issuesText = issuesMatch ? issuesMatch[1].trim() : ''
+    const issuesArray: string[] = []
+
+    if (issuesText && !issuesText.match(/none|None blocking/i)) {
+      issuesText.split('\n').forEach(line => {
+        const trimmed = line.trim().replace(/^-\s*/, '')
+        if (trimmed && !trimmed.match(/^##/)) {
+          issuesArray.push(trimmed)
+        }
+      })
     }
 
-    return sections
+    return {
+      feature,
+      createdAt,
+      sessionId,
+      checkpointId,
+      currentTask,
+      completed: done,
+      inProgress,
+      nextSteps: next,
+      filesModified: files,
+      issues: issuesArray,
+      decisions,
+      context,
+      current: currentTask,
+      done,
+      next,
+      files,
+    }
   }
 
   async createContextSummary(feature: string): Promise<string> {
@@ -596,5 +668,95 @@ Progress: ${state.progress}%
 Completed: ${state.tasks.filter((t) => t.status === 'completed').length}/${state.tasks.length} tasks`
 
     return summary
+  }
+
+  async getContextStatus(feature: string): Promise<ContextStatus> {
+    return await contextCompactor.getContextStatus(feature)
+  }
+
+  async beforeToolUse(feature: string): Promise<ContextWarning | null> {
+    const status = await this.getContextStatus(feature)
+
+    if (status.level === 'handoff') {
+      return {
+        severity: 'emergency',
+        message: 'Context limit reached. Creating handoff document.',
+        action: 'handoff',
+      }
+    }
+
+    if (status.level === 'summarize') {
+      return {
+        severity: 'critical',
+        message: `Context at ${status.usagePercentage.toFixed(1)}%. Summarization recommended.`,
+        action: 'summarize',
+      }
+    }
+
+    if (status.level === 'compact') {
+      return {
+        severity: 'warning',
+        message: `Context at ${status.usagePercentage.toFixed(1)}%. Consider compaction.`,
+        action: 'compact',
+      }
+    }
+
+    return null
+  }
+
+  async handleContextWarning(feature: string, status: ContextStatus): Promise<void> {
+    if (status.level === 'handoff') {
+      await contextCompactor.createHandoffDocument(feature)
+    } else if (status.level === 'summarize') {
+      await contextCompactor.summarize(feature)
+    } else if (status.level === 'compact') {
+      await contextCompactor.compact(feature, undefined)
+    }
+  }
+
+  async triggerCompaction(
+    feature: string,
+    level?: CompactionLevelType
+  ): Promise<CompactionResult> {
+    const result = await contextCompactor.compact(feature, level ? { level } : undefined)
+
+    try {
+      const { logger } = await import('./logger')
+      logger.info(
+        `Compacted ${feature}: ${result.originalTokens} → ${result.compactedTokens} tokens (saved ${result.savedTokens})`
+      )
+    } catch {}
+
+    const state = await this.loadUnifiedState(feature)
+    state.lastCompaction = {
+      timestamp: result.timestamp,
+      level: result.level,
+      tokensBefore: result.originalTokens,
+      tokensAfter: result.compactedTokens,
+      savedTokens: result.savedTokens,
+    }
+    await this.saveUnifiedState(feature, state)
+
+    return result
+  }
+
+  async createCheckpoint(
+    _feature: string,
+    options: { reason: CheckpointReason; message?: string; metadata?: Record<string, unknown> }
+  ): Promise<{
+    id: string
+    reason: CheckpointReason
+    message?: string
+    metadata?: Record<string, unknown>
+    createdAt: string
+  }> {
+    const checkpointId = `checkpoint-${Date.now()}`
+    return {
+      id: checkpointId,
+      reason: options.reason,
+      message: options.message,
+      metadata: options.metadata,
+      createdAt: new Date().toISOString(),
+    }
   }
 }
