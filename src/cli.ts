@@ -59,6 +59,7 @@ feature
   .option('-d, --desc <description>', 'Descrição da feature (alternativa ao argumento posicional)')
   .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
+  .option('--headless', 'Executa em modo headless (termina automaticamente)')
   .action((name, description, options) =>
     featureCommand.create(name, { ...options, description: options.desc || description })
   )
@@ -69,6 +70,7 @@ feature
   .option('-c, --context <file>', 'Arquivo de contexto adicional')
   .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
+  .option('--headless', 'Executa em modo headless (termina automaticamente)')
   .action((name, description, options) =>
     featureCommand.research(name, { ...options, description })
   )
@@ -77,6 +79,7 @@ feature
   .command('tasks <name>')
   .description('Cria breakdown de tasks a partir do PRD/research')
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
+  .option('--headless', 'Executa em modo headless (termina automaticamente)')
   .action((name, options) => featureCommand.tasks(name, options))
 
 feature
@@ -85,6 +88,7 @@ feature
   .option('--skip-spec', 'Pula validação de spec (não recomendado)')
   .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
+  .option('--headless', 'Executa em modo headless (termina automaticamente)')
   .action((name, options) => featureCommand.plan(name, options))
 
 feature
@@ -105,8 +109,9 @@ feature
   .description('Executa revisão de qualidade (QA) - requer worktree')
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
+  .option('--headless', 'Executa em modo headless (termina automaticamente)')
   .action((name, options) =>
-    featureCommand.qa(name, { baseBranch: options.baseBranch, model: options.model })
+    featureCommand.qa(name, { baseBranch: options.baseBranch, model: options.model, headless: options.headless })
   )
 
 feature
@@ -114,8 +119,9 @@ feature
   .description('Gera/atualiza documentação da feature - requer worktree')
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
+  .option('--headless', 'Executa em modo headless (termina automaticamente)')
   .action((name, options) =>
-    featureCommand.docs(name, { baseBranch: options.baseBranch, model: options.model })
+    featureCommand.docs(name, { baseBranch: options.baseBranch, model: options.model, headless: options.headless })
   )
 
 feature
