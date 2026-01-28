@@ -4,14 +4,26 @@ import os from 'node:os'
 import path from 'node:path'
 import * as readline from 'node:readline'
 import { ModelType } from '../types/model'
+import type { CollectedMetrics } from '../types/parallel'
 import { logger } from './logger'
-import { parseAndDisplayStream } from './stream-parser'
+import {
+  disableMetricsCollection,
+  enableMetricsCollection,
+  getCollectedMetrics,
+  parseAndDisplayStream,
+} from './stream-parser'
 
 export interface ClaudeCommandOptions {
   model?: ModelType
   headless?: boolean
   showProgress?: boolean
   cwd?: string
+  collectMetrics?: boolean
+}
+
+export interface HeadlessResult {
+  success: boolean
+  metrics?: CollectedMetrics
 }
 
 const VALID_MODELS = new Set<string>([ModelType.OPUS, ModelType.SONNET, ModelType.HAIKU])
@@ -45,6 +57,14 @@ export async function executeClaudeCommand(
 }
 
 async function executeHeadless(prompt: string, options: ClaudeCommandOptions): Promise<string> {
+  const result = await executeHeadlessWithMetrics(prompt, options)
+  return result.success ? '' : ''
+}
+
+export async function executeHeadlessWithMetrics(
+  prompt: string,
+  options: ClaudeCommandOptions = {}
+): Promise<HeadlessResult> {
   const validatedModel = validateModel(options.model)
   const args = [
     '-p',
@@ -59,6 +79,11 @@ async function executeHeadless(prompt: string, options: ClaudeCommandOptions): P
   }
 
   const showProgress = options.showProgress !== false
+  const collectMetrics = options.collectMetrics === true
+
+  if (collectMetrics) {
+    enableMetricsCollection()
+  }
 
   logger.debug(`Executing headless: claude ${args.join(' ')}`)
 
@@ -84,8 +109,12 @@ async function executeHeadless(prompt: string, options: ClaudeCommandOptions): P
 
     child.on('close', (code) => {
       rl.close()
+      const metrics = collectMetrics ? getCollectedMetrics() : undefined
+      if (collectMetrics) {
+        disableMetricsCollection()
+      }
       if (code === 0) {
-        resolve('')
+        resolve({ success: true, metrics: metrics || undefined })
       } else {
         reject(new Error(`Claude exited with code ${code}`))
       }
@@ -93,6 +122,9 @@ async function executeHeadless(prompt: string, options: ClaudeCommandOptions): P
 
     child.on('error', (err) => {
       rl.close()
+      if (collectMetrics) {
+        disableMetricsCollection()
+      }
       reject(new Error(`Failed to start Claude: ${err.message}`))
     })
   })

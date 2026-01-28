@@ -7,7 +7,8 @@ import ora from 'ora'
 import { createClickUpProvider } from '../providers/clickup/index.js'
 import type { LocalFeature, ProviderSpecificConfig } from '../providers/types.js'
 import type { ModelType } from '../types/model'
-import { executeClaudeCommand } from '../utils/claude'
+import { executeClaudeCommand, executeHeadlessWithMetrics } from '../utils/claude'
+import type { AgentExecutionMetrics, WaveCompletionSummary } from '../types/parallel'
 import { getIntegrationConfig, getProviderConfig } from '../utils/config.js'
 import {
   getClaudePath as getClaudePathUtil,
@@ -4316,7 +4317,13 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
         }
 
         if (wave.parallelizable && wave.tasks.length > 1) {
-          await this.executeWaveParallel(name, wave, options, specContent)
+          const metrics = await this.executeWaveParallel(name, wave, options, specContent)
+          this.displayWaveSummary({
+            waveNumber,
+            agents: metrics,
+            totalDurationMs: Math.max(...metrics.map((m) => m.durationMs)),
+            parallelized: true,
+          })
         } else {
           await this.executeWaveSequential(name, wave, options, specContent)
         }
@@ -4351,12 +4358,40 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
     }
   }
 
+  private displayWaveSummary(summary: WaveCompletionSummary): void {
+    const agentCount = summary.agents.length
+    const allSuccess = summary.agents.every((a) => a.status === 'success')
+    const statusIcon = allSuccess ? chalk.green('⏺') : chalk.yellow('⏺')
+
+    console.log()
+    console.log(`${statusIcon} ${agentCount} agent${agentCount > 1 ? 's' : ''} finished`)
+
+    summary.agents.forEach((agent, index) => {
+      const isLast = index === summary.agents.length - 1
+      const prefix = isLast ? '   └─' : '   ├─'
+
+      const tokenStr =
+        agent.tokenCount > 1000
+          ? `${(agent.tokenCount / 1000).toFixed(1)}k tokens`
+          : `${agent.tokenCount} tokens`
+
+      const statusSuffix = agent.status === 'success' ? '' : chalk.red(' ✗')
+
+      console.log(
+        chalk.gray(prefix) +
+          ` Task ${agent.taskId}` +
+          chalk.gray(` · ${agent.toolCount} tool uses · ${tokenStr}`) +
+          statusSuffix
+      )
+    })
+  }
+
   private async executeWaveParallel(
     name: string,
     wave: { tasks: Array<{ id: string; title: string }> },
     options: FeatureOptions,
     specContent?: string
-  ): Promise<void> {
+  ): Promise<AgentExecutionMetrics[]> {
     const hooksDir = path.join(process.cwd(), '.claude', 'hooks')
 
     const promises = wave.tasks.map(async (task) => {
@@ -4366,20 +4401,40 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
       }).start()
 
       const prompt = this.buildTaskPrompt(name, task, hooksDir, specContent)
+      const startTime = Date.now()
 
       try {
-        await executeClaudeCommand(prompt, {
+        const result = await executeHeadlessWithMetrics(prompt, {
           model: options.model as ModelType | undefined,
-          headless: true,
+          collectMetrics: true,
+          showProgress: false,
         })
         taskSpinner.succeed(chalk.green(`Task ${task.id}: ${task.title}`))
+
+        return {
+          taskId: task.id,
+          taskTitle: task.title,
+          toolCount: result.metrics?.toolCount || 0,
+          tokenCount: result.metrics?.tokenCount || 0,
+          durationMs: result.metrics?.durationMs || Date.now() - startTime,
+          costUsd: result.metrics?.costUsd,
+          status: 'success' as const,
+        }
       } catch (error) {
         taskSpinner.fail(chalk.red(`Task ${task.id}: ${task.title}`))
-        throw error
+
+        return {
+          taskId: task.id,
+          taskTitle: task.title,
+          toolCount: 0,
+          tokenCount: 0,
+          durationMs: Date.now() - startTime,
+          status: 'error' as const,
+        }
       }
     })
 
-    await Promise.all(promises)
+    return Promise.all(promises)
   }
 
   private async executeWaveSequential(

@@ -1,5 +1,6 @@
 import chalk from 'chalk'
 import ora, { type Ora } from 'ora'
+import type { CollectedMetrics } from '../types/parallel'
 
 interface StreamEventContent {
   type: 'text' | 'tool_use' | 'tool_result'
@@ -31,6 +32,26 @@ let totalToolCount = 0
 let lastPrintedText = ''
 let spinner: Ora | null = null
 let pendingTool: PendingTool | null = null
+
+let metricsCollector: CollectedMetrics | null = null
+
+export function enableMetricsCollection(): void {
+  metricsCollector = { toolCount: 0, tokenCount: 0, durationMs: 0 }
+}
+
+export function disableMetricsCollection(): void {
+  metricsCollector = null
+}
+
+export function getCollectedMetrics(): CollectedMetrics | null {
+  return metricsCollector ? { ...metricsCollector } : null
+}
+
+export function resetCollectedMetrics(): void {
+  if (metricsCollector) {
+    metricsCollector = { toolCount: 0, tokenCount: 0, durationMs: 0 }
+  }
+}
 
 export function resetStreamCounters(): void {
   totalToolCount = 0
@@ -81,6 +102,9 @@ function displayEvent(event: StreamEvent): void {
           if (block.type === 'tool_use' && block.name) {
             stopSpinner()
             totalToolCount++
+            if (metricsCollector) {
+              metricsCollector.toolCount++
+            }
             pendingTool = { name: block.name, input: block.input }
             startToolSpinner(block.name, block.input)
           }
@@ -103,6 +127,10 @@ function displayEvent(event: StreamEvent): void {
 
     case 'result': {
       stopSpinner()
+      if (metricsCollector) {
+        metricsCollector.durationMs = event.duration_ms || 0
+        metricsCollector.costUsd = event.total_cost_usd
+      }
       console.log(chalk.gray('─'.repeat(70)))
       const parts: string[] = []
       if (event.duration_ms) {
@@ -185,6 +213,11 @@ function printToolResult(tool: PendingTool, content: string | undefined, isError
 }
 
 function printToolContent(toolName: string, content: string, isError: boolean): void {
+  if (isTaskOutputContent(content)) {
+    printTaskOutput(content, isError)
+    return
+  }
+
   const lines = content.split('\n')
   const maxLines = 12
   const displayLines = lines.slice(0, maxLines)
@@ -219,6 +252,118 @@ function printToolContent(toolName: string, content: string, isError: boolean): 
 
   if (lines.length > maxLines) {
     console.log(prefix + chalk.gray(`... (${lines.length - maxLines} more lines)`))
+  }
+}
+
+function isTaskOutputContent(content: string): boolean {
+  return (
+    content.includes('<task_id>') ||
+    content.includes('<retrieval_status>') ||
+    content.includes('<task_type>') ||
+    content.includes('<status>')
+  )
+}
+
+function extractXmlValue(content: string, tag: string): string | null {
+  const match = content.match(new RegExp(`<${tag}>([^<]*)</${tag}>`))
+  return match ? match[1] : null
+}
+
+function printTaskOutput(content: string, isError: boolean): void {
+  const taskId = extractXmlValue(content, 'task_id')
+  const status = extractXmlValue(content, 'status')
+  const taskType = extractXmlValue(content, 'task_type')
+  const exitCode = extractXmlValue(content, 'exit_code')
+  const retrievalStatus = extractXmlValue(content, 'retrieval_status')
+
+  const statusIcon =
+    status === 'completed' && exitCode === '0'
+      ? chalk.green('●')
+      : status === 'completed'
+        ? chalk.red('●')
+        : status === 'running'
+          ? chalk.yellow('◐')
+          : chalk.gray('○')
+
+  const statusColor =
+    status === 'completed' && exitCode === '0'
+      ? chalk.green
+      : status === 'completed'
+        ? chalk.red
+        : chalk.yellow
+
+  console.log()
+  console.log(
+    chalk.gray('  ┌─') +
+      chalk.cyan(' Task ') +
+      chalk.gray(taskId || 'unknown') +
+      chalk.gray(' ─'.repeat(Math.max(1, 25 - (taskId?.length || 7))))
+  )
+
+  if (taskType) {
+    console.log(chalk.gray('  │ ') + chalk.gray('Type: ') + chalk.white(taskType))
+  }
+
+  console.log(
+    chalk.gray('  │ ') +
+      chalk.gray('Status: ') +
+      statusIcon +
+      ' ' +
+      statusColor(status || 'unknown') +
+      (exitCode !== null ? chalk.gray(` (exit: ${exitCode})`) : '')
+  )
+
+  if (retrievalStatus && retrievalStatus !== 'success') {
+    console.log(
+      chalk.gray('  │ ') + chalk.yellow('⚠ Retrieval: ') + chalk.yellow(retrievalStatus)
+    )
+  }
+
+  const outputMatch = content.match(/<output>([\s\S]*?)<\/output>/)
+  if (outputMatch) {
+    const output = outputMatch[1].trim()
+    if (output) {
+      console.log(chalk.gray('  │'))
+      console.log(chalk.gray('  │ ') + chalk.gray('Output:'))
+      printFormattedOutput(output, isError)
+    }
+  }
+
+  console.log(chalk.gray('  └' + '─'.repeat(40)))
+}
+
+function printFormattedOutput(output: string, isError: boolean): void {
+  const lines = output.split('\n').filter((l) => l.trim())
+  const maxLines = 8
+  const displayLines = lines.slice(0, maxLines)
+  const prefix = chalk.gray('  │   ')
+
+  for (const line of displayLines) {
+    let formattedLine = line.slice(0, 90)
+
+    if (line.includes('PASS') || line.includes('✓') || line.includes('success')) {
+      formattedLine = chalk.green(formattedLine)
+    } else if (
+      line.includes('FAIL') ||
+      line.includes('ERROR') ||
+      line.includes('Error') ||
+      line.includes('✗') ||
+      isError
+    ) {
+      formattedLine = chalk.red(formattedLine)
+    } else if (line.includes('WARN') || line.includes('warning')) {
+      formattedLine = chalk.yellow(formattedLine)
+    } else if (line.match(/^\s*at\s+/)) {
+      formattedLine = chalk.gray(formattedLine)
+    } else {
+      formattedLine = chalk.white(formattedLine)
+    }
+
+    console.log(prefix + formattedLine)
+  }
+
+  if (lines.length > maxLines) {
+    console.log(prefix + chalk.gray(`... +${lines.length - maxLines} lines`))
   }
 }
 
