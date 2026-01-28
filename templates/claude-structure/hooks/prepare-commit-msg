@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Hook: prepare-commit-msg
+# Remove linhas Co-Authored-By automaticamente dos commits
+# Isso evita mencionar IA/Claude nos commits conforme CLAUDE.md
+
+COMMIT_MSG_FILE=$1
+
+if [ -f "$COMMIT_MSG_FILE" ]; then
+  # Remove linhas que contêm Co-Authored-By (case insensitive)
+  sed -i.bak '/[Cc]o-[Aa]uthored-[Bb]y/d' "$COMMIT_MSG_FILE"
+
+  # Remove linhas vazias extras no final
+  sed -i.bak -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$COMMIT_MSG_FILE"
+
+  # Limpa arquivo de backup
+  rm -f "${COMMIT_MSG_FILE}.bak"
+fi

@@ -1,6 +1,12 @@
 import os from 'node:os'
 import path from 'node:path'
 import fs from 'fs-extra'
+import type {
+  CompactionLevelType,
+  CompactionResult,
+  ContextStatus,
+  ContextWarning,
+} from '../types/compaction'
 import type { TaskState, UnifiedFeatureState } from '../types/progress-sync'
 import type {
   CheckpointReason,
@@ -8,14 +14,8 @@ import type {
   LongRunningSession,
   SessionListItem,
 } from '../types/session'
-import type {
-  CompactionLevelType,
-  CompactionResult,
-  ContextStatus,
-  ContextWarning,
-} from '../types/compaction'
-import { parseTasksFile } from './task-parser'
 import { contextCompactor } from './context-compactor'
+import { parseTasksFile } from './task-parser'
 
 /**
  * Manages unified feature state by consolidating data from progress.md and tasks.md.
@@ -542,7 +542,8 @@ ISSUES: ${issues}
   }
 
   parseHandoffDocument(content: string): HandoffDocument {
-    const featureMatch = content.match(/HANDOFF DOCUMENT:\s*(.+)/i) || content.match(/FEATURE:\s*(.+)/i)
+    const featureMatch =
+      content.match(/HANDOFF DOCUMENT:\s*(.+)/i) || content.match(/FEATURE:\s*(.+)/i)
     const feature = featureMatch ? featureMatch[1].trim() : 'unknown'
 
     const generatedMatch = content.match(/Generated:\s*(.+)/i)
@@ -592,7 +593,10 @@ ISSUES: ${issues}
         currentSection = 'decisions'
         continue
       }
-      if (trimmed.match(/^(BLOCKING ISSUES|CONTEXT FOR CONTINUATION|===):/i) || trimmed.startsWith('===')) {
+      if (
+        trimmed.match(/^(BLOCKING ISSUES|CONTEXT FOR CONTINUATION|===):/i) ||
+        trimmed.startsWith('===')
+      ) {
         currentSection = 'none'
         continue
       }
@@ -627,11 +631,11 @@ ISSUES: ${issues}
     }
 
     const issuesMatch = content.match(/(?:BLOCKING )?ISSUES:\s*(.+?)(?=\n\n|##|$)/is)
-    let issuesText = issuesMatch ? issuesMatch[1].trim() : ''
+    const issuesText = issuesMatch ? issuesMatch[1].trim() : ''
     const issuesArray: string[] = []
 
     if (issuesText && !issuesText.match(/none|None blocking/i)) {
-      issuesText.split('\n').forEach(line => {
+      issuesText.split('\n').forEach((line) => {
         const trimmed = line.trim().replace(/^-\s*/, '')
         if (trimmed && !trimmed.match(/^##/)) {
           issuesArray.push(trimmed)
@@ -714,10 +718,7 @@ Completed: ${state.tasks.filter((t) => t.status === 'completed').length}/${state
     }
   }
 
-  async triggerCompaction(
-    feature: string,
-    level?: CompactionLevelType
-  ): Promise<CompactionResult> {
+  async triggerCompaction(feature: string, level?: CompactionLevelType): Promise<CompactionResult> {
     const result = await contextCompactor.compact(feature, level ? { level } : undefined)
 
     try {

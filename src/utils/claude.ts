@@ -46,7 +46,13 @@ export async function executeClaudeCommand(
 
 async function executeHeadless(prompt: string, options: ClaudeCommandOptions): Promise<string> {
   const validatedModel = validateModel(options.model)
-  const args = ['-p', '--dangerously-skip-permissions', '--output-format', 'stream-json', '--verbose']
+  const args = [
+    '-p',
+    '--dangerously-skip-permissions',
+    '--output-format',
+    'stream-json',
+    '--verbose',
+  ]
 
   if (validatedModel) {
     args.push('--model', validatedModel)

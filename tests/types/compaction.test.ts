@@ -1,15 +1,15 @@
 import type {
-  CompactionLevelType,
-  TokenSource,
-  CompactedItemType,
-  CompactionLevel,
-  CompactionResult,
   CompactedItem,
-  TokenCountResult,
-  ContextStatus,
+  CompactedItemType,
   CompactionConfig,
   CompactionHistory,
   CompactionHistoryEntry,
+  CompactionLevel,
+  CompactionLevelType,
+  CompactionResult,
+  ContextStatus,
+  TokenCountResult,
+  TokenSource,
 } from '../../src/types/compaction'
 
 describe('Compaction Types', () => {
@@ -25,12 +25,7 @@ describe('Compaction Types', () => {
     })
 
     it('should validate CompactedItemType', () => {
-      const validTypes: CompactedItemType[] = [
-        'tool_output',
-        'duplicate',
-        'verbose',
-        'old_content',
-      ]
+      const validTypes: CompactedItemType[] = ['tool_output', 'duplicate', 'verbose', 'old_content']
       expect(validTypes).toHaveLength(4)
     })
   })

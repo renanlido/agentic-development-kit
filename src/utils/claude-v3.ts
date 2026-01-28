@@ -60,7 +60,7 @@ export async function executeClaudeCommandV3(
 
     return new Promise((resolve, reject) => {
       const claude = spawn('claude', args, {
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe'],
       })
 
       let stdout = ''
@@ -103,7 +103,7 @@ export async function executeClaudeCommandV3(
           output: stdout,
           sessionId,
           exitCode: code || 0,
-          duration
+          duration,
         })
       })
 
@@ -153,7 +153,7 @@ export async function executeWithSessionTracking(
   const existingSession = await sessionStore.get(feature)
   const isResumable = await sessionStore.isResumable(feature)
 
-  let sessionId = existingSession?.claudeSessionId || null
+  const sessionId = existingSession?.claudeSessionId || null
 
   if (isResumable && sessionId && !options.resume) {
     options.resume = sessionId
@@ -179,8 +179,8 @@ export async function executeWithSessionTracking(
     metadata: {
       model: options.model,
       exitCode: result.exitCode,
-      duration: result.duration
-    }
+      duration: result.duration,
+    },
   }
 
   await sessionStore.save(feature, sessionInfo)

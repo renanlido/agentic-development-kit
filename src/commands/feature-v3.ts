@@ -1,13 +1,13 @@
-import chalk from 'chalk'
-import ora from 'ora'
 import path from 'node:path'
+import chalk from 'chalk'
 import fs from 'fs-extra'
-import { sessionStore } from '../utils/session-store.js'
+import ora from 'ora'
 import { logger } from '../utils/logger.js'
+import { sessionStore } from '../utils/session-store.js'
 
 class FeatureV3Command {
   private validateFeatureName(name: string): void {
-    if (/[\/\\]|\.\./.test(name)) {
+    if (/[/\\]|\.\./.test(name)) {
       throw new Error(`Invalid feature name: ${name}`)
     }
   }
@@ -18,10 +18,7 @@ class FeatureV3Command {
     try {
       this.validateFeatureName(name)
 
-      const featurePath = path.join(
-        process.cwd(),
-        '.claude', 'plans', 'features', name
-      )
+      const featurePath = path.join(process.cwd(), '.claude', 'plans', 'features', name)
 
       if (!(await fs.pathExists(featurePath))) {
         spinner.fail(`Feature "${name}" not found`)
@@ -77,10 +74,14 @@ class FeatureV3Command {
 
   private formatStatus(status: string): string {
     switch (status) {
-      case 'active': return chalk.green('active')
-      case 'completed': return chalk.blue('completed')
-      case 'interrupted': return chalk.yellow('interrupted')
-      default: return chalk.gray(status)
+      case 'active':
+        return chalk.green('active')
+      case 'completed':
+        return chalk.blue('completed')
+      case 'interrupted':
+        return chalk.yellow('interrupted')
+      default:
+        return chalk.gray(status)
     }
   }
 

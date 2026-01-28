@@ -3,6 +3,7 @@ import chalk from 'chalk'
 import { Command } from 'commander'
 import { agentCommand } from './commands/agent.js'
 import { configCommand } from './commands/config.js'
+import { contextCommand } from './commands/context.js'
 import { deployCommand } from './commands/deploy.js'
 import { featureCommand } from './commands/feature.js'
 import { importCommand } from './commands/import.js'
@@ -14,7 +15,6 @@ import { syncCommand } from './commands/sync.js'
 import { toolCommand } from './commands/tool.js'
 import { updateCommand } from './commands/update.js'
 import { workflowCommand } from './commands/workflow.js'
-import { contextCommand } from './commands/context.js'
 
 const program = new Command()
 
@@ -100,8 +100,15 @@ feature
   .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
   .option('--headless', 'Executa em modo headless (termina automaticamente)')
+  .option('--parallel', 'Executa tasks em paralelo com múltiplos agentes')
+  .option('--agents <number>', 'Número de agentes paralelos (padrão: 3)', '3')
+  .option('--dry-run', 'Mostra plano de execução paralela sem executar')
   .action((name, options) =>
-    featureCommand.implement(name, { ...options, baseBranch: options.baseBranch })
+    featureCommand.implement(name, {
+      ...options,
+      baseBranch: options.baseBranch,
+      agents: options.agents ? parseInt(options.agents, 10) : 3,
+    })
   )
 
 feature
@@ -111,7 +118,11 @@ feature
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
   .option('--headless', 'Executa em modo headless (termina automaticamente)')
   .action((name, options) =>
-    featureCommand.qa(name, { baseBranch: options.baseBranch, model: options.model, headless: options.headless })
+    featureCommand.qa(name, {
+      baseBranch: options.baseBranch,
+      model: options.model,
+      headless: options.headless,
+    })
   )
 
 feature
@@ -121,7 +132,11 @@ feature
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
   .option('--headless', 'Executa em modo headless (termina automaticamente)')
   .action((name, options) =>
-    featureCommand.docs(name, { baseBranch: options.baseBranch, model: options.model, headless: options.headless })
+    featureCommand.docs(name, {
+      baseBranch: options.baseBranch,
+      model: options.model,
+      headless: options.headless,
+    })
   )
 
 feature
@@ -204,12 +219,16 @@ feature
   .option('-d, --desc <description>', 'Descrição da feature (alternativa ao argumento posicional)')
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
   .option('-l, --loop', 'Modo loop: executa tasks automaticamente até todas completarem')
+  .option('--parallel', 'Executa implementação com múltiplos agentes em paralelo')
+  .option('--agents <number>', 'Número de agentes paralelos (padrão: 3)', '3')
   .action((name, description, options) =>
     featureCommand.autopilot(name, {
       ...options,
       description: options.desc || description,
       baseBranch: options.baseBranch,
       loop: options.loop,
+      parallel: options.parallel,
+      agents: options.agents ? parseInt(options.agents, 10) : 3,
     })
   )
 
@@ -400,9 +419,7 @@ memory
   .action(() => memoryCommand.processQueue())
 
 // Comando: adk context
-const context = program
-  .command('context')
-  .description('Gerencia contexto e tokens das features')
+const context = program.command('context').description('Gerencia contexto e tokens das features')
 
 context
   .command('status [feature]')

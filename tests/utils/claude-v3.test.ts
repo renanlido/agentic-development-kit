@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { EventEmitter } from 'node:events'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 describe('Claude V3', () => {
   let mockSpawn: jest.MockedFunction<any>
@@ -54,7 +54,7 @@ describe('Claude V3', () => {
 
       jest.doMock('node:child_process', () => ({
         spawn: mockSpawn,
-        spawnSync: mockSpawnSync
+        spawnSync: mockSpawnSync,
       }))
 
       mockSpawn.mockReturnValue(mockProcess)
@@ -76,7 +76,7 @@ describe('Claude V3', () => {
       const mockProcess = createMockChildProcess()
 
       jest.doMock('node:child_process', () => ({
-        spawn: mockSpawn
+        spawn: mockSpawn,
       }))
 
       mockSpawn.mockReturnValue(mockProcess)
@@ -97,7 +97,7 @@ describe('Claude V3', () => {
       const mockProcess = createMockChildProcess()
 
       jest.doMock('node:child_process', () => ({
-        spawn: mockSpawn
+        spawn: mockSpawn,
       }))
 
       mockSpawn.mockReturnValue(mockProcess)
@@ -118,7 +118,7 @@ describe('Claude V3', () => {
       const mockProcess = createMockChildProcess()
 
       jest.doMock('node:child_process', () => ({
-        spawn: mockSpawn
+        spawn: mockSpawn,
       }))
 
       mockSpawn.mockReturnValue(mockProcess)
@@ -139,7 +139,7 @@ describe('Claude V3', () => {
       const mockProcess = createMockChildProcess()
 
       jest.doMock('node:child_process', () => ({
-        spawn: mockSpawn
+        spawn: mockSpawn,
       }))
 
       mockSpawn.mockReturnValue(mockProcess)
@@ -161,7 +161,7 @@ describe('Claude V3', () => {
       const mockProcess = createMockChildProcess()
 
       jest.doMock('node:child_process', () => ({
-        spawn: mockSpawn
+        spawn: mockSpawn,
       }))
 
       mockSpawn.mockReturnValue(mockProcess)
@@ -185,7 +185,7 @@ describe('Claude V3', () => {
       const mockProcess = createMockChildProcess()
 
       jest.doMock('node:child_process', () => ({
-        spawn: mockSpawn
+        spawn: mockSpawn,
       }))
 
       mockSpawn.mockReturnValue(mockProcess)
@@ -207,7 +207,7 @@ describe('Claude V3', () => {
       const mockProcess = createMockChildProcess()
 
       jest.doMock('node:child_process', () => ({
-        spawn: mockSpawn
+        spawn: mockSpawn,
       }))
 
       mockSpawn.mockReturnValue(mockProcess)
@@ -227,7 +227,7 @@ describe('Claude V3', () => {
       const mockProcess = createMockChildProcess()
 
       jest.doMock('node:child_process', () => ({
-        spawn: mockSpawn
+        spawn: mockSpawn,
       }))
 
       mockSpawn.mockReturnValue(mockProcess)
@@ -236,7 +236,7 @@ describe('Claude V3', () => {
 
       const promise = executeClaudeCommandV3('test prompt')
 
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise((resolve) => setTimeout(resolve, 100))
       mockProcess.emit('close', 0)
 
       const result = await promise
@@ -249,7 +249,7 @@ describe('Claude V3', () => {
       const onOutput = jest.fn()
 
       jest.doMock('node:child_process', () => ({
-        spawn: mockSpawn
+        spawn: mockSpawn,
       }))
 
       mockSpawn.mockReturnValue(mockProcess)
@@ -272,7 +272,7 @@ describe('Claude V3', () => {
       const mockProcess = createMockChildProcess()
 
       jest.doMock('node:child_process', () => ({
-        spawn: mockSpawn
+        spawn: mockSpawn,
       }))
 
       mockSpawn.mockReturnValue(mockProcess)
@@ -290,7 +290,7 @@ describe('Claude V3', () => {
   describe('isClaudeInstalledV3', () => {
     it('should detect Claude CLI when installed', async () => {
       jest.doMock('node:child_process', () => ({
-        spawnSync: mockSpawnSync
+        spawnSync: mockSpawnSync,
       }))
 
       mockSpawnSync.mockReturnValue({ status: 0 })
@@ -305,7 +305,7 @@ describe('Claude V3', () => {
 
     it('should return false when Claude CLI not installed', async () => {
       jest.doMock('node:child_process', () => ({
-        spawnSync: mockSpawnSync
+        spawnSync: mockSpawnSync,
       }))
 
       mockSpawnSync.mockReturnValue({ status: 1 })
@@ -321,7 +321,7 @@ describe('Claude V3', () => {
       jest.doMock('node:child_process', () => ({
         spawnSync: jest.fn(() => {
           throw new Error('Command failed')
-        })
+        }),
       }))
 
       const { isClaudeInstalledV3 } = await import('../../src/utils/claude-v3')
@@ -341,10 +341,10 @@ function createMockChildProcess(): any {
   return Object.assign(emitter, {
     stdin: {
       write: jest.fn(),
-      end: jest.fn()
+      end: jest.fn(),
     },
     stdout,
     stderr,
-    kill: jest.fn()
+    kill: jest.fn(),
   })
 }

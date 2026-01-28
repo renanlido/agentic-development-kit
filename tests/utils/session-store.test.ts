@@ -32,7 +32,7 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       })
 
       const saves = Array.from({ length: 10 }, (_, i) =>
@@ -54,14 +54,19 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await store.save('test-feature', session)
 
       const savedPath = path.join(
         tempDir,
-        '.claude', 'plans', 'features', 'test-feature', 'sessions', 'current.json'
+        '.claude',
+        'plans',
+        'features',
+        'test-feature',
+        'sessions',
+        'current.json'
       )
 
       expect(await fs.pathExists(savedPath)).toBe(true)
@@ -79,14 +84,19 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await store.save('atomic-test', session)
 
       const currentPath = path.join(
         tempDir,
-        '.claude', 'plans', 'features', 'atomic-test', 'sessions', 'current.json'
+        '.claude',
+        'plans',
+        'features',
+        'atomic-test',
+        'sessions',
+        'current.json'
       )
 
       expect(await fs.pathExists(currentPath)).toBe(true)
@@ -101,14 +111,20 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await store.save('history-test', session)
 
       const historyPath = path.join(
         tempDir,
-        '.claude', 'plans', 'features', 'history-test', 'sessions', 'history', 'session-3.json'
+        '.claude',
+        'plans',
+        'features',
+        'history-test',
+        'sessions',
+        'history',
+        'session-3.json'
       )
 
       expect(await fs.pathExists(historyPath)).toBe(true)
@@ -125,7 +141,7 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await store.save('get-test', session)
@@ -145,14 +161,15 @@ describe('SessionStore', () => {
       const store = new SessionStore()
       const sessionsPath = path.join(
         tempDir,
-        '.claude', 'plans', 'features', 'corrupted', 'sessions'
+        '.claude',
+        'plans',
+        'features',
+        'corrupted',
+        'sessions'
       )
 
       await fs.ensureDir(sessionsPath)
-      await fs.writeFile(
-        path.join(sessionsPath, 'current.json'),
-        'invalid json {'
-      )
+      await fs.writeFile(path.join(sessionsPath, 'current.json'), 'invalid json {')
 
       const result = await store.get('corrupted')
       expect(result).toBeNull()
@@ -169,7 +186,7 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await store.save('latest-test', session)
@@ -190,7 +207,7 @@ describe('SessionStore', () => {
         startedAt: '2026-01-20T10:00:00Z',
         lastActivity: '2026-01-20T10:00:00Z',
         status: 'completed' as const,
-        resumable: false
+        resumable: false,
       }
 
       const session2 = {
@@ -200,11 +217,11 @@ describe('SessionStore', () => {
         startedAt: '2026-01-25T10:00:00Z',
         lastActivity: '2026-01-25T10:00:00Z',
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await store.save('list-test', session1)
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
       await store.save('list-test', session2)
 
       const sessions = await store.list('list-test')
@@ -217,7 +234,12 @@ describe('SessionStore', () => {
       const store = new SessionStore()
       const historyDir = path.join(
         tempDir,
-        '.claude', 'plans', 'features', 'corrupted-list', 'sessions', 'history'
+        '.claude',
+        'plans',
+        'features',
+        'corrupted-list',
+        'sessions',
+        'history'
       )
 
       await fs.ensureDir(historyDir)
@@ -230,7 +252,7 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await fs.writeJSON(path.join(historyDir, 'valid.json'), validSession)
@@ -259,12 +281,12 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await store.save('update-test', session)
       await store.update('update-test', 'session-update', {
-        status: 'completed'
+        status: 'completed',
       })
 
       const updated = await store.get('update-test')
@@ -288,7 +310,7 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await store.save('mismatch-test', session)
@@ -308,11 +330,11 @@ describe('SessionStore', () => {
         startedAt: oldTimestamp,
         lastActivity: oldTimestamp,
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await store.save('timestamp-test', session)
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
       await store.update('timestamp-test', 'session-timestamp', {})
 
       const updated = await store.get('timestamp-test')
@@ -330,7 +352,7 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await store.save('clear-test', session)
@@ -357,7 +379,7 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await store.save('resumable-test', session)
@@ -378,7 +400,7 @@ describe('SessionStore', () => {
         startedAt: oldDate.toISOString(),
         lastActivity: oldDate.toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       }
 
       await store.save('old-test', session)
@@ -396,7 +418,7 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'interrupted' as const,
-        resumable: false
+        resumable: false,
       }
 
       await store.save('not-resumable-test', session)
@@ -454,7 +476,7 @@ describe('SessionStore', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active' as const,
-        resumable: true
+        resumable: true,
       })
 
       const saves = Array.from({ length: 100 }, async () => {

@@ -44,7 +44,7 @@ describe('FeatureV3Command', () => {
       const content = await fs.readFile(featurePath, 'utf-8')
 
       expect(content).toContain('sessionStore')
-      expect(content).toContain('from \'../utils/session-store.js\'')
+      expect(content).toContain("from '../utils/session-store.js'")
     })
 
     it('should display session information', async () => {
@@ -144,7 +144,12 @@ describe('FeatureV3Command', () => {
       const { SessionStore } = await import('../../src/utils/session-store')
       const store = new SessionStore()
 
-      const maliciousNames = ['../../../etc', '..\\..\\..\\windows', 'test/feature', 'test\\feature']
+      const maliciousNames = [
+        '../../../etc',
+        '..\\..\\..\\windows',
+        'test/feature',
+        'test\\feature',
+      ]
 
       for (const name of maliciousNames) {
         expect(() => store.getSessionsPath(name)).toThrow('Invalid feature name')

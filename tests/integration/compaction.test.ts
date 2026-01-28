@@ -3,15 +3,17 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import fs from 'fs-extra'
 import { ContextCompactor } from '../../src/utils/context-compactor'
-// @ts-ignore - used in test blocks
-import { StateManager } from '../../src/utils/state-manager'
-// @ts-ignore - used in test blocks
+// @ts-expect-error - used in test blocks
 import { MemoryPruner } from '../../src/utils/memory-pruner'
 import { SnapshotManager } from '../../src/utils/snapshot-manager'
+// @ts-expect-error - used in test blocks
+import { StateManager } from '../../src/utils/state-manager'
 import { resetEncoder } from '../../src/utils/token-counter'
 
 jest.mock('../../src/utils/claude', () => ({
-  executeClaudeCommand: jest.fn<() => Promise<string>>().mockResolvedValue('Mocked summary response'),
+  executeClaudeCommand: jest
+    .fn<() => Promise<string>>()
+    .mockResolvedValue('Mocked summary response'),
   isClaudeInstalled: jest.fn<() => boolean>().mockReturnValue(true),
 }))
 
@@ -95,15 +97,13 @@ describe('Compaction Integration', () => {
       }
     })
 
-    it(
-      'should preserve critical content through all levels',
-      async () => {
-        const { ContextCompactor } = await import('../../src/utils/context-compactor')
+    it('should preserve critical content through all levels', async () => {
+      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
-        const featurePath = path.join(tempDir, '.claude/plans/features', featureName)
-        await fs.ensureDir(featurePath)
+      const featurePath = path.join(tempDir, '.claude/plans/features', featureName)
+      await fs.ensureDir(featurePath)
 
-        const criticalContent = `
+      const criticalContent = `
 Regular content line 1
 ## Decision: Use microservices architecture
 Rationale: Better scalability
@@ -116,31 +116,29 @@ ADR-001: Architectural Decision Record
 More regular content
 `
 
-        await fs.writeFile(path.join(featurePath, 'progress.md'), criticalContent)
+      await fs.writeFile(path.join(featurePath, 'progress.md'), criticalContent)
 
-        const compactor = new ContextCompactor()
+      const compactor = new ContextCompactor()
 
-        const result = await compactor.compact(featureName)
-        expect(result).toBeDefined()
+      const result = await compactor.compact(featureName)
+      expect(result).toBeDefined()
 
-        const content = await fs.readFile(path.join(featurePath, 'progress.md'), 'utf-8')
-        expect(content).toContain('## Decision: Use microservices')
-        expect(content).toContain('Error: Critical database')
-        expect(content).toContain('ADR-001')
+      const content = await fs.readFile(path.join(featurePath, 'progress.md'), 'utf-8')
+      expect(content).toContain('## Decision: Use microservices')
+      expect(content).toContain('Error: Critical database')
+      expect(content).toContain('ADR-001')
 
-        try {
-          await compactor.summarize(featureName)
-          const summaryPath = path.join(featurePath, 'summary.md')
-          if (await fs.pathExists(summaryPath)) {
-            const summary = await fs.readFile(summaryPath, 'utf-8')
-            expect(summary.length).toBeGreaterThan(0)
-          }
-        } catch {
-          // Summarize might fail due to Claude not being available, that's ok
+      try {
+        await compactor.summarize(featureName)
+        const summaryPath = path.join(featurePath, 'summary.md')
+        if (await fs.pathExists(summaryPath)) {
+          const summary = await fs.readFile(summaryPath, 'utf-8')
+          expect(summary.length).toBeGreaterThan(0)
         }
-      },
-      15000
-    )
+      } catch {
+        // Summarize might fail due to Claude not being available, that's ok
+      }
+    }, 15000)
 
     it('should allow rollback within 24h', async () => {
       const { ContextCompactor } = await import('../../src/utils/context-compactor')
@@ -161,7 +159,6 @@ More regular content
       expect(restoredContent).toBeDefined()
     })
   })
-
 
   describe('Recovery scenarios', () => {
     it('should recover from API failure', async () => {
@@ -201,7 +198,6 @@ More regular content
     })
   })
 
-
   describe('CLI Integration', () => {
     it('should work with feature status --tokens', async () => {
       const { ContextCompactor } = await import('../../src/utils/context-compactor')
@@ -223,27 +219,23 @@ More regular content
       expect(status.recommendation).toBeDefined()
     })
 
-    it(
-      'should work with feature compact command',
-      async () => {
-        const { ContextCompactor } = await import('../../src/utils/context-compactor')
+    it('should work with feature compact command', async () => {
+      const { ContextCompactor } = await import('../../src/utils/context-compactor')
 
-        const featurePath = path.join(tempDir, '.claude/plans/features', featureName)
-        await fs.ensureDir(featurePath)
+      const featurePath = path.join(tempDir, '.claude/plans/features', featureName)
+      await fs.ensureDir(featurePath)
 
-        const content = Array.from({ length: 500 }, (_, i) => `Line ${i + 1}`).join('\n')
-        await fs.writeFile(path.join(featurePath, 'progress.md'), content)
+      const content = Array.from({ length: 500 }, (_, i) => `Line ${i + 1}`).join('\n')
+      await fs.writeFile(path.join(featurePath, 'progress.md'), content)
 
-        const compactor = new ContextCompactor()
+      const compactor = new ContextCompactor()
 
-        const dryRunResult = await compactor.compact(featureName, { dryRun: true })
-        expect(dryRunResult.itemsCompacted).toBeDefined()
+      const dryRunResult = await compactor.compact(featureName, { dryRun: true })
+      expect(dryRunResult.itemsCompacted).toBeDefined()
 
-        const actualResult = await compactor.compact(featureName)
-        expect(actualResult.compactedTokens).toBeLessThanOrEqual(actualResult.originalTokens)
-      },
-      15000
-    )
+      const actualResult = await compactor.compact(featureName)
+      expect(actualResult.compactedTokens).toBeLessThanOrEqual(actualResult.originalTokens)
+    }, 15000)
 
     it('should work with context prune command', async () => {
       const { MemoryPruner } = await import('../../src/utils/memory-pruner')

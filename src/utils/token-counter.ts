@@ -1,6 +1,6 @@
+import { createHash } from 'node:crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import { encoding_for_model, type Tiktoken } from 'tiktoken'
-import { createHash } from 'node:crypto'
 import type { TokenCountResult } from '../types/compaction.js'
 
 interface CacheEntry {

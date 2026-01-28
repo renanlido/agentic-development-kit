@@ -1,6 +1,6 @@
-import fs from 'fs-extra'
-import path from 'node:path'
 import { createHash } from 'node:crypto'
+import path from 'node:path'
+import fs from 'fs-extra'
 import { getFeaturePath } from './git-paths.js'
 
 interface PruneResult {
@@ -67,12 +67,7 @@ export class MemoryPruner {
 
         if (!dryRun) {
           try {
-            const archivePath = path.join(
-              this.config.basePath!,
-              '.compaction',
-              'archived',
-              feature
-            )
+            const archivePath = path.join(this.config.basePath!, '.compaction', 'archived', feature)
             await this.archiveContent(filePath, archivePath)
 
             const fileSize = (await fs.stat(filePath)).size
@@ -99,12 +94,7 @@ export class MemoryPruner {
   }
 
   async pruneProjectContext(dryRun = false): Promise<LimitResult> {
-    const contextPath = path.join(
-      this.config.basePath!,
-      '.claude',
-      'memory',
-      'project-context.md'
-    )
+    const contextPath = path.join(this.config.basePath!, '.claude', 'memory', 'project-context.md')
 
     if (!(await fs.pathExists(contextPath))) {
       return {
@@ -195,11 +185,9 @@ export class MemoryPruner {
       hash: createHash('md5').update(content).digest('hex'),
     }
 
-    await fs.writeJson(
-      path.join(archivePath, `${fileNameWithoutExt}.meta.json`),
-      metadata,
-      { spaces: 2 }
-    )
+    await fs.writeJson(path.join(archivePath, `${fileNameWithoutExt}.meta.json`), metadata, {
+      spaces: 2,
+    })
 
     const logPath = path.join(archivePath, 'archive.log')
     const logEntry = `${new Date().toISOString()} - ${fileName} - ${metadata.hash}\n`

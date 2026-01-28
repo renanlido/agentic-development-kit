@@ -1,7 +1,7 @@
-import { MemoryPruner } from '../../src/utils/memory-pruner'
-import * as fs from 'fs-extra'
-import * as path from 'node:path'
 import * as os from 'node:os'
+import * as path from 'node:path'
+import * as fs from 'fs-extra'
+import { MemoryPruner } from '../../src/utils/memory-pruner'
 
 describe('MemoryPruner', () => {
   let memoryPruner: MemoryPruner

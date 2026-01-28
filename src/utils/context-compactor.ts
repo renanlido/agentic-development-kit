@@ -1,18 +1,18 @@
-import { TokenCounter } from './token-counter'
-import { SnapshotManager } from './snapshot-manager'
-import { executeClaudeCommand } from './claude'
+import crypto from 'node:crypto'
+import * as path from 'node:path'
+import * as fs from 'fs-extra'
 import type {
-  ContextStatus,
-  CompactionResult,
-  CompactionLevelType,
   CompactedItem,
-  CompactionHistoryEntry,
   CompactionConfig,
+  CompactionHistoryEntry,
+  CompactionLevelType,
+  CompactionResult,
+  ContextStatus,
 } from '../types/compaction'
 import type { HandoffDocument } from '../types/session'
-import * as fs from 'fs-extra'
-import * as path from 'node:path'
-import crypto from 'node:crypto'
+import { executeClaudeCommand } from './claude'
+import { SnapshotManager } from './snapshot-manager'
+import { TokenCounter } from './token-counter'
 
 function validateFeatureName(featureName: string): void {
   if (!/^[a-zA-Z0-9_-]+$/.test(featureName)) {
@@ -280,12 +280,7 @@ Use: adk feature continue ${feature} to resume
   }
 
   async revertCompaction(feature: string, historyId: string): Promise<boolean> {
-    const historyPath = path.join(
-      this.getCompactionPath(),
-      'history',
-      feature,
-      `${historyId}.json`
-    )
+    const historyPath = path.join(this.getCompactionPath(), 'history', feature, `${historyId}.json`)
 
     if (!(await fs.pathExists(historyPath))) {
       return false
@@ -300,7 +295,8 @@ Use: adk feature continue ${feature} to resume
       return false
     }
 
-    const backupPath = history.revertPath || path.join(this.getCompactionPath(), 'backup', historyId)
+    const backupPath =
+      history.revertPath || path.join(this.getCompactionPath(), 'backup', historyId)
 
     if (await fs.pathExists(backupPath)) {
       const featurePath = this.getFeaturePath(feature)

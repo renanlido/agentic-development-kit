@@ -30,9 +30,7 @@ describe('CLI v3', () => {
       const { Command } = await import('commander')
       const program = new Command()
 
-      program
-        .name('adk3')
-        .version('3.0.0-alpha')
+      program.name('adk3').version('3.0.0-alpha')
 
       expect(program.version()).toBe('3.0.0-alpha')
     })
@@ -45,10 +43,7 @@ describe('CLI v3', () => {
       const { Command } = await import('commander')
       const program = new Command()
 
-      program
-        .name('adk3')
-        .description('ADK v3 - Session Continuity Preview')
-        .version('3.0.0-alpha')
+      program.name('adk3').description('ADK v3 - Session Continuity Preview').version('3.0.0-alpha')
 
       const helpText = program.helpInformation()
 
@@ -67,9 +62,7 @@ describe('CLI v3', () => {
       const { Command } = await import('commander')
       const program = new Command()
 
-      program
-        .name('adk3')
-        .version('3.0.0-alpha')
+      program.name('adk3').version('3.0.0-alpha')
 
       program.on('command:*', () => {
         console.error('Invalid command: %s', program.args.join(' '))

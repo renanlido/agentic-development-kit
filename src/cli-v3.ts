@@ -5,14 +5,9 @@ import { featureV3Command } from './commands/feature-v3.js'
 
 const program = new Command()
 
-program
-  .name('adk3')
-  .description('ADK v3 - Session Continuity Preview')
-  .version('3.0.0-alpha')
+program.name('adk3').description('ADK v3 - Session Continuity Preview').version('3.0.0-alpha')
 
-const feature = program
-  .command('feature')
-  .description('Feature commands with session tracking')
+const feature = program.command('feature').description('Feature commands with session tracking')
 
 feature
   .command('status <name>')

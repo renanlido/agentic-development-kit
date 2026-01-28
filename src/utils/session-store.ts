@@ -1,6 +1,6 @@
-import fs from 'fs-extra'
 import os from 'node:os'
 import path from 'node:path'
+import fs from 'fs-extra'
 import type { SessionInfoV3 } from '../types/session-v3.js'
 
 /**
@@ -16,17 +16,14 @@ export class SessionStore {
   }
 
   private validateFeatureName(feature: string): void {
-    if (/[\/\\]|\.\./.test(feature)) {
+    if (/[/\\]|\.\./.test(feature)) {
       throw new Error(`Invalid feature name: ${feature}`)
     }
   }
 
   getSessionsPath(feature: string): string {
     this.validateFeatureName(feature)
-    return path.join(
-      this.getBasePath(),
-      '.claude', 'plans', 'features', feature, 'sessions'
-    )
+    return path.join(this.getBasePath(), '.claude', 'plans', 'features', feature, 'sessions')
   }
 
   /**
@@ -94,8 +91,8 @@ export class SessionStore {
       }
     }
 
-    return sessions.sort((a, b) =>
-      new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+    return sessions.sort(
+      (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
     )
   }
 
@@ -103,11 +100,7 @@ export class SessionStore {
    * Updates existing session. Preserves id and startedAt, always updates lastActivity.
    * Throws if session not found or sessionId doesn't match current session.
    */
-  async update(
-    feature: string,
-    sessionId: string,
-    updates: Partial<SessionInfoV3>
-  ): Promise<void> {
+  async update(feature: string, sessionId: string, updates: Partial<SessionInfoV3>): Promise<void> {
     const current = await this.get(feature)
 
     if (!current || current.id !== sessionId) {
@@ -119,7 +112,7 @@ export class SessionStore {
       ...updates,
       id: current.id,
       startedAt: current.startedAt,
-      lastActivity: new Date().toISOString()
+      lastActivity: new Date().toISOString(),
     }
 
     await this.save(feature, updated)
@@ -146,8 +139,7 @@ export class SessionStore {
     }
 
     const lastActivity = new Date(session.lastActivity)
-    const hoursSinceActivity =
-      (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60)
+    const hoursSinceActivity = (Date.now() - lastActivity.getTime()) / (1000 * 60 * 60)
 
     return hoursSinceActivity < 24
   }
