@@ -287,7 +287,6 @@ function printAssistantText(text: string): void {
 
 function printInsightBlock(text: string): void {
   const lines = text.split('\n')
-  let title = 'Insight'
   const content: string[] = []
   let inBlock = false
 
@@ -296,10 +295,6 @@ function printInsightBlock(text: string): void {
 
     if (trimmed.includes('★ Insight') || trimmed.match(/Insight\s*[─-]/i)) {
       inBlock = true
-      const titleMatch = trimmed.match(/Insight\s*[─-]+\s*(.*)$/i)
-      if (titleMatch && titleMatch[1]) {
-        title = titleMatch[1].trim() || 'Insight'
-      }
       continue
     }
 
@@ -312,22 +307,10 @@ function printInsightBlock(text: string): void {
     }
   }
 
-  const boxWidth = 66
   console.log()
-  console.log(chalk.cyan(`┌─ ★ ${title} ${'─'.repeat(Math.max(0, boxWidth - title.length - 6))}┐`))
-
-  for (const line of content) {
-    const numberedMatch = line.match(/^(\d+)\.\s+(.+)$/)
-    if (numberedMatch) {
-      console.log(
-        chalk.cyan('│ ') + chalk.white(`${numberedMatch[1]}. `) + formatInlineCode(numberedMatch[2])
-      )
-    } else {
-      console.log(chalk.cyan('│ ') + formatInlineCode(line))
-    }
-  }
-
-  console.log(chalk.cyan(`└${'─'.repeat(boxWidth)}┘`))
+  console.log(chalk.gray(`★ Insight ${'─'.repeat(60)}`))
+  console.log(formatInlineCode(content.join(' ')))
+  console.log(chalk.gray('─'.repeat(70)))
 }
 
 function formatInlineCode(text: string): string {
