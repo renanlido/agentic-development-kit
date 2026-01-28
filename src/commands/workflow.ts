@@ -41,7 +41,7 @@ Format:
 [Features em andamento]
 `
 
-      await executeClaudeCommand(prompt)
+      await executeClaudeCommand(prompt, { headless: true })
 
       spinner.succeed('Daily workflow concluído')
 
@@ -76,7 +76,7 @@ If clean: Say "✅ Pre-commit checks passed"
 `
 
       spinner.text = 'Analisando staged files...'
-      await executeClaudeCommand(prompt)
+      await executeClaudeCommand(prompt, { headless: true })
 
       // Run tests
       spinner.text = 'Executando testes...'
@@ -152,7 +152,7 @@ Include:
 If ANY critical item fails: DO NOT PROCEED
 `
 
-      await executeClaudeCommand(prompt)
+      await executeClaudeCommand(prompt, { headless: true })
 
       spinner.succeed('Pre-deploy checklist concluído')
 

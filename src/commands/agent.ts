@@ -78,7 +78,7 @@ ${context}
 Execute the agent tasks and report results.
 `
 
-      await executeClaudeCommand(prompt)
+      await executeClaudeCommand(prompt, { headless: true })
 
       spinner.succeed(`Agent ${name} executado`)
     } catch (error) {

@@ -680,7 +680,7 @@ Output: Salve o PRD em ${prdPath}
 `
 
           const prdModel = getModelForPhase('prd', options.model as ModelType | undefined)
-          await executeClaudeCommand(prdPrompt, { model: prdModel })
+          await executeClaudeCommand(prdPrompt, { model: prdModel, headless: options.headless })
           spinner.succeed('PRD gerado a partir do contexto')
         } else {
           const prdTemplate = await loadTemplate('prd-template.md')
@@ -921,7 +921,7 @@ Estrutura do research.md:
 `
 
       const researchModel = getModelForPhase('research', options.model as ModelType | undefined)
-      await executeClaudeCommand(prompt, { model: researchModel })
+      await executeClaudeCommand(prompt, { model: researchModel, headless: options.headless })
 
       spinner.succeed('Research concluído')
 
@@ -1062,7 +1062,7 @@ IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
 `
 
       const planModel = getModelForPhase('planning', options.model as ModelType | undefined)
-      await executeClaudeCommand(prompt, { model: planModel })
+      await executeClaudeCommand(prompt, { model: planModel, headless: options.headless })
 
       spinner.succeed('Plano criado')
 
@@ -1195,7 +1195,7 @@ IMPORTANTE:
 `
 
       const tasksModel = getModelForPhase('planning', options.model as ModelType | undefined)
-      await executeClaudeCommand(prompt, { model: tasksModel })
+      await executeClaudeCommand(prompt, { model: tasksModel, headless: options.headless })
 
       spinner.succeed('Tasks criadas')
 
@@ -1676,7 +1676,7 @@ Se encontrar issues CRITICAL ou HIGH, o status deve ser FAIL.
 `
 
       const qaModel = getModelForPhase('qa', options.model as ModelType | undefined)
-      await executeClaudeCommand(prompt, { model: qaModel })
+      await executeClaudeCommand(prompt, { model: qaModel, headless: options.headless })
 
       spinner.succeed('QA concluído')
 
@@ -1833,7 +1833,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 `
 
       const docsModel = getModelForPhase('docs', options.model as ModelType | undefined)
-      await executeClaudeCommand(prompt, { model: docsModel })
+      await executeClaudeCommand(prompt, { model: docsModel, headless: options.headless })
 
       spinner.succeed('Documentação gerada')
 
@@ -2527,10 +2527,12 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
       console.log(chalk.bold.cyan(`  ETAPA ${etapaNum}: ${etapaLabel}`))
       console.log(chalk.bold.cyan(`═══════════════════════════════════════════════════\n`))
 
+      const headlessArgs = [...args, '--headless']
+
       if (cwd) {
         console.log(chalk.gray(`Worktree: ${cwd}`))
       }
-      console.log(chalk.gray(`Executando: adk ${args.join(' ')}\n`))
+      console.log(chalk.gray(`Executando: adk ${headlessArgs.join(' ')}\n`))
 
       let success = false
       let attempts = 0
@@ -2543,7 +2545,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 
       while (!success && attempts < maxAttempts) {
         try {
-          execFileSync('adk', args, execOptions)
+          execFileSync('adk', headlessArgs, execOptions)
           success = true
         } catch {
           attempts++
@@ -2595,7 +2597,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 
       if (!isStepCompleted(progress, 'prd')) {
         if (!(await fs.pathExists(prdPath))) {
-          await this.create(name, options)
+          await this.create(name, { ...options, headless: true })
         }
 
         progress = await loadProgress(name)

@@ -42,9 +42,11 @@ function displayEvent(event: StreamEvent): void {
       if (event.message?.content) {
         for (const block of event.message.content) {
           if (block.type === 'text' && block.text) {
-            const text = truncateText(block.text, 120)
-            if (text.trim()) {
-              console.log(chalk.cyan(`  💭 ${text}`))
+            const lines = formatTextBlock(block.text)
+            for (const line of lines) {
+              if (line.trim()) {
+                console.log(chalk.cyan(`  💭 ${line}`))
+              }
             }
           }
           if (block.type === 'tool_use' && block.name) {
@@ -58,8 +60,11 @@ function displayEvent(event: StreamEvent): void {
     case 'user':
       if (event.message?.content) {
         for (const block of event.message.content) {
-          if (block.type === 'tool_result') {
-            console.log(chalk.green('  ✅ Executado'))
+          if (block.type === 'tool_result' && block.content) {
+            const preview = formatToolResult(block.content)
+            if (preview) {
+              console.log(chalk.green(`  ✅ ${preview}`))
+            }
           }
         }
       }
@@ -83,12 +88,24 @@ function displayEvent(event: StreamEvent): void {
   }
 }
 
-function truncateText(text: string, maxLength: number): string {
-  const firstLine = text.split('\n')[0].trim()
-  if (firstLine.length <= maxLength) {
-    return firstLine
+function formatTextBlock(text: string, maxLines = 5, maxLineLength = 200): string[] {
+  const lines = text.split('\n').filter((line) => line.trim())
+  const result: string[] = []
+
+  for (let i = 0; i < Math.min(lines.length, maxLines); i++) {
+    const line = lines[i].trim()
+    if (line.length <= maxLineLength) {
+      result.push(line)
+    } else {
+      result.push(`${line.slice(0, maxLineLength - 3)}...`)
+    }
   }
-  return `${firstLine.slice(0, maxLength - 3)}...`
+
+  if (lines.length > maxLines) {
+    result.push(`... (+${lines.length - maxLines} linhas)`)
+  }
+
+  return result
 }
 
 function formatToolInput(tool: string, input?: Record<string, unknown>): string {
@@ -101,11 +118,18 @@ function formatToolInput(tool: string, input?: Record<string, unknown>): string 
       return truncatePath(input.file_path as string)
     case 'Write':
       return truncatePath(input.file_path as string)
-    case 'Edit':
-      return truncatePath(input.file_path as string)
+    case 'Edit': {
+      const path = truncatePath(input.file_path as string)
+      const oldStr = input.old_string as string
+      if (oldStr) {
+        const preview = oldStr.split('\n')[0].slice(0, 40)
+        return `${path} (${preview}${oldStr.length > 40 ? '...' : ''})`
+      }
+      return path
+    }
     case 'Bash': {
       const cmd = (input.command as string) || ''
-      return cmd.length > 60 ? `${cmd.slice(0, 57)}...` : cmd
+      return cmd.length > 100 ? `${cmd.slice(0, 97)}...` : cmd
     }
     case 'Grep':
       return `"${input.pattern}" em ${truncatePath(input.path as string) || '.'}`
@@ -118,6 +142,10 @@ function formatToolInput(tool: string, input?: Record<string, unknown>): string 
       return (input.subject as string) || ''
     case 'TaskUpdate':
       return `#${input.taskId} → ${input.status || 'update'}`
+    case 'WebFetch':
+      return (input.url as string) || ''
+    case 'WebSearch':
+      return (input.query as string) || ''
     default:
       return ''
   }
@@ -127,12 +155,34 @@ function truncatePath(filePath?: string): string {
   if (!filePath) {
     return ''
   }
-  if (filePath.length <= 50) {
+  if (filePath.length <= 80) {
     return filePath
   }
   const parts = filePath.split('/')
-  if (parts.length <= 2) {
+  if (parts.length <= 3) {
     return filePath
   }
-  return `.../${parts.slice(-2).join('/')}`
+  return `.../${parts.slice(-3).join('/')}`
+}
+
+function formatToolResult(content: string): string {
+  if (!content || content.length === 0) {
+    return 'OK'
+  }
+
+  const lines = content.split('\n').filter((l) => l.trim())
+  if (lines.length === 0) {
+    return 'OK'
+  }
+
+  if (content.includes('error') || content.includes('Error') || content.includes('ERROR')) {
+    const errorLine = lines.find((l) => /error/i.test(l)) || lines[0]
+    return errorLine.slice(0, 100) + (errorLine.length > 100 ? '...' : '')
+  }
+
+  if (lines.length === 1) {
+    return lines[0].slice(0, 80) + (lines[0].length > 80 ? '...' : '')
+  }
+
+  return `${lines.length} linhas`
 }
