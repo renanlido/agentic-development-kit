@@ -387,6 +387,9 @@ function printAssistantText(text: string): void {
       return
     }
 
+    const leadingSpaces = line.match(/^(\s*)/)?.[1].length || 0
+    const indent = '  '.repeat(Math.floor(leadingSpaces / 2))
+
     const h1Match = trimmed.match(/^#\s+(.+)$/)
     if (h1Match) {
       console.log()
@@ -411,21 +414,49 @@ function printAssistantText(text: string): void {
       continue
     }
 
-    const bulletMatch = trimmed.match(/^[-*]\s+(.+)$/)
+    const h4Match = trimmed.match(/^####\s+(.+)$/)
+    if (h4Match) {
+      console.log(chalk.white.bold(h4Match[1]))
+      lastPrintedText = trimmed
+      continue
+    }
+
+    const emojiHeaderMatch = trimmed.match(/^([✅❌⚠️🔴🟢🟡📋🎯💡🚀✨🔧📦🔒⭐])\s*(.+)$/)
+    if (emojiHeaderMatch && !trimmed.startsWith('•') && !trimmed.startsWith('-')) {
+      console.log()
+      console.log(emojiHeaderMatch[1] + ' ' + chalk.bold(formatInlineCode(emojiHeaderMatch[2])))
+      lastPrintedText = trimmed
+      continue
+    }
+
+    const bulletMatch = trimmed.match(/^[-*•]\s+(.+)$/)
     if (bulletMatch) {
-      console.log(chalk.gray('  • ') + formatInlineCode(bulletMatch[1]))
+      console.log(indent + chalk.gray('• ') + formatInlineCode(bulletMatch[1]))
       lastPrintedText = trimmed
       continue
     }
 
     const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/)
     if (numberedMatch) {
-      console.log(chalk.gray(`  ${numberedMatch[1]}. `) + formatInlineCode(numberedMatch[2]))
+      console.log(indent + chalk.gray(`${numberedMatch[1]}. `) + formatInlineCode(numberedMatch[2]))
       lastPrintedText = trimmed
       continue
     }
 
-    console.log(formatInlineCode(trimmed))
+    const tableRowMatch = trimmed.match(/^\|(.+)\|$/)
+    if (tableRowMatch) {
+      const cells = tableRowMatch[1].split('|').map((c) => c.trim())
+      if (cells.every((c) => /^[-:]+$/.test(c))) {
+        console.log(chalk.gray('─'.repeat(70)))
+      } else {
+        const formatted = cells.map((c) => formatInlineCode(c)).join(chalk.gray(' │ '))
+        console.log(chalk.gray('│ ') + formatted + chalk.gray(' │'))
+      }
+      lastPrintedText = trimmed
+      continue
+    }
+
+    console.log(indent + formatInlineCode(trimmed))
     lastPrintedText = trimmed
   }
 }
