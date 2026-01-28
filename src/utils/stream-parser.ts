@@ -1,4 +1,5 @@
 import chalk from 'chalk'
+import ora, { type Ora } from 'ora'
 
 interface StreamEventContent {
   type: 'text' | 'tool_use' | 'tool_result'
@@ -21,18 +22,24 @@ interface StreamEvent {
   total_cost_usd?: number
 }
 
+interface PendingTool {
+  name: string
+  input?: Record<string, unknown>
+}
+
 let totalToolCount = 0
-let batchToolSuccess = 0
-let batchToolFailed = 0
-let batchTools: string[] = []
 let lastPrintedText = ''
+let spinner: Ora | null = null
+let pendingTool: PendingTool | null = null
 
 export function resetStreamCounters(): void {
   totalToolCount = 0
-  batchToolSuccess = 0
-  batchToolFailed = 0
-  batchTools = []
   lastPrintedText = ''
+  pendingTool = null
+  if (spinner) {
+    spinner.stop()
+    spinner = null
+  }
 }
 
 export function printStreamHeader(phase: string, feature?: string): void {
@@ -68,12 +75,14 @@ function displayEvent(event: StreamEvent): void {
       if (event.message?.content) {
         for (const block of event.message.content) {
           if (block.type === 'text' && block.text) {
-            flushToolBatch()
+            stopSpinner()
             printAssistantText(block.text)
           }
           if (block.type === 'tool_use' && block.name) {
+            stopSpinner()
             totalToolCount++
-            batchTools.push(block.name)
+            pendingTool = { name: block.name, input: block.input }
+            startToolSpinner(block.name, block.input)
           }
         }
       }
@@ -82,20 +91,18 @@ function displayEvent(event: StreamEvent): void {
     case 'user':
       if (event.message?.content) {
         for (const block of event.message.content) {
-          if (block.type === 'tool_result') {
+          if (block.type === 'tool_result' && pendingTool) {
             const isError = block.content && /error|fail|exception/i.test(block.content)
-            if (isError) {
-              batchToolFailed++
-            } else {
-              batchToolSuccess++
-            }
+            stopSpinner()
+            printToolResult(pendingTool, block.content, !!isError)
+            pendingTool = null
           }
         }
       }
       break
 
     case 'result': {
-      flushToolBatch()
+      stopSpinner()
       console.log(chalk.gray('─'.repeat(70)))
       const parts: string[] = []
       if (event.duration_ms) {
@@ -114,6 +121,111 @@ function displayEvent(event: StreamEvent): void {
       break
     }
   }
+}
+
+function startToolSpinner(toolName: string, input?: Record<string, unknown>): void {
+  let label = toolName
+
+  if (input) {
+    if (toolName === 'Read' && input.file_path) {
+      label = `Read(${shortenPath(String(input.file_path))})`
+    } else if (toolName === 'Edit' && input.file_path) {
+      label = `Edit(${shortenPath(String(input.file_path))})`
+    } else if (toolName === 'Write' && input.file_path) {
+      label = `Write(${shortenPath(String(input.file_path))})`
+    } else if (toolName === 'Bash' && input.command) {
+      const cmd = String(input.command).slice(0, 40)
+      label = `Bash(${cmd}${String(input.command).length > 40 ? '...' : ''})`
+    } else if (toolName === 'Grep' && input.pattern) {
+      label = `Grep("${String(input.pattern).slice(0, 20)}")`
+    } else if (toolName === 'Glob' && input.pattern) {
+      label = `Glob(${String(input.pattern)})`
+    }
+  }
+
+  spinner = ora({
+    text: chalk.yellow(label),
+    spinner: 'dots',
+    color: 'yellow',
+  }).start()
+}
+
+function stopSpinner(): void {
+  if (spinner) {
+    spinner.stop()
+    spinner = null
+  }
+}
+
+function printToolResult(tool: PendingTool, content: string | undefined, isError: boolean): void {
+  const icon = isError ? chalk.red('✗') : chalk.green('✓')
+  let label = tool.name
+
+  if (tool.input) {
+    if (tool.name === 'Read' && tool.input.file_path) {
+      label = `Read(${shortenPath(String(tool.input.file_path))})`
+    } else if (tool.name === 'Edit' && tool.input.file_path) {
+      label = `Edit(${shortenPath(String(tool.input.file_path))})`
+    } else if (tool.name === 'Write' && tool.input.file_path) {
+      label = `Write(${shortenPath(String(tool.input.file_path))})`
+    } else if (tool.name === 'Bash') {
+      label = 'Bash'
+    } else if (tool.name === 'Grep' && tool.input.pattern) {
+      label = `Grep("${String(tool.input.pattern).slice(0, 20)}")`
+    } else if (tool.name === 'Glob' && tool.input.pattern) {
+      label = `Glob(${String(tool.input.pattern)})`
+    }
+  }
+
+  console.log(chalk.yellow(`🔧 ${label} `) + icon)
+
+  if (content && content.trim()) {
+    printToolContent(tool.name, content, isError)
+  }
+}
+
+function printToolContent(toolName: string, content: string, isError: boolean): void {
+  const lines = content.split('\n')
+  const maxLines = 12
+  const displayLines = lines.slice(0, maxLines)
+  const prefix = isError ? chalk.red('  │ ') : chalk.gray('  │ ')
+
+  for (const line of displayLines) {
+    if (!line.trim()) continue
+
+    let formattedLine = line.slice(0, 100)
+
+    if (toolName === 'Read' || toolName === 'Edit') {
+      const lineNumMatch = formattedLine.match(/^(\s*\d+[→│|:])(.*)$/)
+      if (lineNumMatch) {
+        formattedLine = chalk.gray(lineNumMatch[1]) + chalk.white(lineNumMatch[2])
+      }
+    }
+
+    if (toolName === 'Bash') {
+      if (line.includes('PASS') || line.includes('✓')) {
+        formattedLine = chalk.green(formattedLine)
+      } else if (line.includes('FAIL') || line.includes('ERROR') || line.includes('✗')) {
+        formattedLine = chalk.red(formattedLine)
+      }
+    }
+
+    if (isError) {
+      formattedLine = chalk.red(line.slice(0, 100))
+    }
+
+    console.log(prefix + formattedLine)
+  }
+
+  if (lines.length > maxLines) {
+    console.log(prefix + chalk.gray(`... (${lines.length - maxLines} more lines)`))
+  }
+}
+
+function shortenPath(filePath: string): string {
+  const parts = filePath.split('/')
+  if (parts.length <= 3) return filePath
+  return '.../' + parts.slice(-2).join('/')
 }
 
 function printAssistantText(text: string): void {
@@ -171,28 +283,6 @@ function printAssistantText(text: string): void {
     console.log(formatInlineCode(trimmed))
     lastPrintedText = trimmed
   }
-}
-
-function flushToolBatch(): void {
-  if (batchTools.length === 0) return
-
-  const uniqueTools = [...new Set(batchTools)]
-  const toolList = uniqueTools.slice(0, 5).join(', ')
-  const extra = uniqueTools.length > 5 ? ` +${uniqueTools.length - 5}` : ''
-
-  let statusBadge = ''
-  if (batchToolSuccess > 0) {
-    statusBadge += chalk.green(` ✓${batchToolSuccess}`)
-  }
-  if (batchToolFailed > 0) {
-    statusBadge += chalk.red(` ✗${batchToolFailed}`)
-  }
-
-  console.log(chalk.yellow(`🔧 ${toolList}${extra}`) + statusBadge)
-
-  batchTools = []
-  batchToolSuccess = 0
-  batchToolFailed = 0
 }
 
 function printInsightBlock(text: string): void {
