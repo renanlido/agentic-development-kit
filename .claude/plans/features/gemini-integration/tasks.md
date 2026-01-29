@@ -39,37 +39,37 @@
   - [x] Compatible with CollectedMetrics
 
 ### Task 1.3: Base Provider Abstract Class
-- [~] **Status**: pending
+- [x] **Status**: completed
 - **SP**: 2
 - **Files to create**: `src/ai-providers/base-provider.ts`
 - **Tests**: `tests/ai-providers/base-provider.test.ts`
 - **Dependencies**: Task 1.1, Task 1.2
 - **Acceptance Criteria**:
-  - [ ] `isInstalled()` with caching
-  - [ ] `validateModel()` working
-  - [ ] Abstract methods defined
-  - [ ] Logger integrated
-  - [ ] Uses execFileNoThrow for safety
+  - [x] `isInstalled()` with caching
+  - [x] `validateModel()` working
+  - [x] Abstract methods defined
+  - [x] Logger integrated
+  - [x] Uses execFileNoThrow for safety
 
 ### Task 1.4: AI Provider Registry
-- [~] **Status**: pending
+- [x] **Status**: completed
 - **SP**: 2
 - **Files to create**: `src/ai-providers/index.ts`
 - **Tests**: `tests/ai-providers/registry.test.ts`
 - **Dependencies**: Task 1.1, Task 1.3
 - **Acceptance Criteria**:
-  - [ ] `register()` and `get()` working
-  - [ ] `getAll()` returns all providers
-  - [ ] `getConfigured()` respects config
-  - [ ] Auto-fallback when provider not installed
-  - [ ] Clear error messages with installation guide
+  - [x] `register()` and `get()` working
+  - [x] `getAll()` returns all providers
+  - [x] `getConfigured()` respects config
+  - [x] Auto-fallback when provider not installed
+  - [x] Clear error messages with installation guide
 
 ---
 
 ## Phase 2: Claude Provider Refactor (8 SP)
 
 ### Task 2.1: Claude Stream Parser
-- [~] **Status**: pending
+- [x] **Status**: completed
 - **SP**: 3
 - **Files to create**:
   - `src/ai-providers/stream-parsers/base-parser.ts`
@@ -78,16 +78,16 @@
 - **Tests**: `tests/ai-providers/stream-parsers/claude-parser.test.ts`
 - **Dependencies**: Task 1.2
 - **Acceptance Criteria**:
-  - [ ] Parse `system.init` event
-  - [ ] Parse `assistant` with text
-  - [ ] Parse `assistant` with tool_use
-  - [ ] Parse `user` with tool_result
-  - [ ] Parse `result` with metrics
-  - [ ] Invalid lines return null
-  - [ ] Test coverage >= 90%
+  - [x] Parse `system.init` event
+  - [x] Parse `assistant` with text
+  - [x] Parse `assistant` with tool_use
+  - [x] Parse `user` with tool_result
+  - [x] Parse `result` with metrics
+  - [x] Invalid lines return null
+  - [x] Test coverage >= 90%
 
 ### Task 2.2: Claude Provider Implementation
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 3
 - **Files to create**: `src/ai-providers/claude-provider.ts`
 - **Tests**: `tests/ai-providers/claude-provider.test.ts`
@@ -103,7 +103,7 @@
   - [ ] Same behavior as current `executeClaudeCommand()`
 
 ### Task 2.3: Retrocompatibility Proxy
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 1
 - **Files to modify**: `src/utils/claude.ts`
 - **Tests**: `tests/utils/claude.test.ts` (existing must pass)
@@ -115,7 +115,7 @@
   - [ ] No breaking changes
 
 ### Task 2.4: Claude Provider Bootstrap
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 1
 - **Files to modify**: `src/ai-providers/index.ts`
 - **Tests**: `tests/ai-providers/bootstrap.test.ts`
@@ -130,7 +130,7 @@
 ## Phase 3: Gemini Provider (13 SP)
 
 ### Task 3.1: Gemini Stream Parser
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 3
 - **Files to create**: `src/ai-providers/stream-parsers/gemini-parser.ts`
 - **Tests**: `tests/ai-providers/stream-parsers/gemini-parser.test.ts`
@@ -145,22 +145,22 @@
   - [ ] Test coverage >= 90%
 
 ### Task 3.2: Gemini Provider Implementation
-- [~] **Status**: pending
+- [x] **Status**: completed
 - **SP**: 3
 - **Files to create**: `src/ai-providers/gemini-provider.ts`
 - **Tests**: `tests/ai-providers/gemini-provider.test.ts`
 - **Dependencies**: Task 1.3, Task 3.1
 - **Acceptance Criteria**:
-  - [ ] `isInstalled()` detects Gemini CLI
-  - [ ] `getDefaultModel()` returns 'gemini-2.5-flash'
-  - [ ] `mapModelTier()` correct mapping
-  - [ ] `validateModel()` accepts Gemini models
-  - [ ] `buildArgs()` includes `--yolo` for skip permissions
-  - [ ] `execute()` interactive mode
-  - [ ] `executeHeadless()` with metrics
+  - [x] `isInstalled()` detects Gemini CLI
+  - [x] `getDefaultModel()` returns 'gemini-2.5-flash'
+  - [x] `mapModelTier()` correct mapping
+  - [x] `validateModel()` accepts Gemini models
+  - [x] `buildArgs()` includes `--yolo` for skip permissions
+  - [x] `execute()` interactive mode
+  - [x] `executeHeadless()` with metrics
 
 ### Task 3.3: Gemini Provider Bootstrap
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 1
 - **Files to modify**: `src/ai-providers/index.ts`
 - **Tests**: `tests/ai-providers/bootstrap.test.ts`
@@ -172,7 +172,7 @@
   - [ ] `getAll()` returns both providers
 
 ### Task 3.4: Unified Display Handler
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 3
 - **Files to create**: `src/ai-providers/stream-display.ts`
 - **Tests**: `tests/ai-providers/stream-display.test.ts`
@@ -185,7 +185,7 @@
   - [ ] Consistent visual output
 
 ### Task 3.5: Integration Tests
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 3
 - **Files to create**:
   - `tests/ai-providers/integration/claude.integration.test.ts`
@@ -203,7 +203,7 @@
 ## Phase 4: Integration (13 SP)
 
 ### Task 4.1: Model Router Extension
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 2
 - **Files to modify**:
   - `src/utils/model-router.ts`
@@ -217,7 +217,7 @@
   - [ ] Works for both providers
 
 ### Task 4.2: Configuration System Extension
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 2
 - **Files to modify**:
   - `src/utils/config.ts`
@@ -231,7 +231,7 @@
   - [ ] Validation of values
 
 ### Task 4.3: Environment Variable Support
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 1
 - **Files to modify**: `src/ai-providers/index.ts`
 - **Tests**: `tests/ai-providers/env.test.ts`
@@ -243,7 +243,7 @@
   - [ ] Warning if CLI not installed
 
 ### Task 4.4: CLI Global Flags
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 2
 - **Files to modify**:
   - `src/cli.ts`
@@ -258,7 +258,7 @@
   - [ ] Correct propagation to commands
 
 ### Task 4.5: Command Updates
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 3
 - **Files to modify**:
   - `src/commands/feature.ts`
@@ -273,7 +273,7 @@
   - [ ] Metrics collected
 
 ### Task 4.6: Fallback Manager
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 3
 - **Files to create**: `src/ai-providers/fallback-manager.ts`
 - **Tests**: `tests/ai-providers/fallback-manager.test.ts`
@@ -291,7 +291,7 @@
 ## Phase 5: Polish (8 SP)
 
 ### Task 5.1: Config Providers Command
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 2
 - **Files to create**: `src/commands/config-providers.ts`
 - **Files to modify**:
@@ -307,7 +307,7 @@
   - [ ] Error for invalid provider
 
 ### Task 5.2: Type Exports
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 1
 - **Files to create**: `src/types/ai-provider.ts`
 - **Files to modify**: `src/types/index.ts`
@@ -319,7 +319,7 @@
   - [ ] JSDoc on main types
 
 ### Task 5.3: Documentation Update
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 2
 - **Files to create**: `.claude/docs/multi-provider.md`
 - **Files to modify**: `CLAUDE.md`
@@ -330,7 +330,7 @@
   - [ ] CLAUDE.md updated with quick reference
 
 ### Task 5.4: End-to-End Tests
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 2
 - **Files to create**: `tests/e2e/multi-provider.e2e.test.ts`
 - **Dependencies**: All previous tasks
@@ -342,7 +342,7 @@
   - [ ] Cleanup after tests
 
 ### Task 5.5: Metrics Collection Update
-- [~] **Status**: pending
+- [ ] **Status**: pending
 - **SP**: 1
 - **Files to modify**:
   - `src/ai-providers/stream-display.ts`
@@ -360,12 +360,12 @@
 
 | Phase | Tasks | Completed | Progress |
 |-------|-------|-----------|----------|
-| Phase 1: Foundation | 4 | 0 | 0% |
+| Phase 1: Foundation | 4 | 4 | 100% |
 | Phase 2: Claude Refactor | 4 | 0 | 0% |
-| Phase 3: Gemini Provider | 5 | 0 | 0% |
+| Phase 3: Gemini Provider | 5 | 1 | 20% |
 | Phase 4: Integration | 6 | 0 | 0% |
 | Phase 5: Polish | 5 | 0 | 0% |
-| **Total** | **24** | **0** | **0%** |
+| **Total** | **24** | **5** | **21%** |
 
 ---
 
