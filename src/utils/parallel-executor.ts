@@ -1,5 +1,13 @@
 import path from 'node:path'
+import chalk from 'chalk'
+import { ModelType } from '../types/model'
+import type { OrchestratorResult } from '../types/parallel'
 import { executeClaudeCommand } from './claude.js'
+import {
+  createAndExecuteOrchestrator,
+  formatOrchestratorPlan,
+} from './orchestrator.js'
+import { parseTasksForParallel } from './task-parser.js'
 import {
   createWorktree,
   DEFAULT_WORKTREE_CONFIG,
@@ -21,6 +29,53 @@ export const DEFAULT_PARALLEL_CONFIG: ParallelConfig = {
   timeout: 300000,
   cleanupOnError: true,
   worktreeConfig: DEFAULT_WORKTREE_CONFIG,
+}
+
+export const PARALLEL_DEFAULTS = {
+  maxParallel: 3,
+  timeout: 300000,
+  modelOptimize: true,
+  retryFailed: true,
+  isolate: false,
+  stopOnError: false,
+} as const
+
+export async function executeWithOrchestrator(
+  featureName: string,
+  tasksContent: string
+): Promise<OrchestratorResult> {
+  const tasksDoc = parseTasksForParallel(tasksContent, featureName)
+
+  if (tasksDoc.totalTasks === 0) {
+    console.log(chalk.yellow('No tasks found'))
+    return {
+      success: false,
+      waves: [],
+      totalDuration: 0,
+      totalTasks: 0,
+      completedTasks: 0,
+      failedTasks: 0,
+      totalCost: 0,
+      totalTokens: 0,
+      modelUsage: {
+        [ModelType.OPUS]: 0,
+        [ModelType.SONNET]: 0,
+        [ModelType.HAIKU]: 0,
+      },
+    }
+  }
+
+  return createAndExecuteOrchestrator(featureName, tasksDoc.tasks, PARALLEL_DEFAULTS)
+}
+
+export function previewOrchestration(featureName: string, tasksContent: string): string {
+  const tasksDoc = parseTasksForParallel(tasksContent, featureName)
+
+  if (tasksDoc.totalTasks === 0) {
+    return chalk.yellow('No tasks found to execute')
+  }
+
+  return formatOrchestratorPlan(featureName, tasksDoc.tasks, PARALLEL_DEFAULTS)
 }
 
 export interface AgentResult {

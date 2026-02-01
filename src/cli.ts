@@ -28,6 +28,7 @@ program
   .command('init')
   .description('Adiciona estrutura CADD (.claude/) ao projeto atual')
   .option('-n, --name <name>', 'Nome do projeto')
+  .option('-f, --force', 'Força atualização de todos os templates (sobrescreve existentes)')
   .action(initCommand)
 
 // Comando: adk update
@@ -101,13 +102,11 @@ feature
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
   .option('--headless', 'Executa em modo headless (termina automaticamente)')
   .option('--parallel', 'Executa tasks em paralelo com múltiplos agentes')
-  .option('--agents <number>', 'Número de agentes paralelos (padrão: 3)', '3')
   .option('--dry-run', 'Mostra plano de execução paralela sem executar')
   .action((name, options) =>
     featureCommand.implement(name, {
       ...options,
       baseBranch: options.baseBranch,
-      agents: options.agents ? parseInt(options.agents, 10) : 3,
     })
   )
 
@@ -220,7 +219,6 @@ feature
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
   .option('-l, --loop', 'Modo loop: executa tasks automaticamente até todas completarem')
   .option('--parallel', 'Executa implementação com múltiplos agentes em paralelo')
-  .option('--agents <number>', 'Número de agentes paralelos (padrão: 3)', '3')
   .action((name, description, options) =>
     featureCommand.autopilot(name, {
       ...options,
@@ -228,7 +226,6 @@ feature
       baseBranch: options.baseBranch,
       loop: options.loop,
       parallel: options.parallel,
-      agents: options.agents ? parseInt(options.agents, 10) : 3,
     })
   )
 

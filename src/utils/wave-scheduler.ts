@@ -1,5 +1,12 @@
-import type { ParallelTasksDocument, ParsedTaskForParallel } from './task-parser.js'
-import { canTasksRunInParallel } from './task-parser.js'
+import chalk from 'chalk'
+import { ModelType } from '../types/model'
+import type { ComplexityLevel } from '../types/parallel'
+import {
+  type ParallelTasksDocument,
+  type ParsedTaskForParallel,
+  analyzeTaskComplexity,
+  canTasksRunInParallel,
+} from './task-parser.js'
 
 export interface Wave {
   number: number
@@ -7,6 +14,8 @@ export interface Wave {
   estimatedDuration: string
   parallelizable: boolean
   conflicts: string[]
+  modelBreakdown?: Record<ModelType, number>
+  complexityBreakdown?: Record<ComplexityLevel, number>
 }
 
 export interface SchedulePlan {
@@ -16,6 +25,14 @@ export interface SchedulePlan {
   estimatedSpeedup: string
   sequentialTasks: ParsedTaskForParallel[]
   parallelizableTasks: ParsedTaskForParallel[]
+  modelUsagePreview: Record<ModelType, number>
+  estimatedCost?: number
+}
+
+export interface EnhancedWaveMetrics {
+  totalTokensEstimate: number
+  estimatedCost: number
+  complexityDistribution: Record<ComplexityLevel, number>
 }
 
 export interface SchedulerConfig {
@@ -54,6 +71,12 @@ export function createSchedulePlan(
   let waveNumber = 1
   let remainingTasks = [...pendingTasks]
 
+  const modelUsagePreview: Record<ModelType, number> = {
+    [ModelType.OPUS]: 0,
+    [ModelType.SONNET]: 0,
+    [ModelType.HAIKU]: 0,
+  }
+
   while (remainingTasks.length > 0) {
     const readyTasks = remainingTasks.filter((task) =>
       task.dependencies.every((depId) => processedIds.has(depId))
@@ -74,12 +97,32 @@ export function createSchedulePlan(
       parallelGroup.sort((a, b) => estimateToMinutes(a.estimate) - estimateToMinutes(b.estimate))
     }
 
+    const modelBreakdown: Record<ModelType, number> = {
+      [ModelType.OPUS]: 0,
+      [ModelType.SONNET]: 0,
+      [ModelType.HAIKU]: 0,
+    }
+    const complexityBreakdown: Record<ComplexityLevel, number> = {
+      high: 0,
+      medium: 0,
+      low: 0,
+    }
+
+    for (const task of parallelGroup) {
+      const complexity = analyzeTaskComplexity(task.title, '', task.files)
+      complexityBreakdown[complexity.level]++
+      modelBreakdown[complexity.recommendedModel]++
+      modelUsagePreview[complexity.recommendedModel]++
+    }
+
     const wave: Wave = {
       number: waveNumber,
       tasks: parallelGroup,
       estimatedDuration: calculateWaveDuration(parallelGroup),
       parallelizable: parallelGroup.length > 1 && conflicts.length === 0,
       conflicts,
+      modelBreakdown,
+      complexityBreakdown,
     }
 
     waves.push(wave)
@@ -99,6 +142,8 @@ export function createSchedulePlan(
   )
   const speedup = sequentialTime > 0 ? (sequentialTime / parallelTime).toFixed(1) : '1.0'
 
+  const estimatedCost = calculateEstimatedCost(modelUsagePreview)
+
   return {
     waves,
     totalWaves: waves.length,
@@ -106,7 +151,22 @@ export function createSchedulePlan(
     estimatedSpeedup: `${speedup}x`,
     sequentialTasks,
     parallelizableTasks,
+    modelUsagePreview,
+    estimatedCost,
   }
+}
+
+function calculateEstimatedCost(modelUsage: Record<ModelType, number>): number {
+  const costPerTask = {
+    [ModelType.OPUS]: 0.05,
+    [ModelType.SONNET]: 0.015,
+    [ModelType.HAIKU]: 0.001,
+  }
+
+  return Object.entries(modelUsage).reduce(
+    (sum, [model, count]) => sum + costPerTask[model as ModelType] * count,
+    0
+  )
 }
 
 function shouldForceSequential(task: ParsedTaskForParallel, keywords: string[]): boolean {
@@ -190,30 +250,58 @@ function calculateWaveDuration(tasks: ParsedTaskForParallel[]): string {
 export function formatSchedulePlan(plan: SchedulePlan): string {
   const lines: string[] = []
 
-  lines.push(`\n📋 Parallel Execution Plan`)
+  lines.push(`\n${chalk.cyan.bold('Parallel Execution Plan')}`)
+  lines.push(chalk.gray('─'.repeat(60)))
   lines.push(`   Total Tasks: ${plan.totalTasks}`)
   lines.push(`   Total Waves: ${plan.totalWaves}`)
-  lines.push(`   Estimated Speedup: ${plan.estimatedSpeedup}`)
+  lines.push(`   Estimated Speedup: ${chalk.green(plan.estimatedSpeedup)}`)
+
+  if (plan.estimatedCost !== undefined) {
+    lines.push(`   Estimated Cost: ${chalk.yellow(`$${plan.estimatedCost.toFixed(4)}`)}`)
+  }
+
+  if (plan.modelUsagePreview) {
+    const models: string[] = []
+    if (plan.modelUsagePreview[ModelType.OPUS] > 0) {
+      models.push(`${chalk.magenta('opus')}: ${plan.modelUsagePreview[ModelType.OPUS]}`)
+    }
+    if (plan.modelUsagePreview[ModelType.SONNET] > 0) {
+      models.push(`${chalk.blue('sonnet')}: ${plan.modelUsagePreview[ModelType.SONNET]}`)
+    }
+    if (plan.modelUsagePreview[ModelType.HAIKU] > 0) {
+      models.push(`${chalk.green('haiku')}: ${plan.modelUsagePreview[ModelType.HAIKU]}`)
+    }
+    if (models.length > 0) {
+      lines.push(`   Model Usage: ${models.join(', ')}`)
+    }
+  }
+
   lines.push('')
 
   for (const wave of plan.waves) {
-    const parallel = wave.parallelizable ? '⚡ parallel' : '📝 sequential'
-    lines.push(`Wave ${wave.number} (${wave.estimatedDuration}) [${parallel}]`)
+    const parallel = wave.parallelizable
+      ? chalk.green('⚡ parallel')
+      : chalk.yellow('📝 sequential')
+    lines.push(`${chalk.bold(`Wave ${wave.number}`)} (${wave.estimatedDuration}) [${parallel}]`)
 
     for (const task of wave.tasks) {
-      const estimate = `[${task.estimate}]`
-      lines.push(`   └─ Task ${task.id}: ${task.title} ${estimate}`)
+      const complexity = analyzeTaskComplexity(task.title, '', task.files)
+      const modelTag = chalk.dim(`[${complexity.recommendedModel}]`)
+      const estimate = chalk.gray(`[${task.estimate}]`)
+      lines.push(`   └─ Task ${task.id}: ${task.title} ${modelTag} ${estimate}`)
       if (task.files.length > 0) {
         lines.push(
-          `      Files: ${task.files.slice(0, 3).join(', ')}${task.files.length > 3 ? '...' : ''}`
+          chalk.gray(
+            `      Files: ${task.files.slice(0, 3).join(', ')}${task.files.length > 3 ? '...' : ''}`
+          )
         )
       }
     }
 
     if (wave.conflicts.length > 0) {
-      lines.push(`   ⚠️  Conflicts:`)
+      lines.push(chalk.yellow(`   ⚠️  Conflicts:`))
       for (const conflict of wave.conflicts) {
-        lines.push(`      - ${conflict}`)
+        lines.push(chalk.gray(`      - ${conflict}`))
       }
     }
 

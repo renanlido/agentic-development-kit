@@ -8,6 +8,7 @@ import { copyClaudeStructure } from '../utils/templates'
 
 interface InitOptions {
   name?: string
+  force?: boolean
 }
 
 export async function initCommand(options: InitOptions): Promise<void> {
@@ -50,9 +51,13 @@ export async function initCommand(options: InitOptions): Promise<void> {
     spinner.succeed('Estrutura criada')
 
     // 4. Copy ADK Claude structure (agents, skills, commands, hooks, rules)
-    spinner.start('Copiando estrutura ADK (agents, skills, commands, hooks, rules)...')
-    await copyClaudeStructure(projectPath)
-    spinner.succeed('Estrutura ADK copiada')
+    if (options.force) {
+      spinner.start('Atualizando estrutura ADK (force mode)...')
+    } else {
+      spinner.start('Copiando estrutura ADK (agents, skills, commands, hooks, rules)...')
+    }
+    await copyClaudeStructure(projectPath, { force: options.force })
+    spinner.succeed(options.force ? 'Estrutura ADK atualizada (force)' : 'Estrutura ADK copiada')
 
     // 3. Create initial memory (only if none exists)
     spinner.start('Verificando project memory...')

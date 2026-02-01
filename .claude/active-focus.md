@@ -1,5 +1,5 @@
 # Foco Ativo
 
-feature: adk-v3-session-continuity-4
+feature: gemini-integration
 status: implementação em andamento
-path: .claude/plans/features/adk-v3-session-continuity-4/
+path: .claude/plans/features/gemini-integration/

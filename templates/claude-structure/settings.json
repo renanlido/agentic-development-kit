@@ -1,4 +1,22 @@
 {
+  "modelRouting": {
+    "enabled": true,
+    "phases": {
+      "research": "opus",
+      "planning": "opus",
+      "prd": "opus",
+      "implement": "opus",
+      "qa": "haiku",
+      "validation": "haiku",
+      "docs": "sonnet",
+      "default": "sonnet"
+    }
+  },
+  "parallelExecution": {
+    "maxAgents": 3,
+    "retryOnFailure": true,
+    "modelOptimization": true
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -37,6 +55,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/validate-bash.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-ai-commits.sh"
           }
         ]
       },

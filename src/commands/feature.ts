@@ -7,8 +7,15 @@ import ora from 'ora'
 import { createClickUpProvider } from '../providers/clickup/index.js'
 import type { LocalFeature, ProviderSpecificConfig } from '../providers/types.js'
 import type { ModelType } from '../types/model'
-import { executeClaudeCommand, executeHeadlessWithMetrics } from '../utils/claude'
 import type { AgentExecutionMetrics, WaveCompletionSummary } from '../types/parallel'
+import {
+  type AgentConfig,
+  detectTaskType,
+  formatAgentHeader,
+  getAgentForTask,
+  loadAgentPrompt,
+} from '../utils/agent-router'
+import { executeClaudeCommand, executeHeadlessWithMetrics } from '../utils/claude'
 import { getIntegrationConfig, getProviderConfig } from '../utils/config.js'
 import {
   getClaudePath as getClaudePathUtil,
@@ -50,7 +57,6 @@ interface FeatureOptions {
   loop?: boolean
   headless?: boolean
   parallel?: boolean
-  agents?: number
   dryRun?: boolean
 }
 
@@ -428,8 +434,15 @@ path: ${featurePath}
     }
   }
 
-  private async loadContext(options: FeatureOptions): Promise<string> {
+  private async loadContext(options: FeatureOptions, featureName?: string): Promise<string> {
     let context = ''
+
+    if (featureName) {
+      const featureContextPath = path.join(this.getFeaturePath(featureName), 'context.md')
+      if (await fs.pathExists(featureContextPath)) {
+        context = await fs.readFile(featureContextPath, 'utf-8')
+      }
+    }
 
     if (options.context) {
       const contextPath = path.resolve(options.context)
@@ -447,9 +460,11 @@ path: ${featurePath}
               contents.push(`# File: ${file}\n\n${content}`)
             }
           }
-          context = contents.join('\n\n---\n\n')
+          const explicitContext = contents.join('\n\n---\n\n')
+          context = context ? `${context}\n\n---\n\n${explicitContext}` : explicitContext
         } else {
-          context = await fs.readFile(contextPath, 'utf-8')
+          const explicitContext = await fs.readFile(contextPath, 'utf-8')
+          context = context ? `${context}\n\n---\n\n${explicitContext}` : explicitContext
         }
       }
     }
@@ -578,7 +593,7 @@ path: ${featurePath}
 
       await fs.ensureDir(state.featurePath)
 
-      const contextFromOptions = await this.loadContext(options)
+      const contextFromOptions = await this.loadContext(options, name)
       const hasContext = contextFromOptions && contextFromOptions.trim().length > 0
 
       const prdPath = path.join(state.featurePath, 'prd.md')
@@ -853,7 +868,7 @@ ${featureContext}
       progress = updateStepStatus(progress, 'research', 'in_progress')
       await saveProgress(name, progress)
 
-      let contextContent = await this.loadContext(options)
+      let contextContent = await this.loadContext(options, name)
 
       if (phaseCheck?.action === 'refine' && (await fs.pathExists(researchPath))) {
         const existingContent = await fs.readFile(researchPath, 'utf-8')
@@ -1382,11 +1397,25 @@ Estrutura:
         const result = await this.setupWorktree(name, baseBranch)
 
         if (result.success && result.worktreePath) {
-          const isCurrentDir = result.worktreePath === process.cwd()
+          let isCurrentDir = false
+          try {
+            const normalizedWorktreePath = fs.realpathSync(result.worktreePath)
+            const normalizedCwd = fs.realpathSync(process.cwd())
+            isCurrentDir = normalizedWorktreePath === normalizedCwd
+          } catch {
+            isCurrentDir = result.worktreePath === process.cwd()
+          }
+
           if (isCurrentDir) {
             console.log()
             console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
             console.log()
+          } else if (options.headless) {
+            console.log()
+            console.log(chalk.cyan('📂 Executando no worktree em modo headless'))
+            console.log(chalk.gray(`   Worktree: ${result.worktreePath}`))
+            console.log()
+            process.chdir(result.worktreePath)
           } else {
             console.log()
             console.log(chalk.cyan('📂 Configuração de Worktree'))
@@ -1484,6 +1513,90 @@ Após ler o checkpoint, continue do ponto correto.
 `
       }
 
+      let activeAgentSection = ''
+      let detectedAgent: AgentConfig | null = null
+
+      const tasksFilePath = path.join(featurePath, 'tasks.md')
+      if (await fs.pathExists(tasksFilePath)) {
+        try {
+          const tasksContent = await fs.readFile(tasksFilePath, 'utf-8')
+          const parsedDoc = parseTasksForParallel(tasksContent, name)
+          const pendingTask = parsedDoc.tasks.find(
+            (t) => t.status === 'pending' || t.status === 'in_progress'
+          )
+
+          if (pendingTask) {
+            const taskType = detectTaskType(pendingTask.title, pendingTask.type || '')
+            detectedAgent = getAgentForTask(taskType)
+
+            const agentPrompt = await loadAgentPrompt(detectedAgent.promptPath)
+
+            if (agentPrompt) {
+              activeAgentSection = `
+${formatAgentHeader(detectedAgent)}
+
+📋 PRÓXIMA TASK: ${pendingTask.title}
+📌 TIPO DETECTADO: ${taskType}
+
+<agent-guidelines>
+${agentPrompt}
+</agent-guidelines>
+
+IMPORTANTE: Siga as diretrizes do agente acima para esta task.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`
+              if (!options.headless) {
+                spinner.stop()
+                console.log(chalk.cyan(`\n🤖 Agente selecionado: ${detectedAgent.name}`))
+                console.log(chalk.gray(`   Task: ${pendingTask.title}`))
+                console.log(chalk.gray(`   Tipo: ${taskType}`))
+                console.log()
+                spinner.start('Executando implementação...')
+              }
+            }
+          }
+        } catch {
+          // Fallback silencioso - continua sem roteamento
+        }
+      }
+
+      const agentSection = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 SISTEMA DE AGENTES ESPECIALISTAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Para cada task, IDENTIFIQUE O TIPO e USE O AGENTE ESPECIALISTA apropriado:
+
+| Tipo de Task | Agente | Foco |
+|--------------|--------|------|
+| Feature/Refactor/Bugfix | feature-developer | Codigo de producao, patterns, arquitetura |
+| Unit Test / Integration Test | unit-test-specialist | Testes unitarios, mocks, coverage |
+| E2E Test | e2e-test-specialist | Testes end-to-end, cenarios de usuario |
+| Docs | documenter | Documentacao tecnica |
+
+COMO IDENTIFICAR O TIPO:
+- Se menciona "test unitario", "unit test", ".unit.test" → unit-test-specialist
+- Se menciona "e2e", "end-to-end", "playwright", "cypress" → e2e-test-specialist
+- Se menciona "documentar", "readme", "docs" → documenter
+- Demais casos (criar, implementar, refatorar) → feature-developer
+
+WORKFLOW POR TASK:
+1. Leia a task
+2. Identifique o tipo (keywords acima)
+3. Carregue o agente: .claude/agents/specialists/<agente>.md
+4. Siga as diretrizes do agente especialista
+5. Complete a task seguindo o workflow do agente
+
+AGENTES DISPONIVEIS:
+- .claude/agents/specialists/feature-developer.md
+- .claude/agents/specialists/unit-test-specialist.md
+- .claude/agents/specialists/e2e-test-specialist.md
+- .claude/agents/documenter.md
+
+IMPORTANTE: Cada agente tem regras e workflow especificos. LEIA o agente antes de executar a task.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`
+
       const prompt = `
 PHASE 3: IMPLEMENTATION (TDD)
 
@@ -1493,6 +1606,7 @@ Tasks: .claude/plans/features/${name}/tasks.md
 Target Phase: ${phase}
 ${specSection}
 ${checkpointContext}
+${activeAgentSection || agentSection}
 IMPORTANTE: TDD - TESTES PRIMEIRO
 
 CRITICAL: TASK TRACKING
@@ -1652,41 +1766,63 @@ Não avance para próxima fase até todas as tasks estarem [x].
         const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
 
         if (await fs.pathExists(worktreeDir)) {
-          console.log()
-          console.log(chalk.yellow('⚠️  QA deve ser executado no worktree da feature.'))
-          console.log()
-          console.log(chalk.white(`  cd ${worktreeDir}`))
-          console.log(chalk.white(`  adk feature qa ${name}`))
-          console.log()
-          return
-        }
-
-        const result = await this.setupWorktree(name, baseBranch)
-
-        if (result.success && result.worktreePath) {
-          const isCurrentDir = result.worktreePath === process.cwd()
-          if (isCurrentDir) {
+          if (options.headless) {
             console.log()
-            console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
+            console.log(chalk.cyan('📂 Executando QA no worktree em modo headless'))
+            console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
             console.log()
+            process.chdir(worktreeDir)
           } else {
             console.log()
-            console.log(chalk.cyan('📂 Configuração de Worktree'))
-            console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
-            console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
-            console.log(chalk.gray(`   Base: ${baseBranch}`))
+            console.log(chalk.yellow('⚠️  QA deve ser executado no worktree da feature.'))
             console.log()
-            console.log(chalk.green(`✓ Worktree criado: ${result.worktreePath}`))
-            console.log()
-            console.log(chalk.yellow('Execute o QA no worktree:'))
-            console.log(chalk.white(`  cd ${result.worktreePath}`))
+            console.log(chalk.white(`  cd ${worktreeDir}`))
             console.log(chalk.white(`  adk feature qa ${name}`))
             console.log()
             return
           }
         } else {
-          spinner.fail(`Erro ao criar worktree: ${result.error}`)
-          process.exit(1)
+          const result = await this.setupWorktree(name, baseBranch)
+
+          if (result.success && result.worktreePath) {
+            let isCurrentDir = false
+            try {
+              const normalizedWorktreePath = fs.realpathSync(result.worktreePath)
+              const normalizedCwd = fs.realpathSync(process.cwd())
+              isCurrentDir = normalizedWorktreePath === normalizedCwd
+            } catch {
+              isCurrentDir = result.worktreePath === process.cwd()
+            }
+
+            if (isCurrentDir) {
+              console.log()
+              console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
+              console.log()
+            } else if (options.headless) {
+              console.log()
+              console.log(chalk.cyan('📂 Executando QA no worktree em modo headless'))
+              console.log(chalk.gray(`   Worktree: ${result.worktreePath}`))
+              console.log()
+              process.chdir(result.worktreePath)
+            } else {
+              console.log()
+              console.log(chalk.cyan('📂 Configuração de Worktree'))
+              console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
+              console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
+              console.log(chalk.gray(`   Base: ${baseBranch}`))
+              console.log()
+              console.log(chalk.green(`✓ Worktree criado: ${result.worktreePath}`))
+              console.log()
+              console.log(chalk.yellow('Execute o QA no worktree:'))
+              console.log(chalk.white(`  cd ${result.worktreePath}`))
+              console.log(chalk.white(`  adk feature qa ${name}`))
+              console.log()
+              return
+            }
+          } else {
+            spinner.fail(`Erro ao criar worktree: ${result.error}`)
+            process.exit(1)
+          }
         }
       }
 
@@ -1862,41 +1998,63 @@ Se encontrar issues CRITICAL ou HIGH, o status deve ser FAIL.
         const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
 
         if (await fs.pathExists(worktreeDir)) {
-          console.log()
-          console.log(chalk.yellow('⚠️  Docs deve ser executado no worktree da feature.'))
-          console.log()
-          console.log(chalk.white(`  cd ${worktreeDir}`))
-          console.log(chalk.white(`  adk feature docs ${name}`))
-          console.log()
-          return
-        }
-
-        const result = await this.setupWorktree(name, baseBranch)
-
-        if (result.success && result.worktreePath) {
-          const isCurrentDir = result.worktreePath === process.cwd()
-          if (isCurrentDir) {
+          if (options.headless) {
             console.log()
-            console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
+            console.log(chalk.cyan('📂 Executando docs no worktree em modo headless'))
+            console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
             console.log()
+            process.chdir(worktreeDir)
           } else {
             console.log()
-            console.log(chalk.cyan('📂 Configuração de Worktree'))
-            console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
-            console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
-            console.log(chalk.gray(`   Base: ${baseBranch}`))
+            console.log(chalk.yellow('⚠️  Docs deve ser executado no worktree da feature.'))
             console.log()
-            console.log(chalk.green(`✓ Worktree criado: ${result.worktreePath}`))
-            console.log()
-            console.log(chalk.yellow('Execute docs no worktree:'))
-            console.log(chalk.white(`  cd ${result.worktreePath}`))
+            console.log(chalk.white(`  cd ${worktreeDir}`))
             console.log(chalk.white(`  adk feature docs ${name}`))
             console.log()
             return
           }
         } else {
-          spinner.fail(`Erro ao criar worktree: ${result.error}`)
-          process.exit(1)
+          const result = await this.setupWorktree(name, baseBranch)
+
+          if (result.success && result.worktreePath) {
+            let isCurrentDir = false
+            try {
+              const normalizedWorktreePath = fs.realpathSync(result.worktreePath)
+              const normalizedCwd = fs.realpathSync(process.cwd())
+              isCurrentDir = normalizedWorktreePath === normalizedCwd
+            } catch {
+              isCurrentDir = result.worktreePath === process.cwd()
+            }
+
+            if (isCurrentDir) {
+              console.log()
+              console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
+              console.log()
+            } else if (options.headless) {
+              console.log()
+              console.log(chalk.cyan('📂 Executando docs no worktree em modo headless'))
+              console.log(chalk.gray(`   Worktree: ${result.worktreePath}`))
+              console.log()
+              process.chdir(result.worktreePath)
+            } else {
+              console.log()
+              console.log(chalk.cyan('📂 Configuração de Worktree'))
+              console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
+              console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
+              console.log(chalk.gray(`   Base: ${baseBranch}`))
+              console.log()
+              console.log(chalk.green(`✓ Worktree criado: ${result.worktreePath}`))
+              console.log()
+              console.log(chalk.yellow('Execute docs no worktree:'))
+              console.log(chalk.white(`  cd ${result.worktreePath}`))
+              console.log(chalk.white(`  adk feature docs ${name}`))
+              console.log()
+              return
+            }
+          } else {
+            spinner.fail(`Erro ao criar worktree: ${result.error}`)
+            process.exit(1)
+          }
         }
       }
 
@@ -2396,16 +2554,81 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
     let completed = 0
     let total = 0
 
+    const taskHeaderRegex = /^###?\s+Task\s+\d+(?:\.\d+)?/i
+    const criteriaHeaderRegex = /^###\s+Crit[ée]rios\s+de\s+Aceite/i
+    const acceptanceHeaderRegex = /^###\s+Acceptance/i
+
+    interface TaskInfo {
+      hasHeaderCheckbox: boolean
+      headerCompleted: boolean
+      criteriaTotal: number
+      criteriaCompleted: number
+    }
+
+    let currentTask: TaskInfo | null = null
+    let inCriteriaSection = false
+    const tasks: TaskInfo[] = []
+
     for (const line of lines) {
-      if (/^\s*- \[x\]/i.test(line)) {
-        completed++
-        total++
-      } else if (/^\s*- \[ \]/i.test(line)) {
-        total++
-      } else if (/^\s*- \[~\]/i.test(line)) {
-        total++
-      } else if (/^\s*- \[!\]/i.test(line)) {
-        total++
+      const trimmed = line.trim()
+
+      if (taskHeaderRegex.test(trimmed)) {
+        if (currentTask) {
+          tasks.push(currentTask)
+        }
+
+        const hasCheckbox =
+          /\[x\]/i.test(trimmed) || /\[~\]/i.test(trimmed) || /\[ \]/i.test(trimmed)
+        const isCompleted = /\[x\]/i.test(trimmed)
+
+        currentTask = {
+          hasHeaderCheckbox: hasCheckbox,
+          headerCompleted: isCompleted,
+          criteriaTotal: 0,
+          criteriaCompleted: 0,
+        }
+        inCriteriaSection = false
+        continue
+      }
+
+      if (!currentTask) continue
+
+      if (criteriaHeaderRegex.test(trimmed) || acceptanceHeaderRegex.test(trimmed)) {
+        inCriteriaSection = true
+        continue
+      }
+
+      if (
+        /^###?\s+/.test(trimmed) &&
+        !criteriaHeaderRegex.test(trimmed) &&
+        !acceptanceHeaderRegex.test(trimmed)
+      ) {
+        inCriteriaSection = false
+      }
+
+      if (inCriteriaSection && /^-\s*\[/.test(trimmed)) {
+        currentTask.criteriaTotal++
+        if (/\[x\]/i.test(trimmed)) {
+          currentTask.criteriaCompleted++
+        }
+      }
+    }
+
+    if (currentTask) {
+      tasks.push(currentTask)
+    }
+
+    total = tasks.length
+
+    for (const task of tasks) {
+      if (task.hasHeaderCheckbox) {
+        if (task.headerCompleted) {
+          completed++
+        }
+      } else if (task.criteriaTotal > 0) {
+        if (task.criteriaCompleted === task.criteriaTotal) {
+          completed++
+        }
       }
     }
 
@@ -2441,6 +2664,20 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
       process.exit(1)
     }
 
+    if (_options.context) {
+      const featurePath = this.getFeaturePath(name)
+      const contextPath = path.join(featurePath, 'context.md')
+      const sourceContextPath = path.resolve(_options.context)
+      if (await fs.pathExists(sourceContextPath)) {
+        const contextContent = await fs.readFile(sourceContextPath, 'utf-8')
+        await fs.writeFile(
+          contextPath,
+          `# Contexto Adicional\n\n> Importado de: ${_options.context}\n\n${contextContent}`
+        )
+        console.log(chalk.green(`✓ Contexto salvo em: ${contextPath}`))
+      }
+    }
+
     const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
     const mainRepo = this.getMainRepoPath()
     const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
@@ -2456,6 +2693,8 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
       iteration++
 
       const taskStatus = await this.checkTasksCompletion(name)
+      const progress = await loadProgress(name)
+      const implementDone = isStepCompleted(progress, 'implementacao')
 
       console.log(
         chalk.cyan(
@@ -2463,8 +2702,8 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
         )
       )
 
-      if (taskStatus.allDone) {
-        console.log(chalk.green('\n✅ Todas as tasks completas!'))
+      if (taskStatus.allDone || implementDone) {
+        console.log(chalk.green('\n✅ Implementação concluída!'))
         console.log(chalk.gray(`Próximo passo: adk feature qa ${name}`))
         return
       }
@@ -2472,9 +2711,6 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
       const implementArgs = ['feature', 'implement', name, '--phase', 'All', '--headless']
       if (_options.parallel) {
         implementArgs.push('--parallel')
-        if (_options.agents) {
-          implementArgs.push('--agents', String(_options.agents))
-        }
       }
 
       console.log(chalk.gray(`\nExecutando: adk ${implementArgs.join(' ')}`))
@@ -2488,8 +2724,12 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
         console.log(chalk.yellow('\n⚠️  Sessão de implementação encerrada'))
 
         const updatedStatus = await this.checkTasksCompletion(name)
-        if (updatedStatus.allDone) {
-          console.log(chalk.green('\n✅ Todas as tasks completas!'))
+        const updatedProgress = await loadProgress(name)
+        const implementNowDone = isStepCompleted(updatedProgress, 'implementacao')
+
+        if (updatedStatus.allDone || implementNowDone) {
+          console.log(chalk.green('\n✅ Implementação concluída!'))
+          console.log(chalk.gray(`Próximo passo: adk feature qa ${name}`))
           return
         }
       }
@@ -2551,8 +2791,21 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
     const featurePath = state.featurePath
     const prdPath = path.join(featurePath, 'prd.md')
     const planPath = path.join(featurePath, 'implementation-plan.md')
+    const contextPath = path.join(featurePath, 'context.md')
 
     await fs.ensureDir(featurePath)
+
+    if (options.context) {
+      const sourceContextPath = path.resolve(options.context)
+      if (await fs.pathExists(sourceContextPath)) {
+        const contextContent = await fs.readFile(sourceContextPath, 'utf-8')
+        await fs.writeFile(
+          contextPath,
+          `# Contexto Adicional\n\n> Importado de: ${options.context}\n\n${contextContent}`
+        )
+        console.log(chalk.green(`✓ Contexto salvo em: ${contextPath}`))
+      }
+    }
 
     let progress = await loadProgress(name)
 
@@ -2856,9 +3109,9 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
       const docsDone = isStepCompleted(progress, 'docs')
 
       const taskStatus = await this.checkTasksCompletion(name)
-      const implementReallyDone = implementDone && taskStatus.allDone
+      const implementReallyDone = implementDone || taskStatus.allDone
 
-      if (implementReallyDone && qaDone && docsDone) {
+      if (implementDone && qaDone && docsDone) {
         console.log(chalk.green('✓ Implementação já concluída, pulando etapa 5'))
         console.log(chalk.green('✓ QA já concluído, pulando etapa 6'))
         console.log(chalk.green('✓ Documentação já concluída, pulando etapa 7'))
@@ -2962,9 +3215,6 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
           const implementArgs = ['feature', 'implement', name, '--phase', 'All']
           if (options.parallel) {
             implementArgs.push('--parallel')
-            if (options.agents) {
-              implementArgs.push('--agents', String(options.agents))
-            }
           }
           await executePhase(implementArgs, 'implementacao', 5, 'IMPLEMENTAÇÃO (TDD)', worktreePath)
 
@@ -4242,12 +4492,12 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
     name: string,
     options: FeatureOptions,
     featurePath: string,
-    specContent?: string
+    _specContent?: string
   ): Promise<void> {
     const tasksPath = path.join(featurePath, 'tasks.md')
 
     if (!(await fs.pathExists(tasksPath))) {
-      console.log(chalk.red('❌ tasks.md não encontrado. Execute tasks primeiro.'))
+      console.log(chalk.red('tasks.md not found. Run tasks first.'))
       console.log(chalk.gray(`   adk feature tasks ${name}`))
       process.exit(1)
     }
@@ -4256,19 +4506,21 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
     const tasksDoc = parseTasksForParallel(tasksContent, name)
 
     if (tasksDoc.totalTasks === 0) {
-      console.log(chalk.yellow('⚠️  Nenhuma task encontrada em tasks.md'))
+      console.log(chalk.yellow('No tasks found in tasks.md'))
       process.exit(1)
     }
 
+    const maxParallelTasks = 3
     const schedulerConfig: SchedulerConfig = {
-      maxParallelTasks: options.agents || 3,
+      maxParallelTasks,
       forceSequential: ['migration', 'seed', 'config', 'setup', 'infraestrutura'],
       prioritizeByEstimate: true,
     }
 
     console.log()
-    console.log(chalk.cyan.bold('📋 Parallel Implementation Mode'))
+    console.log(chalk.cyan.bold('Parallel Implementation Mode'))
     console.log(chalk.gray('─'.repeat(60)))
+    console.log(chalk.gray('Model: opus (implementation) | Retry: enabled | Agents: 3'))
 
     try {
       const plan = createSchedulePlan(tasksDoc, schedulerConfig)
@@ -4276,8 +4528,8 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
       console.log(formatSchedulePlan(plan))
 
       if (options.dryRun) {
-        console.log(chalk.yellow('\n⚠️  Modo dry-run: plano exibido, nenhuma execução realizada'))
-        console.log(chalk.gray(`   Para executar: adk feature implement ${name} --parallel`))
+        console.log(chalk.yellow('\nDry-run mode: plan displayed, no execution'))
+        console.log(chalk.gray(`   To execute: adk feature implement ${name} --parallel`))
         return
       }
 
@@ -4288,13 +4540,13 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
         {
           type: 'confirm',
           name: 'confirm',
-          message: `Executar ${plan.totalTasks} tasks em ${plan.totalWaves} waves com até ${schedulerConfig.maxParallelTasks} agentes?`,
+          message: `Execute ${plan.totalTasks} tasks in ${plan.totalWaves} waves with up to ${maxParallelTasks} parallel agents?`,
           default: true,
         },
       ])
 
       if (!confirm) {
-        console.log(chalk.yellow('Execução cancelada'))
+        console.log(chalk.yellow('Execution cancelled'))
         return
       }
 
@@ -4305,19 +4557,19 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
         waveNumber++
         console.log()
         console.log(
-          chalk.cyan.bold(`━━ Wave ${waveNumber}/${plan.totalWaves} ━━`) +
+          chalk.cyan.bold(`Wave ${waveNumber}/${plan.totalWaves}`) +
             chalk.gray(` (${wave.tasks.length} tasks)`)
         )
 
         if (wave.conflicts.length > 0) {
-          console.log(chalk.yellow('⚠️  Conflitos detectados - executando sequencialmente'))
+          console.log(chalk.yellow('Conflicts detected - executing sequentially'))
           for (const conflict of wave.conflicts) {
             console.log(chalk.gray(`   ${conflict}`))
           }
         }
 
         if (wave.parallelizable && wave.tasks.length > 1) {
-          const metrics = await this.executeWaveParallel(name, wave, options, specContent)
+          const metrics = await this.executeWaveParallel(name, wave, options, _specContent)
           this.displayWaveSummary({
             waveNumber,
             agents: metrics,
@@ -4325,33 +4577,37 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
             parallelized: true,
           })
         } else {
-          await this.executeWaveSequential(name, wave, options, specContent)
+          await this.executeWaveSequential(name, wave, options, _specContent)
         }
 
         for (const task of wave.tasks) {
           completedTaskIds.add(task.id)
         }
 
-        console.log(chalk.green(`✓ Wave ${waveNumber} concluída`))
+        console.log(chalk.green(`Wave ${waveNumber} complete`))
       }
 
       console.log()
-      console.log(chalk.green.bold('✨ Implementação paralela concluída!'))
+      console.log(chalk.green.bold('Parallel implementation complete!'))
       console.log(chalk.gray(`   Tasks: ${plan.totalTasks}`))
       console.log(chalk.gray(`   Waves: ${plan.totalWaves}`))
-      console.log(chalk.gray(`   Speedup estimado: ${plan.estimatedSpeedup}`))
+      console.log(chalk.gray(`   Estimated speedup: ${plan.estimatedSpeedup}`))
+
+      if (plan.estimatedCost !== undefined) {
+        console.log(chalk.gray(`   Estimated cost: $${plan.estimatedCost.toFixed(4)}`))
+      }
 
       let progress = await loadProgress(name)
       progress = updateStepStatus(progress, 'implementacao', 'completed')
       await saveProgress(name, progress)
 
       console.log()
-      console.log(chalk.yellow('Próximo passo:'))
+      console.log(chalk.yellow('Next step:'))
       console.log(chalk.gray(`  adk feature qa ${name}`))
     } catch (error) {
       if (error instanceof Error && error.message.includes('Circular dependency')) {
-        console.log(chalk.red(`❌ ${error.message}`))
-        console.log(chalk.gray('   Revise as dependências em tasks.md'))
+        console.log(chalk.red(`${error.message}`))
+        console.log(chalk.gray('   Review dependencies in tasks.md'))
         process.exit(1)
       }
       throw error
@@ -4375,11 +4631,12 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
           ? `${(agent.tokenCount / 1000).toFixed(1)}k tokens`
           : `${agent.tokenCount} tokens`
 
+      const modelTag = agent.model ? chalk.dim(`[${agent.model}]`) : ''
       const statusSuffix = agent.status === 'success' ? '' : chalk.red(' ✗')
 
       console.log(
         chalk.gray(prefix) +
-          ` Task ${agent.taskId}` +
+          ` Task ${agent.taskId} ${modelTag}` +
           chalk.gray(` · ${agent.toolCount} tool uses · ${tokenStr}`) +
           statusSuffix
       )

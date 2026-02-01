@@ -38,7 +38,7 @@ export const DEFAULT_MODEL_MAPPING: PhaseModelMapping = {
   research: ModelType.OPUS,
   planning: ModelType.OPUS,
   prd: ModelType.OPUS,
-  implement: ModelType.SONNET,
+  implement: ModelType.OPUS,
   qa: ModelType.HAIKU,
   validation: ModelType.HAIKU,
   docs: ModelType.SONNET,

@@ -1,25 +1,34 @@
-import chalk from 'chalk'
+import { themeManager } from './output'
 
 export const logger = {
   info: (message: string) => {
-    console.log(chalk.blue('ℹ'), message)
+    const colors = themeManager.getColors()
+    const icons = themeManager.getIcons()
+    console.log(colors.info(icons.info), message)
   },
 
   success: (message: string) => {
-    console.log(chalk.green('✔'), message)
+    const colors = themeManager.getColors()
+    const icons = themeManager.getIcons()
+    console.log(colors.success(icons.success), message)
   },
 
   warn: (message: string) => {
-    console.log(chalk.yellow('⚠'), message)
+    const colors = themeManager.getColors()
+    const icons = themeManager.getIcons()
+    console.log(colors.warning(icons.warning), message)
   },
 
   error: (message: string) => {
-    console.log(chalk.red('✖'), message)
+    const colors = themeManager.getColors()
+    const icons = themeManager.getIcons()
+    console.log(colors.error(icons.error), message)
   },
 
   debug: (message: string) => {
     if (process.env.DEBUG) {
-      console.log(chalk.gray('🐛'), message)
+      const colors = themeManager.getColors()
+      console.log(colors.muted('🐛'), message)
     }
   },
 }

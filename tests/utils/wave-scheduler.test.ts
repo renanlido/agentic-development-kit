@@ -1,10 +1,10 @@
+import type { ParallelTasksDocument, ParsedTaskForParallel } from '../../src/utils/task-parser'
 import {
   createSchedulePlan,
   formatSchedulePlan,
-  validateDependencies,
   type SchedulerConfig,
+  validateDependencies,
 } from '../../src/utils/wave-scheduler'
-import type { ParallelTasksDocument, ParsedTaskForParallel } from '../../src/utils/task-parser'
 
 describe('wave-scheduler', () => {
   const defaultConfig: SchedulerConfig = {
@@ -105,10 +105,14 @@ describe('wave-scheduler', () => {
 
       const plan = createSchedulePlan(doc, defaultConfig)
 
-      const migrationTask = plan.waves.flatMap(w => w.tasks).find(t => t.title.includes('migration'))
+      const migrationTask = plan.waves
+        .flatMap((w) => w.tasks)
+        .find((t) => t.title.includes('migration'))
       expect(migrationTask).toBeDefined()
 
-      const migrationWave = plan.waves.find(w => w.tasks.some(t => t.title.includes('migration')))
+      const migrationWave = plan.waves.find((w) =>
+        w.tasks.some((t) => t.title.includes('migration'))
+      )
       expect(migrationWave?.tasks).toHaveLength(1)
     })
 
@@ -146,10 +150,7 @@ describe('wave-scheduler', () => {
 
   describe('validateDependencies', () => {
     it('should return empty array for valid dependencies', () => {
-      const doc = createDoc([
-        createTask('1', 'Task A'),
-        createTask('2', 'Task B', ['1']),
-      ])
+      const doc = createDoc([createTask('1', 'Task A'), createTask('2', 'Task B', ['1'])])
 
       const errors = validateDependencies(doc)
 
@@ -157,9 +158,7 @@ describe('wave-scheduler', () => {
     })
 
     it('should detect non-existent dependencies', () => {
-      const doc = createDoc([
-        createTask('1', 'Task A', ['999']),
-      ])
+      const doc = createDoc([createTask('1', 'Task A', ['999'])])
 
       const errors = validateDependencies(doc)
 
@@ -168,23 +167,17 @@ describe('wave-scheduler', () => {
     })
 
     it('should detect circular dependencies', () => {
-      const doc = createDoc([
-        createTask('1', 'Task A', ['2']),
-        createTask('2', 'Task B', ['1']),
-      ])
+      const doc = createDoc([createTask('1', 'Task A', ['2']), createTask('2', 'Task B', ['1'])])
 
       const errors = validateDependencies(doc)
 
-      expect(errors.some(e => e.includes('Circular'))).toBe(true)
+      expect(errors.some((e) => e.includes('Circular'))).toBe(true)
     })
   })
 
   describe('formatSchedulePlan', () => {
     it('should format plan as readable string', () => {
-      const doc = createDoc([
-        createTask('1', 'Task A'),
-        createTask('2', 'Task B'),
-      ])
+      const doc = createDoc([createTask('1', 'Task A'), createTask('2', 'Task B')])
 
       const plan = createSchedulePlan(doc, defaultConfig)
       const formatted = formatSchedulePlan(plan)

@@ -1,6 +1,18 @@
-import chalk from 'chalk'
 import ora, { type Ora } from 'ora'
 import type { CollectedMetrics } from '../types/parallel'
+import type { ResultSummary, SessionInfo } from '../types/result-summary'
+import type { ToolInput } from '../types/tool-formatter'
+import {
+  formatToolDetail,
+  formatToolHeader,
+  formatToolResultLine,
+  formatToolStart,
+  parseToolResult,
+  printResultSummary,
+  printSessionHeader,
+  printSessionInit,
+  themeManager,
+} from './output'
 
 interface StreamEventContent {
   type: 'text' | 'tool_use' | 'tool_result'
@@ -11,27 +23,48 @@ interface StreamEventContent {
   tool_use_id?: string
 }
 
+interface StreamEventDelta {
+  type: 'content_block_delta' | 'text_delta'
+  delta?: {
+    type: 'text_delta'
+    text: string
+  }
+  text?: string
+}
+
 interface StreamEvent {
-  type: 'system' | 'assistant' | 'user' | 'result'
+  type: 'system' | 'assistant' | 'user' | 'result' | 'stream_event'
   subtype?: string
   message?: {
     content: StreamEventContent[]
   }
+  event?: StreamEventDelta
   session_id?: string
+  model?: string
+  tools?: string[]
+  claude_code_version?: string
   duration_ms?: number
   num_turns?: number
   total_cost_usd?: number
+  usage?: {
+    input_tokens?: number
+    output_tokens?: number
+  }
 }
 
 interface PendingTool {
   name: string
-  input?: Record<string, unknown>
+  input?: ToolInput
+  startTime: number
 }
 
 let totalToolCount = 0
 let lastPrintedText = ''
 let spinner: Ora | null = null
 let pendingTool: PendingTool | null = null
+let sessionInfo: SessionInfo | null = null
+let streamingText = ''
+let isStreaming = false
 
 let metricsCollector: CollectedMetrics | null = null
 
@@ -57,6 +90,9 @@ export function resetStreamCounters(): void {
   totalToolCount = 0
   lastPrintedText = ''
   pendingTool = null
+  sessionInfo = null
+  streamingText = ''
+  isStreaming = false
   if (spinner) {
     spinner.stop()
     spinner = null
@@ -65,31 +101,32 @@ export function resetStreamCounters(): void {
 
 export function printStreamHeader(phase: string, feature?: string): void {
   resetStreamCounters()
-  console.log()
-  console.log(
-    chalk.bgCyan.black.bold(` ADK `) + chalk.bgGray.white.bold(` ${phase.toUpperCase()} `)
-  )
-  if (feature) {
-    console.log(chalk.gray(`Feature: ${feature}`))
-  }
-  console.log(chalk.gray('─'.repeat(70)))
+  printSessionHeader(phase, feature, undefined, true)
 }
 
 export function parseAndDisplayStream(line: string): void {
   try {
     const event: StreamEvent = JSON.parse(line)
     displayEvent(event)
-  } catch {
-    // Linha não é JSON válido, ignorar
-  }
+  } catch {}
 }
 
 function displayEvent(event: StreamEvent): void {
   switch (event.type) {
     case 'system':
       if (event.subtype === 'init') {
-        console.log(chalk.gray('⚡ Sessão iniciada\n'))
+        sessionInfo = {
+          sessionId: event.session_id,
+          model: event.model,
+          toolCount: event.tools?.length,
+          version: event.claude_code_version,
+        }
+        printSessionInit(sessionInfo)
       }
+      break
+
+    case 'stream_event':
+      handleStreamEvent(event)
       break
 
     case 'assistant':
@@ -97,16 +134,22 @@ function displayEvent(event: StreamEvent): void {
         for (const block of event.message.content) {
           if (block.type === 'text' && block.text) {
             stopSpinner()
+            flushStreamingText()
             printAssistantText(block.text)
           }
           if (block.type === 'tool_use' && block.name) {
             stopSpinner()
+            flushStreamingText()
             totalToolCount++
             if (metricsCollector) {
               metricsCollector.toolCount++
             }
-            pendingTool = { name: block.name, input: block.input }
-            startToolSpinner(block.name, block.input)
+            pendingTool = {
+              name: block.name,
+              input: block.input as ToolInput,
+              startTime: Date.now(),
+            }
+            startToolSpinner(block.name, block.input as ToolInput)
           }
         }
       }
@@ -117,8 +160,9 @@ function displayEvent(event: StreamEvent): void {
         for (const block of event.message.content) {
           if (block.type === 'tool_result' && pendingTool) {
             const isError = block.content && /error|fail|exception/i.test(block.content)
+            const duration = Date.now() - pendingTool.startTime
             stopSpinner()
-            printToolResult(pendingTool, block.content, !!isError)
+            printToolResult(pendingTool, block.content, !!isError, duration)
             pendingTool = null
           }
         }
@@ -127,53 +171,84 @@ function displayEvent(event: StreamEvent): void {
 
     case 'result': {
       stopSpinner()
+      flushStreamingText()
+
       if (metricsCollector) {
         metricsCollector.durationMs = event.duration_ms || 0
         metricsCollector.costUsd = event.total_cost_usd
+        if (event.usage) {
+          metricsCollector.tokenCount =
+            (event.usage.input_tokens || 0) + (event.usage.output_tokens || 0)
+        }
       }
-      console.log(chalk.gray('─'.repeat(70)))
-      const parts: string[] = []
-      if (event.duration_ms) {
-        parts.push(`${(event.duration_ms / 1000).toFixed(1)}s`)
+
+      const isError = event.subtype?.startsWith('error_') || false
+
+      const result: ResultSummary = {
+        success: !isError,
+        subtype: event.subtype,
+        durationMs: event.duration_ms,
+        turns: event.num_turns,
+        toolCount: totalToolCount,
+        costUsd: event.total_cost_usd,
+        inputTokens: event.usage?.input_tokens,
+        outputTokens: event.usage?.output_tokens,
       }
-      if (event.num_turns) {
-        parts.push(`${event.num_turns} turns`)
-      }
-      if (totalToolCount > 0) {
-        parts.push(`${totalToolCount} tools`)
-      }
-      if (event.total_cost_usd) {
-        parts.push(`$${event.total_cost_usd.toFixed(4)}`)
-      }
-      console.log(chalk.green('✨ Concluído ') + chalk.gray(parts.join(' · ')))
+
+      printResultSummary(result, {
+        showTokens: true,
+        showCost: true,
+        showTools: true,
+        showTurns: true,
+        showDuration: true,
+        compact: false,
+      })
       break
     }
   }
 }
 
-function startToolSpinner(toolName: string, input?: Record<string, unknown>): void {
-  let label = toolName
+function handleStreamEvent(event: StreamEvent): void {
+  if (!event.event) return
 
-  if (input) {
-    if (toolName === 'Read' && input.file_path) {
-      label = `Read(${shortenPath(String(input.file_path))})`
-    } else if (toolName === 'Edit' && input.file_path) {
-      label = `Edit(${shortenPath(String(input.file_path))})`
-    } else if (toolName === 'Write' && input.file_path) {
-      label = `Write(${shortenPath(String(input.file_path))})`
-    } else if (toolName === 'Bash' && input.command) {
-      const cmd = String(input.command).slice(0, 40)
-      label = `Bash(${cmd}${String(input.command).length > 40 ? '...' : ''})`
-    } else if (toolName === 'Grep' && input.pattern) {
-      label = `Grep("${String(input.pattern).slice(0, 20)}")`
-    } else if (toolName === 'Glob' && input.pattern) {
-      label = `Glob(${String(input.pattern)})`
-    }
+  const delta = event.event
+  let text = ''
+
+  if (delta.type === 'content_block_delta' && delta.delta?.type === 'text_delta') {
+    text = delta.delta.text
+  } else if (delta.type === 'text_delta' && delta.text) {
+    text = delta.text
   }
 
+  if (text) {
+    if (!isStreaming) {
+      isStreaming = true
+      stopSpinner()
+      const colors = themeManager.getColors()
+      process.stdout.write(colors.muted('💭 '))
+    }
+    streamingText += text
+    process.stdout.write(text)
+  }
+}
+
+function flushStreamingText(): void {
+  if (isStreaming && streamingText) {
+    process.stdout.write('\n')
+    isStreaming = false
+    streamingText = ''
+  }
+}
+
+function startToolSpinner(toolName: string, input?: ToolInput): void {
+  const formatted = formatToolStart(toolName, input)
+  const label = formatted.detail
+    ? `${formatted.icon} ${formatted.label} ${formatted.detail}`
+    : `${formatted.icon} ${formatted.label}`
+
   spinner = ora({
-    text: chalk.yellow(label),
-    spinner: 'dots',
+    text: formatted.color(label),
+    spinner: themeManager.getSpinnerStyle() as any,
     color: 'yellow',
   }).start()
 }
@@ -185,73 +260,86 @@ function stopSpinner(): void {
   }
 }
 
-function printToolResult(tool: PendingTool, content: string | undefined, isError: boolean): void {
-  const icon = isError ? chalk.red('✗') : chalk.green('✓')
-  let label = tool.name
+function printToolResult(
+  tool: PendingTool,
+  content: string | undefined,
+  isError: boolean,
+  duration?: number
+): void {
+  const icons = themeManager.getIcons()
 
-  if (tool.input) {
-    if (tool.name === 'Read' && tool.input.file_path) {
-      label = `Read(${shortenPath(String(tool.input.file_path))})`
-    } else if (tool.name === 'Edit' && tool.input.file_path) {
-      label = `Edit(${shortenPath(String(tool.input.file_path))})`
-    } else if (tool.name === 'Write' && tool.input.file_path) {
-      label = `Write(${shortenPath(String(tool.input.file_path))})`
-    } else if (tool.name === 'Bash') {
-      label = 'Bash'
-    } else if (tool.name === 'Grep' && tool.input.pattern) {
-      label = `Grep("${String(tool.input.pattern).slice(0, 20)}")`
-    } else if (tool.name === 'Glob' && tool.input.pattern) {
-      label = `Glob(${String(tool.input.pattern)})`
-    }
-  }
-
-  console.log(chalk.yellow(`🔧 ${label} `) + icon)
-
-  if (content && content.trim()) {
-    printToolContent(tool.name, content, isError)
-  }
-}
-
-function printToolContent(toolName: string, content: string, isError: boolean): void {
-  if (isTaskOutputContent(content)) {
-    printTaskOutput(content, isError)
+  if (isTaskOutputContent(content || '')) {
+    printTaskOutput(content || '', isError)
     return
   }
 
+  const header = formatToolHeader(tool.name, tool.input)
+  console.log(header)
+
+  const detail = formatToolDetail(tool.input, tool.name)
+  if (detail) {
+    console.log(`   ${detail}`)
+  }
+
+  const resultInfo = parseToolResult(tool.name, content)
+  if (duration) {
+    resultInfo.duration = duration
+  }
+  const resultLine = formatToolResultLine(tool.name, resultInfo)
+  console.log(`   ${icons.corner} ${resultLine}`)
+
+  if (content && content.trim() && shouldShowContent(tool.name, content)) {
+    printToolContent(tool.name, content, isError)
+  }
+
+  console.log()
+}
+
+function shouldShowContent(toolName: string, content: string): boolean {
+  if (toolName === 'Read') return false
+  if (toolName === 'Glob') return false
+  if (toolName === 'Grep' && content.split('\n').length > 50) return false
+  return true
+}
+
+function printToolContent(toolName: string, content: string, isError: boolean): void {
+  const colors = themeManager.getColors()
+  const icons = themeManager.getIcons()
+
   const lines = content.split('\n')
-  const maxLines = 12
+  const maxLines = 8
   const displayLines = lines.slice(0, maxLines)
-  const prefix = isError ? chalk.red('  │ ') : chalk.gray('  │ ')
+  const prefix = `   ${colors.muted(icons.line)}  `
 
   for (const line of displayLines) {
     if (!line.trim()) continue
 
-    let formattedLine = line.slice(0, 100)
+    let formattedLine = line.slice(0, 90)
 
     if (toolName === 'Read' || toolName === 'Edit') {
       const lineNumMatch = formattedLine.match(/^(\s*\d+[→│|:])(.*)$/)
       if (lineNumMatch) {
-        formattedLine = chalk.gray(lineNumMatch[1]) + chalk.white(lineNumMatch[2])
+        formattedLine = colors.muted(lineNumMatch[1]) + colors.primary(lineNumMatch[2])
       }
     }
 
     if (toolName === 'Bash') {
       if (line.includes('PASS') || line.includes('✓')) {
-        formattedLine = chalk.green(formattedLine)
+        formattedLine = colors.success(formattedLine)
       } else if (line.includes('FAIL') || line.includes('ERROR') || line.includes('✗')) {
-        formattedLine = chalk.red(formattedLine)
+        formattedLine = colors.error(formattedLine)
       }
     }
 
     if (isError) {
-      formattedLine = chalk.red(line.slice(0, 100))
+      formattedLine = colors.error(line.slice(0, 90))
     }
 
     console.log(prefix + formattedLine)
   }
 
   if (lines.length > maxLines) {
-    console.log(prefix + chalk.gray(`... (${lines.length - maxLines} more lines)`))
+    console.log(prefix + colors.muted(`... +${lines.length - maxLines} lines`))
   }
 }
 
@@ -270,6 +358,9 @@ function extractXmlValue(content: string, tag: string): string | null {
 }
 
 function printTaskOutput(content: string, isError: boolean): void {
+  const colors = themeManager.getColors()
+  const icons = themeManager.getIcons()
+
   const taskId = extractXmlValue(content, 'task_id')
   const status = extractXmlValue(content, 'status')
   const taskType = extractXmlValue(content, 'task_type')
@@ -278,44 +369,39 @@ function printTaskOutput(content: string, isError: boolean): void {
 
   const statusIcon =
     status === 'completed' && exitCode === '0'
-      ? chalk.green('●')
+      ? colors.success(icons.completed)
       : status === 'completed'
-        ? chalk.red('●')
+        ? colors.error(icons.completed)
         : status === 'running'
-          ? chalk.yellow('◐')
-          : chalk.gray('○')
+          ? colors.warning(icons.running)
+          : colors.muted(icons.pending)
 
   const statusColor =
     status === 'completed' && exitCode === '0'
-      ? chalk.green
+      ? colors.success
       : status === 'completed'
-        ? chalk.red
-        : chalk.yellow
+        ? colors.error
+        : colors.warning
 
   console.log()
   console.log(
-    chalk.gray('  ┌─') +
-      chalk.cyan(' Task ') +
-      chalk.gray(taskId || 'unknown') +
-      chalk.gray(' ─'.repeat(Math.max(1, 25 - (taskId?.length || 7))))
+    `   ${colors.muted('╭─')} ${colors.highlight('Task')} ${colors.muted(taskId || 'unknown')} ${colors.muted('─'.repeat(Math.max(1, 30 - (taskId?.length || 7))))}`
   )
 
   if (taskType) {
-    console.log(chalk.gray('  │ ') + chalk.gray('Type: ') + chalk.white(taskType))
+    console.log(
+      `   ${colors.muted(icons.line)}  ${colors.muted('Type:')} ${colors.primary(taskType)}`
+    )
   }
 
   console.log(
-    chalk.gray('  │ ') +
-      chalk.gray('Status: ') +
-      statusIcon +
-      ' ' +
-      statusColor(status || 'unknown') +
-      (exitCode !== null ? chalk.gray(` (exit: ${exitCode})`) : '')
+    `   ${colors.muted(icons.line)}  ${colors.muted('Status:')} ${statusIcon} ${statusColor(status || 'unknown')}` +
+      (exitCode !== null ? colors.muted(` (exit: ${exitCode})`) : '')
   )
 
   if (retrievalStatus && retrievalStatus !== 'success') {
     console.log(
-      chalk.gray('  │ ') + chalk.yellow('⚠ Retrieval: ') + chalk.yellow(retrievalStatus)
+      `   ${colors.muted(icons.line)}  ${colors.warning(icons.warning)} ${colors.warning('Retrieval:')} ${colors.warning(retrievalStatus)}`
     )
   }
 
@@ -323,26 +409,29 @@ function printTaskOutput(content: string, isError: boolean): void {
   if (outputMatch) {
     const output = outputMatch[1].trim()
     if (output) {
-      console.log(chalk.gray('  │'))
-      console.log(chalk.gray('  │ ') + chalk.gray('Output:'))
+      console.log(`   ${colors.muted(icons.line)}`)
+      console.log(`   ${colors.muted(icons.line)}  ${colors.muted('Output:')}`)
       printFormattedOutput(output, isError)
     }
   }
 
-  console.log(chalk.gray('  └' + '─'.repeat(40)))
+  console.log(`   ${colors.muted(icons.corner)}${colors.muted('─'.repeat(40))}`)
 }
 
 function printFormattedOutput(output: string, isError: boolean): void {
+  const colors = themeManager.getColors()
+  const icons = themeManager.getIcons()
+
   const lines = output.split('\n').filter((l) => l.trim())
   const maxLines = 8
   const displayLines = lines.slice(0, maxLines)
-  const prefix = chalk.gray('  │   ')
+  const prefix = `   ${colors.muted(icons.line)}    `
 
   for (const line of displayLines) {
-    let formattedLine = line.slice(0, 90)
+    let formattedLine = line.slice(0, 85)
 
     if (line.includes('PASS') || line.includes('✓') || line.includes('success')) {
-      formattedLine = chalk.green(formattedLine)
+      formattedLine = colors.success(formattedLine)
     } else if (
       line.includes('FAIL') ||
       line.includes('ERROR') ||
@@ -350,30 +439,25 @@ function printFormattedOutput(output: string, isError: boolean): void {
       line.includes('✗') ||
       isError
     ) {
-      formattedLine = chalk.red(formattedLine)
+      formattedLine = colors.error(formattedLine)
     } else if (line.includes('WARN') || line.includes('warning')) {
-      formattedLine = chalk.yellow(formattedLine)
+      formattedLine = colors.warning(formattedLine)
     } else if (line.match(/^\s*at\s+/)) {
-      formattedLine = chalk.gray(formattedLine)
+      formattedLine = colors.muted(formattedLine)
     } else {
-      formattedLine = chalk.white(formattedLine)
+      formattedLine = colors.primary(formattedLine)
     }
 
     console.log(prefix + formattedLine)
   }
 
   if (lines.length > maxLines) {
-    console.log(prefix + chalk.gray(`... +${lines.length - maxLines} lines`))
+    console.log(prefix + colors.muted(`... +${lines.length - maxLines} lines`))
   }
 }
 
-function shortenPath(filePath: string): string {
-  const parts = filePath.split('/')
-  if (parts.length <= 3) return filePath
-  return '.../' + parts.slice(-2).join('/')
-}
-
 function printAssistantText(text: string): void {
+  const colors = themeManager.getColors()
   const lines = text.split('\n')
 
   for (const line of lines) {
@@ -393,7 +477,7 @@ function printAssistantText(text: string): void {
     const h1Match = trimmed.match(/^#\s+(.+)$/)
     if (h1Match) {
       console.log()
-      console.log(chalk.bold.white.underline(h1Match[1]))
+      console.log(themeManager.formatBold(themeManager.formatUnderline(h1Match[1])))
       console.log()
       lastPrintedText = trimmed
       continue
@@ -402,21 +486,21 @@ function printAssistantText(text: string): void {
     const h2Match = trimmed.match(/^##\s+(.+)$/)
     if (h2Match) {
       console.log()
-      console.log(chalk.bold.cyan(h2Match[1]))
+      console.log(colors.highlight(themeManager.formatBold(h2Match[1])))
       lastPrintedText = trimmed
       continue
     }
 
     const h3Match = trimmed.match(/^###\s+(.+)$/)
     if (h3Match) {
-      console.log(chalk.cyan(h3Match[1]))
+      console.log(colors.highlight(h3Match[1]))
       lastPrintedText = trimmed
       continue
     }
 
     const h4Match = trimmed.match(/^####\s+(.+)$/)
     if (h4Match) {
-      console.log(chalk.white.bold(h4Match[1]))
+      console.log(themeManager.formatBold(h4Match[1]))
       lastPrintedText = trimmed
       continue
     }
@@ -424,21 +508,25 @@ function printAssistantText(text: string): void {
     const emojiHeaderMatch = trimmed.match(/^([✅❌⚠️🔴🟢🟡📋🎯💡🚀✨🔧📦🔒⭐])\s*(.+)$/)
     if (emojiHeaderMatch && !trimmed.startsWith('•') && !trimmed.startsWith('-')) {
       console.log()
-      console.log(emojiHeaderMatch[1] + ' ' + chalk.bold(formatInlineCode(emojiHeaderMatch[2])))
+      console.log(
+        emojiHeaderMatch[1] + ' ' + themeManager.formatBold(formatInlineCode(emojiHeaderMatch[2]))
+      )
       lastPrintedText = trimmed
       continue
     }
 
     const bulletMatch = trimmed.match(/^[-*•]\s+(.+)$/)
     if (bulletMatch) {
-      console.log(indent + chalk.gray('• ') + formatInlineCode(bulletMatch[1]))
+      console.log(indent + colors.muted('• ') + formatInlineCode(bulletMatch[1]))
       lastPrintedText = trimmed
       continue
     }
 
     const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/)
     if (numberedMatch) {
-      console.log(indent + chalk.gray(`${numberedMatch[1]}. `) + formatInlineCode(numberedMatch[2]))
+      console.log(
+        indent + colors.muted(`${numberedMatch[1]}. `) + formatInlineCode(numberedMatch[2])
+      )
       lastPrintedText = trimmed
       continue
     }
@@ -447,10 +535,10 @@ function printAssistantText(text: string): void {
     if (tableRowMatch) {
       const cells = tableRowMatch[1].split('|').map((c) => c.trim())
       if (cells.every((c) => /^[-:]+$/.test(c))) {
-        console.log(chalk.gray('─'.repeat(70)))
+        console.log(colors.muted('─'.repeat(70)))
       } else {
-        const formatted = cells.map((c) => formatInlineCode(c)).join(chalk.gray(' │ '))
-        console.log(chalk.gray('│ ') + formatted + chalk.gray(' │'))
+        const formatted = cells.map((c) => formatInlineCode(c)).join(colors.muted(' │ '))
+        console.log(colors.muted('│ ') + formatted + colors.muted(' │'))
       }
       lastPrintedText = trimmed
       continue
@@ -462,6 +550,7 @@ function printAssistantText(text: string): void {
 }
 
 function printInsightBlock(text: string): void {
+  const colors = themeManager.getColors()
   const lines = text.split('\n')
   const content: string[] = []
   let inBlock = false
@@ -484,13 +573,13 @@ function printInsightBlock(text: string): void {
   }
 
   console.log()
-  console.log(chalk.gray(`★ Insight ${'─'.repeat(60)}`))
+  console.log(colors.muted(`★ Insight ${'─'.repeat(60)}`))
   console.log(formatInlineCode(content.join(' ')))
-  console.log(chalk.gray('─'.repeat(70)))
+  console.log(colors.muted('─'.repeat(70)))
 }
 
 function formatInlineCode(text: string): string {
   return text
-    .replace(/\*\*([^*]+)\*\*/g, (_, content) => chalk.bold(content))
-    .replace(/`([^`]+)`/g, (_, code) => chalk.bgGray.white(` ${code} `))
+    .replace(/\*\*([^*]+)\*\*/g, (_, content) => themeManager.formatBold(content))
+    .replace(/`([^`]+)`/g, (_, code) => themeManager.formatInverse(` ${code} `))
 }

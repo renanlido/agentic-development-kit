@@ -1,9 +1,113 @@
+import { ModelType } from '../types/model'
+import {
+  COMPLEXITY_KEYWORDS,
+  type ComplexityLevel,
+  type TaskComplexity,
+} from '../types/parallel'
 import type { TaskState, TasksDocument } from '../types/progress-sync'
 
 const CHECKBOX_REGEX = /^(\s*)- \[([x~! ])\]\s*(.+)$/i
 const PRIORITY_REGEX = /P([0-4]):/i
 
 export type { TaskStatus } from '../types/progress-sync'
+
+export function analyzeTaskComplexity(
+  title: string,
+  description?: string,
+  files?: string[]
+): TaskComplexity {
+  const combined = `${title} ${description || ''}`.toLowerCase()
+  let score = 50
+  const indicators: string[] = []
+
+  for (const keyword of COMPLEXITY_KEYWORDS.high) {
+    if (combined.includes(keyword)) {
+      score += 20
+      indicators.push(keyword)
+    }
+  }
+
+  for (const keyword of COMPLEXITY_KEYWORDS.medium) {
+    if (combined.includes(keyword) && !indicators.includes(keyword)) {
+      score += 10
+      indicators.push(keyword)
+    }
+  }
+
+  for (const keyword of COMPLEXITY_KEYWORDS.low) {
+    if (combined.includes(keyword) && !indicators.includes(keyword)) {
+      score -= 10
+      indicators.push(keyword)
+    }
+  }
+
+  if (files && files.length > 5) score += 15
+  if (files && files.length > 10) score += 10
+
+  score = Math.max(0, Math.min(100, score))
+
+  let level: ComplexityLevel
+  let recommendedModel: ModelType
+
+  if (score >= 70) {
+    level = 'high'
+    recommendedModel = ModelType.OPUS
+  } else if (score >= 40) {
+    level = 'medium'
+    recommendedModel = ModelType.OPUS
+  } else {
+    level = 'low'
+    recommendedModel = ModelType.HAIKU
+  }
+
+  return {
+    level,
+    score,
+    indicators: indicators.slice(0, 5),
+    recommendedModel,
+  }
+}
+
+export type TaskCategory = 'implementation' | 'testing' | 'review' | 'other'
+
+export function categorizeTask(title: string, taskType?: string): TaskCategory {
+  const text = title.toLowerCase()
+  const type = taskType?.toLowerCase() || ''
+
+  if (
+    type.includes('test') ||
+    text.includes('test') ||
+    text.includes('spec') ||
+    text.includes('coverage')
+  ) {
+    return 'testing'
+  }
+
+  if (
+    text.includes('review') ||
+    text.includes('validate') ||
+    text.includes('check') ||
+    text.includes('lint') ||
+    text.includes('qa')
+  ) {
+    return 'review'
+  }
+
+  if (
+    type === 'feature' ||
+    type === 'refactor' ||
+    type === 'bugfix' ||
+    text.includes('implement') ||
+    text.includes('create') ||
+    text.includes('add') ||
+    text.includes('build') ||
+    text.includes('develop')
+  ) {
+    return 'implementation'
+  }
+
+  return 'other'
+}
 
 /**
  * Extracts task status from markdown checkbox format.
@@ -207,6 +311,11 @@ export function parseTasksForParallel(content: string, featureName: string): Par
 
   let currentTask: Partial<ParsedTaskForParallel> | null = null
   let inFilesSection = false
+  let inCriteriaSection = false
+  let criteriaTotal = 0
+  let criteriaCompleted = 0
+  let criteriaInProgress = 0
+  let headerHasCheckbox = false
 
   for (const line of lines) {
     const trimmed = line.trim()
@@ -214,11 +323,19 @@ export function parseTasksForParallel(content: string, featureName: string): Par
     const taskMatch = trimmed.match(TASK_HEADER_REGEX)
     if (taskMatch) {
       if (currentTask && currentTask.id) {
+        if (!headerHasCheckbox && criteriaTotal > 0) {
+          currentTask.status = inferStatusFromCriteria(
+            criteriaTotal,
+            criteriaCompleted,
+            criteriaInProgress
+          )
+        }
         tasks.push(finalizeParallelTask(currentTask))
       }
 
       const isCompleted = /\[x\]/i.test(trimmed)
       const isInProgress = /\[~\]/i.test(trimmed)
+      headerHasCheckbox = isCompleted || isInProgress || /\[ \]/i.test(trimmed)
 
       currentTask = {
         id: taskMatch[1],
@@ -230,10 +347,37 @@ export function parseTasksForParallel(content: string, featureName: string): Par
         estimate: 'M',
       }
       inFilesSection = false
+      inCriteriaSection = false
+      criteriaTotal = 0
+      criteriaCompleted = 0
+      criteriaInProgress = 0
       continue
     }
 
     if (!currentTask) continue
+
+    if (
+      trimmed.match(/^###\s+Crit[ée]rios\s+de\s+Aceite/i) ||
+      trimmed.match(/^###\s+Acceptance/i)
+    ) {
+      inCriteriaSection = true
+      inFilesSection = false
+      continue
+    }
+
+    if (trimmed.match(/^###?\s+/) && !trimmed.match(/Crit[ée]rios|Acceptance/i)) {
+      inCriteriaSection = false
+    }
+
+    if (inCriteriaSection && trimmed.match(/^-\s*\[/)) {
+      criteriaTotal++
+      if (/\[x\]/i.test(trimmed)) {
+        criteriaCompleted++
+      } else if (/\[~\]/i.test(trimmed)) {
+        criteriaInProgress++
+      }
+      continue
+    }
 
     if (trimmed.match(/^#+\s+/)) {
       inFilesSection = false
@@ -274,6 +418,13 @@ export function parseTasksForParallel(content: string, featureName: string): Par
   }
 
   if (currentTask && currentTask.id) {
+    if (!headerHasCheckbox && criteriaTotal > 0) {
+      currentTask.status = inferStatusFromCriteria(
+        criteriaTotal,
+        criteriaCompleted,
+        criteriaInProgress
+      )
+    }
     tasks.push(finalizeParallelTask(currentTask))
   }
 
@@ -286,6 +437,20 @@ export function parseTasksForParallel(content: string, featureName: string): Par
     completedTasks,
     pendingTasks: tasks.length - completedTasks,
   }
+}
+
+function inferStatusFromCriteria(
+  total: number,
+  completed: number,
+  inProgress: number
+): ParsedTaskForParallel['status'] {
+  if (completed === total) {
+    return 'completed'
+  }
+  if (completed > 0 || inProgress > 0) {
+    return 'in_progress'
+  }
+  return 'pending'
 }
 
 function finalizeParallelTask(task: Partial<ParsedTaskForParallel>): ParsedTaskForParallel {

@@ -2,9 +2,173 @@ import { exec } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import chalk from 'chalk'
+import type {
+  ConflictInfo as EnhancedConflictInfo,
+  TaskExecutionResult,
+  WaveExecutionOptions,
+} from '../types/parallel'
 import type { AgentResult, ConflictInfo } from './parallel-executor.js'
 
 const execAsync = promisify(exec)
+
+export interface FileConflictForWave {
+  file: string
+  tasks: string[]
+  conflictType: 'overlap' | 'merge'
+}
+
+export function detectFileConflictsForWave(results: TaskExecutionResult[]): FileConflictForWave[] {
+  const fileToTasks = new Map<string, string[]>()
+
+  for (const result of results) {
+    if (!result.success) continue
+
+    for (const file of result.filesModified) {
+      const tasks = fileToTasks.get(file) || []
+      tasks.push(result.taskId)
+      fileToTasks.set(file, tasks)
+    }
+  }
+
+  const conflicts: FileConflictForWave[] = []
+  for (const [file, tasks] of fileToTasks) {
+    if (tasks.length > 1) {
+      conflicts.push({
+        file,
+        tasks,
+        conflictType: 'overlap',
+      })
+    }
+  }
+
+  return conflicts
+}
+
+export function classifyConflictResolution(
+  file: string,
+  taskCount: number
+): EnhancedConflictInfo['resolution'] {
+  const simpleFiles = [
+    '.json',
+    '.yaml',
+    '.yml',
+    '.toml',
+    '.env',
+    '.lock',
+    'package.json',
+  ]
+
+  const isSimpleFile = simpleFiles.some((ext) => file.endsWith(ext))
+
+  if (taskCount === 2 && isSimpleFile) {
+    return 'auto'
+  }
+
+  if (taskCount > 3) {
+    return 'manual'
+  }
+
+  return 'retry'
+}
+
+export async function resolveConflicts(
+  results: TaskExecutionResult[],
+  _options: WaveExecutionOptions
+): Promise<EnhancedConflictInfo[]> {
+  const fileConflicts = detectFileConflictsForWave(results)
+  const conflicts: EnhancedConflictInfo[] = []
+
+  for (const fc of fileConflicts) {
+    const resolution = classifyConflictResolution(fc.file, fc.tasks.length)
+
+    conflicts.push({
+      type: 'file_overlap',
+      tasks: fc.tasks,
+      files: [fc.file],
+      resolution,
+      resolved: resolution === 'auto',
+    })
+  }
+
+  return conflicts
+}
+
+export async function attemptAutoResolveEnhanced(conflict: EnhancedConflictInfo): Promise<boolean> {
+  if (conflict.resolution !== 'auto') {
+    return false
+  }
+
+  try {
+    await execAsync(`git add ${conflict.files.join(' ')}`)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function formatEnhancedConflictReport(conflicts: EnhancedConflictInfo[]): string {
+  if (conflicts.length === 0) {
+    return chalk.green('No conflicts detected')
+  }
+
+  const lines: string[] = []
+  lines.push('')
+  lines.push(chalk.yellow.bold('Conflicts Detected:'))
+
+  for (const conflict of conflicts) {
+    const icon =
+      conflict.resolution === 'manual'
+        ? chalk.red('!')
+        : conflict.resolution === 'auto'
+          ? chalk.green('~')
+          : chalk.yellow('?')
+
+    lines.push(`  ${icon} ${conflict.type}: ${conflict.files.join(', ')}`)
+    lines.push(`    Tasks: ${conflict.tasks.join(', ')}`)
+    lines.push(`    Resolution: ${conflict.resolution}`)
+  }
+
+  return lines.join('\n')
+}
+
+export interface ConflictResolutionStrategy {
+  type: 'ours' | 'theirs' | 'manual' | 'retry-sequential'
+  description: string
+}
+
+export function suggestResolutionStrategy(conflict: EnhancedConflictInfo): ConflictResolutionStrategy {
+  if (conflict.resolution === 'auto') {
+    return {
+      type: 'theirs',
+      description: 'Accept the latest changes automatically',
+    }
+  }
+
+  if (conflict.tasks.length === 2) {
+    return {
+      type: 'retry-sequential',
+      description: 'Re-run conflicting tasks sequentially',
+    }
+  }
+
+  return {
+    type: 'manual',
+    description: 'Manual intervention required',
+  }
+}
+
+export function getConflictSummary(conflicts: EnhancedConflictInfo[]): {
+  auto: number
+  manual: number
+  retry: number
+} {
+  return {
+    auto: conflicts.filter((c) => c.resolution === 'auto').length,
+    manual: conflicts.filter((c) => c.resolution === 'manual').length,
+    retry: conflicts.filter((c) => c.resolution === 'retry').length,
+  }
+}
 
 async function runGit(command: string, cwd?: string): Promise<string> {
   const options = cwd ? { cwd } : {}

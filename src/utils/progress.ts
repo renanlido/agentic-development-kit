@@ -165,17 +165,15 @@ function parseProgressFile(content: string): FeatureProgress | null {
     steps.push(step)
   }
 
-  if (steps.length === 0) {
-    return {
-      feature,
-      currentPhase,
-      steps: DEFAULT_STEPS.map((s) => ({ ...s })),
-      lastUpdated,
-      nextStep,
+  const mergedSteps: StepProgress[] = DEFAULT_STEPS.map((defaultStep) => {
+    const existingStep = steps.find((s) => s.name === defaultStep.name)
+    if (existingStep) {
+      return existingStep
     }
-  }
+    return { ...defaultStep }
+  })
 
-  return { feature, currentPhase, steps, lastUpdated, nextStep }
+  return { feature, currentPhase, steps: mergedSteps, lastUpdated, nextStep }
 }
 
 function formatProgressFile(progress: FeatureProgress): string {

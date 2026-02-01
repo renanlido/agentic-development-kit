@@ -19,6 +19,7 @@ export interface ClaudeCommandOptions {
   showProgress?: boolean
   cwd?: string
   collectMetrics?: boolean
+  enableTokenStreaming?: boolean
 }
 
 export interface HeadlessResult {
@@ -66,12 +67,14 @@ export async function executeHeadlessWithMetrics(
   options: ClaudeCommandOptions = {}
 ): Promise<HeadlessResult> {
   const validatedModel = validateModel(options.model)
+  const enableStreaming = options.enableTokenStreaming !== false
   const args = [
     '-p',
     '--dangerously-skip-permissions',
     '--output-format',
     'stream-json',
     '--verbose',
+    ...(enableStreaming ? ['--include-partial-messages'] : []),
   ]
 
   if (validatedModel) {
