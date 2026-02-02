@@ -20,57 +20,58 @@ A v2 do ADK tem **código implementado que nunca é usado** e **funcionalidades 
 
 ## 1. ANÁLISE: `src/utils/claude.ts`
 
-```typescript
-// Linha 1-6: Imports
-import { spawnSync, execSync } from 'node:child_process'
-// ❌ PROBLEMA: Ambos são SÍNCRONOS (bloqueantes)
-// ❌ FALTA: spawn (assíncrono) para streaming
+> **ATUALIZAÇÃO 2026-02-02**: Análise revisada. O código possui DOIS modos de execução.
 
-// Linha 8-10: Interface
+### Modo Interativo (executeInteractive) - SÍNCRONO
+```typescript
+// Linha 145-184: executeInteractive
+const result = spawnSync('claude', args, {
+  input,
+  encoding: 'utf-8',
+  stdio: ['pipe', 'inherit', 'inherit'],  // ❌ output vai pro terminal!
+})
+return ''  // ❌ SEMPRE RETORNA STRING VAZIA!
+// ❌ PROBLEMA: spawnSync é BLOCKING
+// ❌ PROBLEMA: stdio inherit = não captura output
+```
+
+### Modo Headless (executeHeadless) - ASSÍNCRONO ✅
+```typescript
+// Linha 62-143: executeHeadlessWithMetrics
+const child = spawn('claude', args, {
+  stdio: ['pipe', 'pipe', stderrMode],  // ✅ Captura stdout
+})
+// ✅ USA spawn (assíncrono)
+// ✅ Captura stream-json output
+// ✅ Coleta métricas (tokens, tempo)
+// ❌ AINDA FALTA: session tracking
+```
+
+### Interface atual:
+```typescript
 export interface ClaudeCommandOptions {
   model?: ModelType
-}
-// ❌ FALTA: resume?: string    // Para retomar sessão
-// ❌ FALTA: sessionId?: string // Para rastrear sessão
-// ❌ FALTA: timeout?: number   // Para controle de tempo
-
-// Linha 23-60: executeClaudeCommand
-export async function executeClaudeCommand(
-  prompt: string,
-  options: ClaudeCommandOptions = {}
-): Promise<string> {
-  // ❌ MENTIRA: Função é "async" mas internamente é SÍNCRONA
-  
-  // Linha 38-41:
-  const args = ['--dangerously-skip-permissions']
-  if (validatedModel) {
-    args.push('--model', validatedModel)
-  }
-  // ❌ FALTA: args.push('--resume', sessionId)
-  // ❌ FALTA: args.push('--print-session-id')
-  
-  // Linha 46-50:
-  const result = spawnSync('claude', args, {
-    input,
-    encoding: 'utf-8',
-    stdio: ['pipe', 'inherit', 'inherit'],  // ❌ output vai pro terminal!
-  })
-  // ❌ PROBLEMA: spawnSync é BLOCKING
-  // ❌ PROBLEMA: stdio inherit = não captura output
-  // ❌ PROBLEMA: Não pode cancelar ou fazer timeout
-  
-  // Linha 58:
-  return ''  // ❌ SEMPRE RETORNA STRING VAZIA!
-  // ❌ PROBLEMA CRÍTICO: Não retorna output do Claude
-  // ❌ PROBLEMA CRÍTICO: Não pode pegar session ID
+  headless?: boolean      // ✅ EXISTE
+  showProgress?: boolean  // ✅ EXISTE
+  collectMetrics?: boolean // ✅ EXISTE
+  // ❌ FALTA: resume?: string    // Para retomar sessão
+  // ❌ FALTA: sessionId?: string // Para rastrear sessão
 }
 ```
 
+### Flags do Claude CLI Disponíveis (verificado 2026-02-02):
+```bash
+-r, --resume [value]     # Resume by session ID
+--session-id <uuid>      # Use specific session ID
+-c, --continue           # Continue most recent conversation
+--fork-session           # Create new session ID when resuming
+```
+
 ### Impacto:
-- **Cada chamada de `executeClaudeCommand()` = nova sessão Claude**
-- **Impossível retomar sessões**
-- **Impossível saber o que Claude fez**
-- **Impossível capturar session ID**
+- ✅ **Modo headless JÁ é assíncrono** - pode ser base para v3
+- ❌ **Falta integrar `--resume` e `--session-id`** no código
+- ❌ **Cada chamada = nova sessão** (não usa flags de continuidade)
+- ❌ **Impossível capturar session ID** do output atual
 
 ---
 

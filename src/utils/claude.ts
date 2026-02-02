@@ -4,7 +4,8 @@ import os from 'node:os'
 import path from 'node:path'
 import * as readline from 'node:readline'
 import { ModelType } from '../types/model'
-import type { CollectedMetrics } from '../types/parallel'
+import type { CollectedMetrics, StreamEventCallback } from '../types/parallel'
+import type { StreamEvent } from '../types/stream-events'
 import { logger } from './logger'
 import {
   disableMetricsCollection,
@@ -20,6 +21,7 @@ export interface ClaudeCommandOptions {
   cwd?: string
   collectMetrics?: boolean
   enableTokenStreaming?: boolean
+  onEvent?: StreamEventCallback
 }
 
 export interface HeadlessResult {
@@ -91,22 +93,29 @@ export async function executeHeadlessWithMetrics(
   logger.debug(`Executing headless: claude ${args.join(' ')}`)
 
   return new Promise((resolve, reject) => {
+    const stderrMode = showProgress ? 'inherit' : 'pipe'
     const child = spawn('claude', args, {
-      stdio: ['pipe', 'pipe', 'inherit'],
+      stdio: ['pipe', 'pipe', stderrMode],
       cwd: options.cwd || process.cwd(),
     })
 
-    child.stdin.write(prompt)
-    child.stdin.end()
+    child.stdin!.write(prompt)
+    child.stdin!.end()
 
     const rl = readline.createInterface({
-      input: child.stdout,
+      input: child.stdout!,
       crlfDelay: Infinity,
     })
 
     rl.on('line', (line) => {
       if (showProgress) {
         parseAndDisplayStream(line)
+      }
+      if (options.onEvent) {
+        try {
+          const event = JSON.parse(line) as StreamEvent
+          options.onEvent(event)
+        } catch {}
       }
     })
 

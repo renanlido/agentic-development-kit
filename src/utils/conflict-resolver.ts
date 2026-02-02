@@ -49,15 +49,7 @@ export function classifyConflictResolution(
   file: string,
   taskCount: number
 ): EnhancedConflictInfo['resolution'] {
-  const simpleFiles = [
-    '.json',
-    '.yaml',
-    '.yml',
-    '.toml',
-    '.env',
-    '.lock',
-    'package.json',
-  ]
+  const simpleFiles = ['.json', '.yaml', '.yml', '.toml', '.env', '.lock', 'package.json']
 
   const isSimpleFile = simpleFiles.some((ext) => file.endsWith(ext))
 
@@ -137,7 +129,9 @@ export interface ConflictResolutionStrategy {
   description: string
 }
 
-export function suggestResolutionStrategy(conflict: EnhancedConflictInfo): ConflictResolutionStrategy {
+export function suggestResolutionStrategy(
+  conflict: EnhancedConflictInfo
+): ConflictResolutionStrategy {
   if (conflict.resolution === 'auto') {
     return {
       type: 'theirs',

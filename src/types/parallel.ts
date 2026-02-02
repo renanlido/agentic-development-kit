@@ -1,4 +1,7 @@
 import type { ModelType } from './model'
+import type { StreamEvent } from './stream-events'
+
+export type StreamEventCallback = (event: StreamEvent) => void
 
 export type ComplexityLevel = 'high' | 'medium' | 'low'
 
@@ -88,6 +91,7 @@ export interface WaveExecutionOptions {
   retryOnFailure: boolean
   maxRetries?: number
   stopOnError?: boolean
+  verbose?: boolean
 }
 
 export interface OrchestratorOptions {
@@ -97,6 +101,7 @@ export interface OrchestratorOptions {
   retryFailed: boolean
   modelOptimize: boolean
   stopOnError: boolean
+  verbose?: boolean
 }
 
 export interface OrchestratorResult {

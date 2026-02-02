@@ -1,7 +1,7 @@
 import path from 'node:path'
 import chalk from 'chalk'
-import ora from 'ora'
 import { ModelType } from '../types/model'
+import type { StreamEvent } from '../types/stream-events'
 import type {
   EnhancedTask,
   TaskExecutionResult,
@@ -16,6 +16,12 @@ import {
 } from './agent-router'
 import { executeHeadlessWithMetrics } from './claude'
 import { resolveConflicts } from './conflict-resolver'
+import {
+  completeWaveProgress,
+  createTaskEventHandler,
+  initWaveProgress,
+  setVerboseMode,
+} from './wave-progress'
 import { createWorktree, getChangedFilesInWorktree, removeWorktree } from './worktree-utils'
 
 export interface Wave {
@@ -34,6 +40,8 @@ export interface AgentTaskConfig {
   runInBackground: boolean
   taskId: string
   taskTitle: string
+  onEvent?: (event: StreamEvent) => void
+  verbose?: boolean
 }
 
 async function executeAgentTask(config: AgentTaskConfig): Promise<TaskExecutionResult> {
@@ -43,12 +51,11 @@ async function executeAgentTask(config: AgentTaskConfig): Promise<TaskExecutionR
     const result = await executeHeadlessWithMetrics(config.prompt, {
       model: config.model,
       collectMetrics: true,
-      showProgress: false,
+      showProgress: config.verbose || false,
+      onEvent: config.onEvent,
     })
 
-    const filesModified = config.worktree
-      ? await getChangedFilesInWorktree(config.worktree)
-      : []
+    const filesModified = config.worktree ? await getChangedFilesInWorktree(config.worktree) : []
 
     return {
       taskId: config.taskId,
@@ -114,10 +121,16 @@ IMPORTANT: Focus only on this specific task. Do not make changes outside the sco
 `
 }
 
+export interface ExtendedWaveOptions extends WaveExecutionOptions {
+  verbose?: boolean
+  totalWaves?: number
+  onTaskEvent?: (taskId: string, event: StreamEvent) => void
+}
+
 export async function executeWave(
   wave: Wave,
   featureName: string,
-  options: WaveExecutionOptions
+  options: ExtendedWaveOptions
 ): Promise<WaveExecutionResult> {
   const startTime = Date.now()
   const taskResults: TaskExecutionResult[] = []
@@ -135,12 +148,16 @@ export async function executeWave(
         await createWorktree(branch, worktreeBase)
         worktreePath = worktreeBase
         worktreePaths.push(worktreePath)
-      } catch (error) {
+      } catch {
         console.log(chalk.yellow(`  Warning: Could not create worktree for task ${task.id}`))
       }
     }
 
     const prompt = buildAgentPrompt(task, agentSelection, featureName, worktreePath)
+
+    const eventHandler = options.onTaskEvent
+      ? (event: StreamEvent) => options.onTaskEvent!(task.id, event)
+      : createTaskEventHandler(task.id)
 
     return executeAgentTask({
       agentType: agentSelection.agentType,
@@ -151,6 +168,8 @@ export async function executeWave(
       runInBackground: false,
       taskId: task.id,
       taskTitle: task.title,
+      onEvent: eventHandler,
+      verbose: options.verbose,
     })
   })
 
@@ -182,14 +201,12 @@ export async function executeWave(
       try {
         await removeWorktree(wt, true)
       } catch {
-        // Ignore cleanup errors
       }
     }
   }
 
   const success =
-    taskResults.every((t) => t.success) &&
-    !conflicts.some((c) => c.resolution === 'manual')
+    taskResults.every((t) => t.success) && !conflicts.some((c) => c.resolution === 'manual')
 
   return {
     waveIndex: wave.index,
@@ -203,14 +220,12 @@ export async function executeWave(
 export async function executeWaveWithProgress(
   wave: Wave,
   featureName: string,
-  options: WaveExecutionOptions
+  options: ExtendedWaveOptions
 ): Promise<WaveExecutionResult> {
-  console.log()
-  console.log(
-    chalk.cyan.bold(`Wave ${wave.index}`) +
-      chalk.gray(` (${wave.tasks.length} tasks)`) +
-      (wave.parallelizable ? chalk.green(' [parallel]') : chalk.yellow(' [sequential]'))
-  )
+  const totalWaves = options.totalWaves || 1
+  const verbose = options.verbose || false
+
+  setVerboseMode(verbose)
 
   if (wave.conflicts.length > 0) {
     console.log(chalk.yellow('  Conflicts detected:'))
@@ -219,34 +234,18 @@ export async function executeWaveWithProgress(
     }
   }
 
-  const spinners = wave.tasks.map((task) => {
-    const modelTag = chalk.dim(`[${task.model}]`)
-    return ora({
-      text: `Task ${task.id}: ${task.title} ${modelTag}`,
-      prefixText: '  ',
-    }).start()
+  initWaveProgress(
+    wave.index,
+    totalWaves,
+    wave.tasks.map((t) => ({ id: t.id, title: t.title }))
+  )
+
+  const result = await executeWave(wave, featureName, {
+    ...options,
+    verbose,
   })
 
-  const result = await executeWave(wave, featureName, options)
-
-  result.tasks.forEach((taskResult, index) => {
-    const spinner = spinners[index]
-    if (taskResult.success) {
-      const tokenStr =
-        taskResult.tokensUsed > 1000
-          ? `${(taskResult.tokensUsed / 1000).toFixed(1)}k`
-          : `${taskResult.tokensUsed}`
-      spinner.succeed(
-        chalk.green(`Task ${taskResult.taskId}: ${taskResult.taskTitle}`) +
-          chalk.gray(` (${tokenStr} tokens, $${taskResult.cost.toFixed(4)})`)
-      )
-    } else {
-      spinner.fail(
-        chalk.red(`Task ${taskResult.taskId}: ${taskResult.taskTitle}`) +
-          chalk.gray(` - ${taskResult.error}`)
-      )
-    }
-  })
+  completeWaveProgress()
 
   return result
 }

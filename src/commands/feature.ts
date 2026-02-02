@@ -1165,20 +1165,29 @@ IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
 
       spinner.stop()
 
-      const phaseCheck = await this.checkPhaseExists('tasks', 'Tasks', tasksPath, 'Plano')
+      let phaseCheck: PhaseCheckResult | null = null
 
-      if (phaseCheck) {
-        if (phaseCheck.action === 'next') {
-          let progress = await loadProgress(name)
-          progress = updateStepStatus(progress, 'tasks', 'completed')
-          await saveProgress(name, progress)
-          console.log(chalk.green('✓ Tasks marcadas como concluídas'))
-          console.log(chalk.yellow(`\nPróximo: adk feature plan ${name}`))
+      if (options.headless) {
+        if (await fs.pathExists(tasksPath)) {
+          console.log(chalk.green('✓ Tasks já existem, pulando...'))
           return
         }
+      } else {
+        phaseCheck = await this.checkPhaseExists('tasks', 'Tasks', tasksPath, 'Plano')
 
-        if (phaseCheck.action === 'redo') {
-          await fs.remove(tasksPath)
+        if (phaseCheck) {
+          if (phaseCheck.action === 'next') {
+            let progress = await loadProgress(name)
+            progress = updateStepStatus(progress, 'tasks', 'completed')
+            await saveProgress(name, progress)
+            console.log(chalk.green('✓ Tasks marcadas como concluídas'))
+            console.log(chalk.yellow(`\nPróximo: adk feature plan ${name}`))
+            return
+          }
+
+          if (phaseCheck.action === 'redo') {
+            await fs.remove(tasksPath)
+          }
         }
       }
 
@@ -2651,17 +2660,62 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
     console.log(chalk.gray('Ctrl+C a qualquer momento para pausar'))
     console.log()
 
-    const state = await this.getFeatureState(name)
+    let state = await this.getFeatureState(name)
+
     if (!state.exists) {
-      logger.error(`Feature "${name}" não encontrada. Crie primeiro com: adk feature new ${name}`)
-      process.exit(1)
+      console.log(chalk.yellow(`⚡ Feature "${name}" não existe. Criando automaticamente...`))
+      const createArgs = ['feature', 'new', name, '--headless']
+      if (_options.context) {
+        createArgs.push('-c', _options.context)
+      }
+      if (_options.description) {
+        createArgs.push('-d', _options.description)
+      }
+      try {
+        execFileSync('adk', createArgs, { stdio: 'inherit' })
+      } catch {
+        logger.error(`Falha ao criar feature "${name}".`)
+        process.exit(1)
+      }
+      state = await this.getFeatureState(name)
+    }
+
+    if (!state.hasResearch) {
+      console.log(chalk.yellow(`⚡ Research não encontrado. Gerando automaticamente...`))
+      const researchArgs = ['feature', 'research', name, '--headless']
+      try {
+        execFileSync('adk', researchArgs, { stdio: 'inherit' })
+      } catch {
+        logger.error(`Falha ao gerar research para "${name}".`)
+      }
+      state = await this.getFeatureState(name)
     }
 
     if (!state.hasTasks) {
-      logger.error(
-        `Tasks não encontradas para "${name}". Execute primeiro: adk feature autopilot ${name}`
-      )
-      process.exit(1)
+      console.log(chalk.yellow(`⚡ Tasks não encontradas. Gerando automaticamente...`))
+      const tasksArgs = ['feature', 'tasks', name, '--headless']
+      try {
+        execFileSync('adk', tasksArgs, { stdio: 'inherit' })
+      } catch {
+        logger.error(`Falha ao gerar tasks para "${name}".`)
+      }
+      state = await this.getFeatureState(name)
+
+      if (!state.hasTasks) {
+        logger.error(`Tasks não foram geradas para "${name}". Verifique o PRD.`)
+        process.exit(1)
+      }
+    }
+
+    if (!state.hasPlan) {
+      console.log(chalk.yellow(`⚡ Plan não encontrado. Gerando automaticamente...`))
+      const planArgs = ['feature', 'plan', name, '--headless']
+      try {
+        execFileSync('adk', planArgs, { stdio: 'inherit' })
+      } catch {
+        logger.error(`Falha ao gerar plan para "${name}".`)
+      }
+      state = await this.getFeatureState(name)
     }
 
     if (_options.context) {
@@ -4536,14 +4590,18 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
       console.log(chalk.gray('─'.repeat(60)))
       console.log()
 
-      const { confirm } = await inquirer.prompt([
-        {
-          type: 'confirm',
-          name: 'confirm',
-          message: `Execute ${plan.totalTasks} tasks in ${plan.totalWaves} waves with up to ${maxParallelTasks} parallel agents?`,
-          default: true,
-        },
-      ])
+      let confirm = true
+      if (!options.headless) {
+        const response = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'confirm',
+            message: `Execute ${plan.totalTasks} tasks in ${plan.totalWaves} waves with up to ${maxParallelTasks} parallel agents?`,
+            default: true,
+          },
+        ])
+        confirm = response.confirm
+      }
 
       if (!confirm) {
         console.log(chalk.yellow('Execution cancelled'))

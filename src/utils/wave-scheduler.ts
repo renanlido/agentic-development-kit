@@ -2,10 +2,10 @@ import chalk from 'chalk'
 import { ModelType } from '../types/model'
 import type { ComplexityLevel } from '../types/parallel'
 import {
-  type ParallelTasksDocument,
-  type ParsedTaskForParallel,
   analyzeTaskComplexity,
   canTasksRunInParallel,
+  type ParallelTasksDocument,
+  type ParsedTaskForParallel,
 } from './task-parser.js'
 
 export interface Wave {
@@ -58,7 +58,7 @@ export function createSchedulePlan(
 
   doc.tasks.filter((t) => t.status === 'completed').forEach((t) => processedIds.add(t.id))
 
-  const pendingTasks = doc.tasks.filter((t) => t.status === 'pending')
+  const pendingTasks = doc.tasks.filter((t) => t.status === 'pending' || t.status === 'in_progress')
 
   for (const task of pendingTasks) {
     if (shouldForceSequential(task, config.forceSequential)) {

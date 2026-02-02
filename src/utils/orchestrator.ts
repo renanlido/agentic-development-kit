@@ -4,7 +4,6 @@ import type {
   EnhancedTask,
   OrchestratorOptions,
   OrchestratorResult,
-  WaveExecutionOptions,
   WaveExecutionResult,
 } from '../types/parallel'
 import { upgradeModelForRetry } from './agent-router'
@@ -13,19 +12,14 @@ import {
   createOrchestratorResult,
   formatMetricsSummary,
 } from './result-aggregator'
+import { analyzeTaskComplexity, type ParsedTaskForParallel } from './task-parser'
 import {
-  analyzeTaskComplexity,
-  type ParsedTaskForParallel,
-} from './task-parser'
-import {
-  type Wave,
   executeWaveWithProgress,
+  type ExtendedWaveOptions,
   formatWaveResult,
+  type Wave,
 } from './wave-executor'
-import {
-  type SchedulePlan,
-  createSchedulePlan,
-} from './wave-scheduler'
+import { createSchedulePlan, type SchedulePlan } from './wave-scheduler'
 
 export interface WaveOrchestratorConfig {
   featureName: string
@@ -39,7 +33,7 @@ export class WaveOrchestrator {
   private featureName: string
   private options: OrchestratorOptions
   private enhancedTasks: EnhancedTask[] = []
-  private startTime: number = 0
+  private startTime = 0
 
   constructor(config: WaveOrchestratorConfig) {
     this.featureName = config.featureName
@@ -126,12 +120,14 @@ export class WaveOrchestrator {
     this.startTime = Date.now()
     this.displayExecutionStart()
 
-    const waveOptions: WaveExecutionOptions = {
+    const waveOptions: ExtendedWaveOptions = {
       useWorktrees: this.options.isolate,
       timeout: this.options.timeout,
       retryOnFailure: this.options.retryFailed,
       maxRetries: 2,
       stopOnError: this.options.stopOnError,
+      verbose: this.options.verbose,
+      totalWaves: this.waves.length,
     }
 
     for (const wave of this.waves) {
@@ -161,13 +157,15 @@ export class WaveOrchestrator {
   private async retryFailedTasks(
     wave: Wave,
     result: WaveExecutionResult,
-    waveOptions: WaveExecutionOptions
+    waveOptions: ExtendedWaveOptions
   ): Promise<void> {
     const failedTasks = result.tasks.filter((t) => !t.success)
 
     if (failedTasks.length === 0) return
 
-    console.log(chalk.yellow(`\nRetrying ${failedTasks.length} failed tasks with upgraded models...`))
+    console.log(
+      chalk.yellow(`\nRetrying ${failedTasks.length} failed tasks with upgraded models...`)
+    )
 
     for (const failed of failedTasks) {
       const task = wave.tasks.find((t) => t.id === failed.taskId)
@@ -182,7 +180,9 @@ export class WaveOrchestrator {
       task.model = upgradeModelForRetry(task.model)
 
       console.log(
-        chalk.yellow(`  Retrying Task ${task.id} with ${task.model} (attempt ${task.retryCount + 1})`)
+        chalk.yellow(
+          `  Retrying Task ${task.id} with ${task.model} (attempt ${task.retryCount + 1})`
+        )
       )
 
       const retryWave: Wave = {
@@ -192,11 +192,10 @@ export class WaveOrchestrator {
         conflicts: [],
       }
 
-      const retryResult = await executeWaveWithProgress(
-        retryWave,
-        this.featureName,
-        { ...waveOptions, retryOnFailure: false }
-      )
+      const retryResult = await executeWaveWithProgress(retryWave, this.featureName, {
+        ...waveOptions,
+        retryOnFailure: false,
+      })
 
       if (retryResult.success) {
         const originalIndex = result.tasks.findIndex((t) => t.taskId === task.id)
@@ -212,12 +211,13 @@ export class WaveOrchestrator {
 
     console.log()
     console.log(chalk.bold('╭' + '─'.repeat(65) + '╮'))
-    console.log(chalk.bold('│') + chalk.cyan.bold('  Parallel Execution Started') + ' '.repeat(37) + chalk.bold('│'))
     console.log(
       chalk.bold('│') +
-        `  Feature: ${this.featureName}`.padEnd(65) +
+        chalk.cyan.bold('  Parallel Execution Started') +
+        ' '.repeat(37) +
         chalk.bold('│')
     )
+    console.log(chalk.bold('│') + `  Feature: ${this.featureName}`.padEnd(65) + chalk.bold('│'))
     console.log(
       chalk.bold('│') +
         `  Tasks: ${totalTasks}  │  Waves: ${this.waves.length}`.padEnd(65) +
@@ -232,7 +232,11 @@ export class WaveOrchestrator {
 
     if (!result.success) {
       console.log(chalk.yellow('\nSome tasks failed. Review the output above for details.'))
-      console.log(chalk.gray('You can retry failed tasks with: adk feature implement <name> --parallel --retry-failed'))
+      console.log(
+        chalk.gray(
+          'You can retry failed tasks with: adk feature implement <name> --parallel --retry-failed'
+        )
+      )
     }
   }
 
@@ -271,6 +275,7 @@ export async function createAndExecuteOrchestrator(
     retryFailed: options.retryFailed ?? false,
     modelOptimize: options.modelOptimize ?? true,
     stopOnError: options.stopOnError ?? false,
+    verbose: options.verbose ?? false,
   }
 
   const orchestrator = new WaveOrchestrator({

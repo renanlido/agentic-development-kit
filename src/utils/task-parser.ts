@@ -1,9 +1,5 @@
 import { ModelType } from '../types/model'
-import {
-  COMPLEXITY_KEYWORDS,
-  type ComplexityLevel,
-  type TaskComplexity,
-} from '../types/parallel'
+import { COMPLEXITY_KEYWORDS, type ComplexityLevel, type TaskComplexity } from '../types/parallel'
 import type { TaskState, TasksDocument } from '../types/progress-sync'
 
 const CHECKBOX_REGEX = /^(\s*)- \[([x~! ])\]\s*(.+)$/i
@@ -299,11 +295,12 @@ export interface ParallelTasksDocument {
   pendingTasks: number
 }
 
-const TASK_HEADER_REGEX = /^##\s+Task\s+(\d+(?:\.\d+)?):?\s*(.+)$/i
+const TASK_HEADER_REGEX = /^#{2,3}\s+Task\s+(\d+(?:\.\d+)?):?\s*(.+)$/i
 const DEPENDENCY_REGEX = /^\*?\*?Depend[êe]ncias\*?\*?:\s*(.+)$/im
-const FILES_SECTION_REGEX = /^### Arquivos/i
+const FILES_SECTION_REGEX = /^#{2,4}\s+Arquivos/i
 const TYPE_REGEX = /^\*?\*?Tipo\*?\*?:\s*(\w+)/im
 const ESTIMATE_REGEX = /^\*?\*?Estimativa\*?\*?:\s*\[?([PMG])\]?/im
+const STATUS_LINE_REGEX = /^\*?\*?Status\*?\*?:\s*(completed|done|conclu[íi]d[oa]|in_progress|em\s*andamento|pending|pendente)/i
 
 export function parseTasksForParallel(content: string, featureName: string): ParallelTasksDocument {
   const lines = content.split('\n')
@@ -333,8 +330,8 @@ export function parseTasksForParallel(content: string, featureName: string): Par
         tasks.push(finalizeParallelTask(currentTask))
       }
 
-      const isCompleted = /\[x\]/i.test(trimmed)
-      const isInProgress = /\[~\]/i.test(trimmed)
+      const isCompleted = /\[x\]/i.test(trimmed) || /[✅✔️]/.test(trimmed)
+      const isInProgress = /\[~\]/i.test(trimmed) || /[🔄⏳]/.test(trimmed)
       headerHasCheckbox = isCompleted || isInProgress || /\[ \]/i.test(trimmed)
 
       currentTask = {
@@ -357,15 +354,15 @@ export function parseTasksForParallel(content: string, featureName: string): Par
     if (!currentTask) continue
 
     if (
-      trimmed.match(/^###\s+Crit[ée]rios\s+de\s+Aceite/i) ||
-      trimmed.match(/^###\s+Acceptance/i)
+      trimmed.match(/^#{2,4}\s+Crit[ée]rios\s+de\s+Aceite/i) ||
+      trimmed.match(/^#{2,4}\s+Acceptance/i)
     ) {
       inCriteriaSection = true
       inFilesSection = false
       continue
     }
 
-    if (trimmed.match(/^###?\s+/) && !trimmed.match(/Crit[ée]rios|Acceptance/i)) {
+    if (trimmed.match(/^#{2,4}\s+/) && !trimmed.match(/Crit[ée]rios|Acceptance/i)) {
       inCriteriaSection = false
     }
 
@@ -379,7 +376,7 @@ export function parseTasksForParallel(content: string, featureName: string): Par
       continue
     }
 
-    if (trimmed.match(/^#+\s+/)) {
+    if (trimmed.match(/^#{2,4}\s+/) && !trimmed.match(/Arquivos/i)) {
       inFilesSection = false
     }
 
@@ -392,6 +389,23 @@ export function parseTasksForParallel(content: string, featureName: string): Par
     const estimateMatch = trimmed.match(ESTIMATE_REGEX)
     if (estimateMatch) {
       currentTask.estimate = estimateMatch[1] as ParsedTaskForParallel['estimate']
+      continue
+    }
+
+    const statusMatch = trimmed.match(STATUS_LINE_REGEX)
+    if (statusMatch) {
+      const statusText = statusMatch[1].toLowerCase()
+      if (
+        statusText === 'completed' ||
+        statusText === 'done' ||
+        statusText.includes('conclu')
+      ) {
+        currentTask.status = 'completed'
+        headerHasCheckbox = true
+      } else if (statusText === 'in_progress' || statusText.includes('andamento')) {
+        currentTask.status = 'in_progress'
+        headerHasCheckbox = true
+      }
       continue
     }
 
@@ -546,6 +560,81 @@ export function detectFileConflictsForParallel(
   }
 
   return conflicts
+}
+
+export async function updateTaskStatusInFile(
+  filePath: string,
+  taskId: string,
+  newStatus: 'completed' | 'in_progress' | 'pending'
+): Promise<boolean> {
+  const fs = await import('fs-extra')
+
+  if (!(await fs.pathExists(filePath))) {
+    return false
+  }
+
+  const content = await fs.readFile(filePath, 'utf-8')
+  const lines = content.split('\n')
+  const result: string[] = []
+
+  let inTargetTask = false
+  let inCriteriaSection = false
+  let modified = false
+
+  const taskHeaderRegex = new RegExp(`^#{2,4}\\s+Task\\s+${taskId}\\b`, 'i')
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const trimmed = line.trim()
+
+    if (taskHeaderRegex.test(trimmed)) {
+      inTargetTask = true
+      inCriteriaSection = false
+
+      if (newStatus === 'completed' && !trimmed.includes('[x]') && !trimmed.includes('✅')) {
+        const updatedLine = trimmed.replace(/\s*\[.\]\s*$/, '') + ' [x]'
+        result.push(line.replace(trimmed, updatedLine))
+        modified = true
+        continue
+      } else if (newStatus === 'in_progress' && !trimmed.includes('[~]')) {
+        const updatedLine = trimmed.replace(/\s*\[.\]\s*$/, '') + ' [~]'
+        result.push(line.replace(trimmed, updatedLine))
+        modified = true
+        continue
+      }
+    } else if (inTargetTask && trimmed.match(/^#{2,4}\s+Task\s+\d/i)) {
+      inTargetTask = false
+      inCriteriaSection = false
+    }
+
+    if (inTargetTask && trimmed.match(/^\*?\*?Status\*?\*?:/i)) {
+      const statusText =
+        newStatus === 'completed' ? 'completed' : newStatus === 'in_progress' ? 'in_progress' : 'pending'
+      result.push(line.replace(/:\s*.+$/, `: ${statusText}`))
+      modified = true
+      continue
+    }
+
+    if (inTargetTask && trimmed.match(/^#{2,4}\s+Crit[ée]rios|^#{2,4}\s+Acceptance/i)) {
+      inCriteriaSection = true
+    }
+
+    if (inTargetTask && inCriteriaSection && newStatus === 'completed') {
+      if (trimmed.match(/^-\s*\[\s\]/)) {
+        result.push(line.replace(/\[\s\]/, '[x]'))
+        modified = true
+        continue
+      }
+    }
+
+    result.push(line)
+  }
+
+  if (modified) {
+    await fs.writeFile(filePath, result.join('\n'), 'utf-8')
+  }
+
+  return modified
 }
 
 export function canTasksRunInParallel(

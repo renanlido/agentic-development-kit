@@ -12,6 +12,7 @@ import { memoryCommand } from './commands/memory.js'
 import { reportCommand } from './commands/report.js'
 import { specCommand } from './commands/spec.js'
 import { syncCommand } from './commands/sync.js'
+import { taskCommand } from './commands/task.js'
 import { toolCommand } from './commands/tool.js'
 import { updateCommand } from './commands/update.js'
 import { workflowCommand } from './commands/workflow.js'
@@ -72,6 +73,8 @@ feature
   .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
   .option('--headless', 'Executa em modo headless (termina automaticamente)')
+  .option('--extract-guidelines', 'Força re-extração de guidelines do contexto')
+  .option('--skip-guidelines', 'Pula extração automática de guidelines')
   .action((name, description, options) =>
     featureCommand.research(name, { ...options, description })
   )
@@ -101,12 +104,15 @@ feature
   .option('--no-sync', 'Não sincroniza com ferramenta de projeto')
   .option('-m, --model <model>', 'Modelo a usar (opus, sonnet, haiku) - sobrepõe config')
   .option('--headless', 'Executa em modo headless (termina automaticamente)')
+  .option('-l, --loop', 'Modo loop: executa tasks automaticamente até todas completarem')
   .option('--parallel', 'Executa tasks em paralelo com múltiplos agentes')
   .option('--dry-run', 'Mostra plano de execução paralela sem executar')
+  .option('-v, --verbose', 'Mostra logs detalhados de cada task durante execução paralela')
   .action((name, options) =>
     featureCommand.implement(name, {
       ...options,
       baseBranch: options.baseBranch,
+      loop: options.loop,
     })
   )
 
@@ -217,8 +223,18 @@ feature
   .option('-c, --context <file>', 'Arquivo de contexto adicional')
   .option('-d, --desc <description>', 'Descrição da feature (alternativa ao argumento posicional)')
   .option('--base-branch <branch>', 'Branch base para criar o worktree (padrão: main)')
-  .option('-l, --loop', 'Modo loop: executa tasks automaticamente até todas completarem')
-  .option('--parallel', 'Executa implementação com múltiplos agentes em paralelo')
+  .option(
+    '-l, --loop',
+    'Modo loop: executa tasks automaticamente até todas completarem (padrão: true)',
+    true
+  )
+  .option('--no-loop', 'Desativa modo loop')
+  .option(
+    '--parallel',
+    'Executa implementação com múltiplos agentes em paralelo (padrão: true)',
+    true
+  )
+  .option('--no-parallel', 'Desativa execução paralela')
   .action((name, description, options) =>
     featureCommand.autopilot(name, {
       ...options,
@@ -539,6 +555,9 @@ program
   .option('-w, --weekly', 'Relatório semanal com commits e features')
   .option('-f, --feature <feature>', 'Relatório detalhado de uma feature')
   .action((options) => reportCommand.run(options))
+
+// Comando: adk task
+program.addCommand(taskCommand.getCommand())
 
 // Error handling
 program.on('command:*', () => {

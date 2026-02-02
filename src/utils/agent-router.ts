@@ -2,7 +2,7 @@ import path from 'node:path'
 import fs from 'fs-extra'
 import { ModelType } from '../types/model'
 import type { EnhancedTask, TaskComplexity } from '../types/parallel'
-import { type TaskCategory, categorizeTask } from './task-parser'
+import { categorizeTask, type TaskCategory } from './task-parser'
 
 export type TaskType =
   | 'Feature'

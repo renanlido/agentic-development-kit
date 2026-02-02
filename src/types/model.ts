@@ -5,6 +5,7 @@ export enum ModelType {
 }
 
 export type PhaseType =
+  | 'guidelines'
   | 'research'
   | 'planning'
   | 'prd'
@@ -15,6 +16,7 @@ export type PhaseType =
   | 'default'
 
 export interface PhaseModelMapping {
+  guidelines: ModelType
   research: ModelType
   planning: ModelType
   prd: ModelType
@@ -35,6 +37,7 @@ export interface ModelConfig {
 }
 
 export const DEFAULT_MODEL_MAPPING: PhaseModelMapping = {
+  guidelines: ModelType.OPUS,
   research: ModelType.OPUS,
   planning: ModelType.OPUS,
   prd: ModelType.OPUS,

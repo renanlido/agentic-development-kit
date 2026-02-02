@@ -107,7 +107,9 @@ export function formatMetricsSummary(metrics: AggregatedMetrics): string {
       : `${metrics.totalTokens}`
 
   lines.push(`  ${chalk.cyan('Duration')}     ${durationSecs}s`)
-  lines.push(`  ${chalk.cyan('Tasks')}        ${metrics.completedTasks}/${metrics.totalTasks} succeeded`)
+  lines.push(
+    `  ${chalk.cyan('Tasks')}        ${metrics.completedTasks}/${metrics.totalTasks} succeeded`
+  )
   lines.push(`  ${chalk.cyan('Tokens')}       ${tokenStr}`)
   lines.push(`  ${chalk.cyan('Cost')}         $${metrics.totalCost.toFixed(4)}`)
   lines.push(`  ${chalk.cyan('Speedup')}      ${metrics.speedupFactor.toFixed(1)}x`)
@@ -142,10 +144,7 @@ export function formatMetricsSummary(metrics: AggregatedMetrics): string {
 }
 
 export function formatCompactSummary(metrics: AggregatedMetrics): string {
-  const successRate = (
-    (metrics.completedTasks / Math.max(metrics.totalTasks, 1)) *
-    100
-  ).toFixed(0)
+  const successRate = ((metrics.completedTasks / Math.max(metrics.totalTasks, 1)) * 100).toFixed(0)
   const duration = (metrics.totalDuration / 1000).toFixed(1)
 
   return (

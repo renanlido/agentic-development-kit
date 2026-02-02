@@ -1,5 +1,5 @@
 # Foco Ativo
 
-feature: gemini-integration
-status: implementação em andamento
-path: .claude/plans/features/gemini-integration/
+feature: v3-version
+status: arquitetura pronta
+path: .claude/plans/features/v3-version/

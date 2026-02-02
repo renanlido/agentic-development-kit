@@ -3,10 +3,7 @@ import chalk from 'chalk'
 import { ModelType } from '../types/model'
 import type { OrchestratorResult } from '../types/parallel'
 import { executeClaudeCommand } from './claude.js'
-import {
-  createAndExecuteOrchestrator,
-  formatOrchestratorPlan,
-} from './orchestrator.js'
+import { createAndExecuteOrchestrator, formatOrchestratorPlan } from './orchestrator.js'
 import { parseTasksForParallel } from './task-parser.js'
 import {
   createWorktree,

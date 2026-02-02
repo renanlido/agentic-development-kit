@@ -373,4 +373,132 @@ Random text
       expect(extractPriority('Some text P1: with priority')).toBe(1)
     })
   })
+
+  describe('parseTasksForParallel', () => {
+    it('should detect completed status from [x] in header', async () => {
+      const { parseTasksForParallel } = await import('../../src/utils/task-parser')
+
+      const content = `
+## Task 1: First task [x]
+Some description
+
+## Task 2: Second task
+Another description
+`
+      const result = parseTasksForParallel(content, 'test-feature')
+
+      expect(result.tasks).toHaveLength(2)
+      expect(result.tasks[0].status).toBe('completed')
+      expect(result.tasks[1].status).toBe('pending')
+      expect(result.completedTasks).toBe(1)
+      expect(result.pendingTasks).toBe(1)
+    })
+
+    it('should detect completed status from Status: line', async () => {
+      const { parseTasksForParallel } = await import('../../src/utils/task-parser')
+
+      const content = `
+## Task 1: First task
+**Status**: completed
+Description here
+
+## Task 2: Second task
+**Status**: pending
+Another description
+`
+      const result = parseTasksForParallel(content, 'test-feature')
+
+      expect(result.tasks).toHaveLength(2)
+      expect(result.tasks[0].status).toBe('completed')
+      expect(result.tasks[1].status).toBe('pending')
+    })
+
+    it('should detect completed status from emoji ✅', async () => {
+      const { parseTasksForParallel } = await import('../../src/utils/task-parser')
+
+      const content = `
+## Task 1: First task ✅
+Some description
+
+## Task 2: Second task
+Another description
+`
+      const result = parseTasksForParallel(content, 'test-feature')
+
+      expect(result.tasks).toHaveLength(2)
+      expect(result.tasks[0].status).toBe('completed')
+      expect(result.tasks[1].status).toBe('pending')
+    })
+
+    it('should detect in_progress status from [~]', async () => {
+      const { parseTasksForParallel } = await import('../../src/utils/task-parser')
+
+      const content = `
+## Task 1: First task [~]
+Some description
+`
+      const result = parseTasksForParallel(content, 'test-feature')
+
+      expect(result.tasks[0].status).toBe('in_progress')
+    })
+
+    it('should detect status from Portuguese Status: concluído', async () => {
+      const { parseTasksForParallel } = await import('../../src/utils/task-parser')
+
+      const content = `
+## Task 1: First task
+Status: concluído
+Description here
+`
+      const result = parseTasksForParallel(content, 'test-feature')
+
+      expect(result.tasks[0].status).toBe('completed')
+    })
+
+    it('should infer status from acceptance criteria', async () => {
+      const { parseTasksForParallel } = await import('../../src/utils/task-parser')
+
+      const content = `
+## Task 1: First task
+
+### Critérios de Aceite
+- [x] First criterion
+- [x] Second criterion
+- [x] Third criterion
+
+## Task 2: Second task
+
+### Critérios de Aceite
+- [x] First criterion
+- [ ] Second criterion
+`
+      const result = parseTasksForParallel(content, 'test-feature')
+
+      expect(result.tasks[0].status).toBe('completed')
+      expect(result.tasks[1].status).toBe('in_progress')
+    })
+
+    it('should count completed and pending tasks correctly', async () => {
+      const { parseTasksForParallel } = await import('../../src/utils/task-parser')
+
+      const content = `
+## Task 1: Task one [x]
+Done
+
+## Task 2: Task two [x]
+Done
+
+## Task 3: Task three
+Pending
+
+## Task 4: Task four [~]
+In progress
+`
+      const result = parseTasksForParallel(content, 'test-feature')
+
+      expect(result.totalTasks).toBe(4)
+      expect(result.completedTasks).toBe(2)
+      expect(result.pendingTasks).toBe(2)
+    })
+  })
 })
