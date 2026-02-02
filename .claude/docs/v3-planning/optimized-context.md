@@ -717,7 +717,91 @@ interface FeatureTest {
 
 ---
 
-## 17. REFERENCES
+## 17. TOKEN OPTIMIZATION STRATEGIES
+
+### 17.1 Quick Wins
+
+| Strategy | Impact | Implementation |
+|----------|--------|----------------|
+| **Prompt Caching** | 80% latency, 90% token savings | Cache system prompts between sessions |
+| **Model Tiering** | 90-97% cost reduction | Haiku for trivial, Sonnet for coding, Opus for architecture |
+| **CLAUDE.md Diet** | Context reduction | Keep < 500 lines, move specialized to skills |
+| **Compaction at 70%** | Prevent degradation | `/compact` before hitting 80% |
+
+### 17.2 Context Engineering
+
+```text
+PRINCIPLE: "Find smallest set of high-signal tokens"
+
+1. MINIMAL VIABLE CONTEXT
+   - Load only tokens needed for current task
+   - Use file paths instead of full content
+   - Progressive disclosure
+
+2. JUST-IN-TIME RETRIEVAL
+   - Maintain breadcrumbs (references)
+   - Load on demand
+   - Discard after use
+
+3. TWO-THRESHOLD COMPRESSION
+   - Tmax (80%): Trigger compression
+   - Tretained (50%): Post-compression target
+```
+
+### 17.3 What to Preserve vs Compress
+
+**PRESERVE:**
+- Session intent (original objective)
+- File paths and line numbers
+- Artifact trail (what was modified)
+- Decisions (why, not just what)
+- Breadcrumbs (re-fetch references)
+
+**COMPRESS:**
+- Redundant explanations
+- Processed tool outputs
+- Failed attempts (keep only lesson)
+- Clarification conversations (keep only decision)
+
+### 17.4 MCP Tool Search
+
+**Impact:** 46.9% context reduction (51K → 8.5K tokens)
+
+```bash
+# Enable tool search with low threshold
+ENABLE_TOOL_SEARCH=auto:<N>
+```
+
+Deferred tools only enter context when used, not when declared.
+
+### 17.5 Multi-Agent Optimization
+
+**Plan-and-Execute Pattern:** 90% cost reduction
+
+```text
+PLANNER (Opus) → Creates strategy, divides sub-tasks
+                          │
+    ┌───────────────┬─────┴─────┬───────────────┐
+    ▼               ▼           ▼               ▼
+EXECUTOR      EXECUTOR     EXECUTOR       EXECUTOR
+(Sonnet)      (Sonnet)     (Sonnet)       (Sonnet)
+```
+
+**Sub-Agent Rule:** Return summaries (1-2K tokens), not raw data.
+
+### 17.6 Key Metrics
+
+| Metric | Formula | Target |
+|--------|---------|--------|
+| **CPT (Cost Per Task)** | Tokens × Price / Completions | Decreasing |
+| **Token Efficiency** | Useful Output / Tokens Used | Increasing |
+| **Context Utilization** | Active Tokens / Total Context | > 70% |
+
+> **Reference:** Full strategies in `token-optimization-strategies.md`
+
+---
+
+## 18. REFERENCES
 
 ### Planning Documents
 
@@ -730,6 +814,7 @@ interface FeatureTest {
 | `04-context-memory-implementation.md` | **Memory specs, anti-stub, hooks** |
 | `05-implementation-guide.md` | Step-by-step guide, schemas |
 | `context-management-research.md` | Full research (25+ sources) |
+| `token-optimization-strategies.md` | **Token optimization (20+ sources)** |
 
 ### Key External Sources
 
@@ -743,6 +828,17 @@ interface FeatureTest {
 | Addy Osmani | Agent Coordination | addyosmani.com/blog/coding-agents-manager |
 | MongoDB | Memory Engineering | medium.com/mongodb/multi-agent-memory-engineering |
 | MemGPT (Letta) | Hierarchical Memory | arxiv.org/abs/2310.08560 |
+| Claude Code | Context Management | claudefa.st/blog/guide/mechanics/context-management |
+| JetBrains | Efficient Context | blog.jetbrains.com/research/2025/12/efficient-context-management/ |
+
+### Token Optimization Sources
+
+| Source | Topic |
+|--------|-------|
+| Medium (Agentic AI Stack) | DeepSeek + Modal + Plan Caching |
+| DataRobot | Cut Agentic AI Costs |
+| ACON Paper (arXiv) | Context Compression for LLM Agents |
+| Richard Porter | Claude Code Token Management |
 
 ### Competitor Analysis
 

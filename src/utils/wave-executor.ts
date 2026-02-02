@@ -16,6 +16,7 @@ import {
 } from './agent-router'
 import { executeHeadlessWithMetrics } from './claude'
 import { resolveConflicts } from './conflict-resolver'
+import { updateTaskStatusInFile } from './task-parser'
 import {
   completeWaveProgress,
   createTaskEventHandler,
@@ -53,6 +54,7 @@ async function executeAgentTask(config: AgentTaskConfig): Promise<TaskExecutionR
       collectMetrics: true,
       showProgress: config.verbose || false,
       onEvent: config.onEvent,
+      cwd: config.worktree || process.cwd(),
     })
 
     const filesModified = config.worktree ? await getChangedFilesInWorktree(config.worktree) : []
@@ -115,9 +117,13 @@ ${task.files.length > 0 ? task.files.map((f) => `- ${f}`).join('\n') : 'No speci
 1. Analyze the task requirements
 2. Implement the changes following TDD principles
 3. Run tests to verify your changes
-4. Mark the task as completed when done
+4. Mark the task as completed:
+   .claude/hooks/mark-task.sh ${featureName} "Task ${task.id}" completed
 
-IMPORTANT: Focus only on this specific task. Do not make changes outside the scope.
+IMPORTANT:
+- Focus only on this specific task
+- ALWAYS run the mark-task.sh command when done
+- Do not make changes outside the scope
 `
 }
 
@@ -191,6 +197,23 @@ export async function executeWave(
         error: result.reason?.message || 'Promise rejected',
         filesModified: [],
       })
+    }
+  }
+
+  const tasksFilePath = path.join(
+    process.cwd(),
+    '.claude',
+    'plans',
+    'features',
+    featureName,
+    'tasks.md'
+  )
+  for (const taskResult of taskResults) {
+    if (taskResult.success && taskResult.taskId !== 'unknown') {
+      try {
+        await updateTaskStatusInFile(tasksFilePath, taskResult.taskId, 'completed')
+      } catch {
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-import { execFileSync, execSync } from 'node:child_process'
+import { execFileSync, execSync, spawn } from 'node:child_process'
 import path from 'node:path'
 import chalk from 'chalk'
 import fs from 'fs-extra'
@@ -58,6 +58,7 @@ interface FeatureOptions {
   headless?: boolean
   parallel?: boolean
   dryRun?: boolean
+  verbose?: boolean
 }
 
 interface QuickOptions {
@@ -1419,9 +1420,9 @@ Estrutura:
             console.log()
             console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
             console.log()
-          } else if (options.headless) {
+          } else if (options.headless || options.parallel) {
             console.log()
-            console.log(chalk.cyan('📂 Executando no worktree em modo headless'))
+            console.log(chalk.cyan('📂 Executando no worktree'))
             console.log(chalk.gray(`   Worktree: ${result.worktreePath}`))
             console.log()
             process.chdir(result.worktreePath)
@@ -2743,61 +2744,129 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
       console.log()
     }
 
-    while (iteration < MAX_ITERATIONS) {
-      iteration++
+    let shouldExit = false
+    let childProcess: ReturnType<typeof spawn> | null = null
 
-      const taskStatus = await this.checkTasksCompletion(name)
-      const progress = await loadProgress(name)
-      const implementDone = isStepCompleted(progress, 'implementacao')
+    const exitHandler = () => {
+      if (shouldExit) {
+        console.log(chalk.red('\n\nForçando saída...'))
+        if (childProcess) {
+          childProcess.kill('SIGKILL')
+        }
+        process.exit(1)
+      }
+      shouldExit = true
+      console.log(chalk.yellow('\n\n⚠️  Ctrl+C detectado. Parando...'))
+      if (childProcess) {
+        childProcess.kill('SIGTERM')
+      }
+    }
+    process.on('SIGINT', exitHandler)
 
-      console.log(
-        chalk.cyan(
-          `\n📊 Iteração ${iteration} - Tasks: ${taskStatus.completed}/${taskStatus.total} (${taskStatus.percentage}%)`
+    try {
+      while (iteration < MAX_ITERATIONS && !shouldExit) {
+        iteration++
+
+        const taskStatus = await this.checkTasksCompletion(name)
+        const progress = await loadProgress(name)
+        const implementDone = isStepCompleted(progress, 'implementacao')
+
+        console.log(
+          chalk.cyan(
+            `\n📊 Iteração ${iteration} - Tasks: ${taskStatus.completed}/${taskStatus.total} (${taskStatus.percentage}%)`
+          )
         )
-      )
 
-      if (taskStatus.allDone || implementDone) {
-        console.log(chalk.green('\n✅ Implementação concluída!'))
-        console.log(chalk.gray(`Próximo passo: adk feature qa ${name}`))
-        return
-      }
-
-      const implementArgs = ['feature', 'implement', name, '--phase', 'All', '--headless']
-      if (_options.parallel) {
-        implementArgs.push('--parallel')
-      }
-
-      console.log(chalk.gray(`\nExecutando: adk ${implementArgs.join(' ')}`))
-
-      try {
-        execFileSync('adk', implementArgs, {
-          stdio: 'inherit',
-          cwd,
-        })
-      } catch {
-        console.log(chalk.yellow('\n⚠️  Sessão de implementação encerrada'))
-
-        const updatedStatus = await this.checkTasksCompletion(name)
-        const updatedProgress = await loadProgress(name)
-        const implementNowDone = isStepCompleted(updatedProgress, 'implementacao')
-
-        if (updatedStatus.allDone || implementNowDone) {
+        if (taskStatus.allDone || implementDone) {
           console.log(chalk.green('\n✅ Implementação concluída!'))
           console.log(chalk.gray(`Próximo passo: adk feature qa ${name}`))
           return
         }
-      }
 
-      console.log(chalk.gray(`\n⏳ Próxima task em ${COOLDOWN_MS / 1000}s... (Ctrl+C para pausar)`))
-      await this.sleep(COOLDOWN_MS)
+        const implementArgs = ['feature', 'implement', name, '--phase', 'All', '--headless']
+        if (_options.parallel) {
+          implementArgs.push('--parallel')
+        }
+
+        console.log(chalk.gray(`\nExecutando: adk ${implementArgs.join(' ')}`))
+
+        const exitCode = await new Promise<number>((resolve) => {
+          childProcess = spawn('adk', implementArgs, {
+            stdio: 'inherit',
+            cwd,
+          })
+
+          childProcess.on('close', (code, signal) => {
+            childProcess = null
+            if (signal === 'SIGINT' || signal === 'SIGTERM' || code === 130 || code === 143) {
+              shouldExit = true
+            }
+            resolve(code ?? 1)
+          })
+
+          childProcess.on('error', () => {
+            childProcess = null
+            resolve(1)
+          })
+        })
+
+        if (shouldExit) {
+          console.log(chalk.yellow('\n⏸️  Interrupção detectada. Saindo...'))
+          break
+        }
+
+        if (exitCode !== 0) {
+          console.log(chalk.yellow('\n⚠️  Sessão de implementação encerrada'))
+
+          const updatedStatus = await this.checkTasksCompletion(name)
+          const updatedProgress = await loadProgress(name)
+          const implementNowDone = isStepCompleted(updatedProgress, 'implementacao')
+
+          if (updatedStatus.allDone || implementNowDone) {
+            console.log(chalk.green('\n✅ Implementação concluída!'))
+            console.log(chalk.gray(`Próximo passo: adk feature qa ${name}`))
+            return
+          }
+        }
+
+        if (shouldExit) break
+
+        console.log(chalk.gray(`\n⏳ Próxima task em ${COOLDOWN_MS / 1000}s... (Ctrl+C para pausar)`))
+        await this.sleep(COOLDOWN_MS, () => shouldExit)
+      }
+    } finally {
+      process.removeListener('SIGINT', exitHandler)
+      if (childProcess !== null) {
+        (childProcess as ReturnType<typeof spawn>).kill('SIGKILL')
+      }
+    }
+
+    if (shouldExit) {
+      console.log(chalk.yellow('\n⏸️  Loop pausado pelo usuário'))
+      console.log(chalk.gray(`   Retome com: adk feature autopilot ${name} --loop`))
+      process.exit(0)
     }
 
     console.log(chalk.yellow(`\n⚠️  Limite de ${MAX_ITERATIONS} iterações atingido`))
     console.log(chalk.gray(`Verifique o progresso: adk feature status ${name}`))
   }
 
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms))
+  private sleep(ms: number, shouldExitFn?: () => boolean): Promise<void> {
+    return new Promise((resolve) => {
+      if (shouldExitFn) {
+        const checkInterval = 100
+        let elapsed = 0
+        const timer = setInterval(() => {
+          elapsed += checkInterval
+          if (shouldExitFn() || elapsed >= ms) {
+            clearInterval(timer)
+            resolve()
+          }
+        }, checkInterval)
+      } else {
+        setTimeout(resolve, ms)
+      }
+    })
   }
 
   async autopilot(name: string, options: FeatureOptions = {}): Promise<void> {
@@ -3266,7 +3335,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
         }
 
         if (!implementReallyDone) {
-          const implementArgs = ['feature', 'implement', name, '--phase', 'All']
+          const implementArgs = ['feature', 'implement', name, '--phase', 'All', '--headless']
           if (options.parallel) {
             implementArgs.push('--parallel')
           }
@@ -4708,48 +4777,83 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
     specContent?: string
   ): Promise<AgentExecutionMetrics[]> {
     const hooksDir = path.join(process.cwd(), '.claude', 'hooks')
+    const startTime = Date.now()
 
-    const promises = wave.tasks.map(async (task) => {
-      const taskSpinner = ora({
-        text: chalk.yellow(`Task ${task.id}: ${task.title}`),
-        prefixText: `  `,
-      }).start()
+    const prompt = this.buildParallelWavePrompt(name, wave.tasks, hooksDir, specContent)
 
-      const prompt = this.buildTaskPrompt(name, task, hooksDir, specContent)
-      const startTime = Date.now()
+    try {
+      await executeHeadlessWithMetrics(prompt, {
+        model: options.model as ModelType | undefined,
+        showProgress: true,
+      })
 
-      try {
-        const result = await executeHeadlessWithMetrics(prompt, {
-          model: options.model as ModelType | undefined,
-          collectMetrics: true,
-          showProgress: false,
-        })
-        taskSpinner.succeed(chalk.green(`Task ${task.id}: ${task.title}`))
+      return wave.tasks.map((task) => ({
+        taskId: task.id,
+        taskTitle: task.title,
+        toolCount: 0,
+        tokenCount: 0,
+        durationMs: Date.now() - startTime,
+        status: 'success' as const,
+      }))
+    } catch (error) {
+      return wave.tasks.map((task) => ({
+        taskId: task.id,
+        taskTitle: task.title,
+        toolCount: 0,
+        tokenCount: 0,
+        durationMs: Date.now() - startTime,
+        status: 'error' as const,
+      }))
+    }
+  }
 
-        return {
-          taskId: task.id,
-          taskTitle: task.title,
-          toolCount: result.metrics?.toolCount || 0,
-          tokenCount: result.metrics?.tokenCount || 0,
-          durationMs: result.metrics?.durationMs || Date.now() - startTime,
-          costUsd: result.metrics?.costUsd,
-          status: 'success' as const,
-        }
-      } catch (error) {
-        taskSpinner.fail(chalk.red(`Task ${task.id}: ${task.title}`))
+  private buildParallelWavePrompt(
+    name: string,
+    tasks: Array<{ id: string; title: string }>,
+    hooksDir: string,
+    specContent?: string
+  ): string {
+    const taskDescriptions = tasks
+      .map(
+        (task) => `
+### Task ${task.id}: ${task.title}
+- Implementar seguindo TDD
+- Ao finalizar, marcar como completed:
+  ${hooksDir}/mark-task.sh ${name} "Task ${task.id}" completed
+`
+      )
+      .join('\n')
 
-        return {
-          taskId: task.id,
-          taskTitle: task.title,
-          toolCount: 0,
-          tokenCount: 0,
-          durationMs: Date.now() - startTime,
-          status: 'error' as const,
-        }
-      }
-    })
+    return `
+# Execução Paralela de Tasks - Feature: ${name}
 
-    return Promise.all(promises)
+Você deve executar as seguintes tasks **EM PARALELO** usando a ferramenta **Task**.
+
+IMPORTANTE:
+- Use a ferramenta Task para lançar um subagent para CADA task
+- Lance TODOS os subagents em paralelo (na mesma mensagem)
+- Cada subagent deve implementar sua task de forma independente
+- Use subagent_type="feature-developer" para tasks de código
+- Use subagent_type="unit-test-specialist" para tasks de teste
+
+## Tasks para Executar em Paralelo
+
+${taskDescriptions}
+
+${specContent ? `## Especificação da Feature\n\n${specContent}` : ''}
+
+## Instruções para os Subagents
+
+Cada subagent deve:
+1. Ler o arquivo tasks.md para entender o contexto completo da task
+2. Implementar seguindo TDD (teste primeiro, depois código)
+3. Executar os testes para validar
+4. Marcar a task como completed usando mark-task.sh
+
+## Execução
+
+Lance todos os subagents agora em paralelo. Use uma única mensagem com múltiplas chamadas da ferramenta Task.
+`
   }
 
   private async executeWaveSequential(
@@ -4760,64 +4864,52 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
   ): Promise<void> {
     const hooksDir = path.join(process.cwd(), '.claude', 'hooks')
 
-    for (const task of wave.tasks) {
-      const taskSpinner = ora({
-        text: chalk.yellow(`Task ${task.id}: ${task.title}`),
-        prefixText: `  `,
-      }).start()
+    const prompt = this.buildSequentialWavePrompt(name, wave.tasks, hooksDir, specContent)
 
-      const prompt = this.buildTaskPrompt(name, task, hooksDir, specContent)
-
-      try {
-        await executeClaudeCommand(prompt, {
-          model: options.model as ModelType | undefined,
-          headless: true,
-        })
-        taskSpinner.succeed(chalk.green(`Task ${task.id}: ${task.title}`))
-      } catch (error) {
-        taskSpinner.fail(chalk.red(`Task ${task.id}: ${task.title}`))
-        throw error
-      }
-    }
+    await executeHeadlessWithMetrics(prompt, {
+      model: options.model as ModelType | undefined,
+      showProgress: true,
+    })
   }
 
-  private buildTaskPrompt(
+  private buildSequentialWavePrompt(
     name: string,
-    task: { id: string; title: string },
+    tasks: Array<{ id: string; title: string }>,
     hooksDir: string,
     specContent?: string
   ): string {
-    const specSection = specContent
-      ? `
-## Spec (Especificação Formal)
-
-<spec>
-${specContent}
-</spec>
-
-IMPORTANTE: A implementação DEVE seguir a spec acima.
+    const taskDescriptions = tasks
+      .map(
+        (task) => `
+### Task ${task.id}: ${task.title}
+- Implementar seguindo TDD
+- Ao finalizar, marcar como completed:
+  ${hooksDir}/mark-task.sh ${name} "Task ${task.id}" completed
 `
-      : ''
+      )
+      .join('\n')
 
     return `
-IMPLEMENTAÇÃO DE TASK ESPECÍFICA (TDD)
+# Execução Sequencial de Tasks - Feature: ${name}
 
-Feature: ${name}
-Task: ${task.id} - ${task.title}
-Tasks File: .claude/plans/features/${name}/tasks.md
-${specSection}
-INSTRUÇÕES:
+Estas tasks têm conflitos e devem ser executadas **SEQUENCIALMENTE** (uma após a outra).
 
-1. Leia a task ${task.id} completa em tasks.md
-2. Marque como in_progress: ${hooksDir}/mark-task.sh ${name} "Task ${task.id}" in_progress
-3. Implemente seguindo TDD:
-   - Escreva testes primeiro
-   - Implemente o código
-   - Verifique que testes passam
-4. Marque como completed: ${hooksDir}/mark-task.sh ${name} "Task ${task.id}" completed
-5. Faça commit das mudanças
+## Tasks para Executar
 
-FOCO: Implemente APENAS a Task ${task.id}. Não toque em outras tasks.
+${taskDescriptions}
+
+${specContent ? `## Especificação da Feature\n\n${specContent}` : ''}
+
+## Instruções
+
+Para cada task, em ordem:
+1. Leia o arquivo tasks.md para entender o contexto completo
+2. Implemente seguindo TDD (teste primeiro, depois código)
+3. Execute os testes para validar
+4. Marque a task como completed usando mark-task.sh
+5. Só então passe para a próxima task
+
+Execute as tasks agora, uma por vez.
 `
   }
 }

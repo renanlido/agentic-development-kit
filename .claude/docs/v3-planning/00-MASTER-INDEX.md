@@ -42,10 +42,21 @@
 | Documento | O que contém | Localização |
 |-----------|--------------|-------------|
 | context-management-research.md | Pesquisa completa (1000+ linhas, 25+ refs) | `.claude/docs/` |
+| **token-optimization-strategies.md** | Estratégias de otimização de tokens (20+ refs) | `.claude/docs/` |
 
 ---
 
 ## 📝 CHANGELOG DE REVISÕES
+
+### 2026-02-02 - Token Optimization Research
+- ✅ **token-optimization-strategies.md**: Novo documento consolidando pesquisa de 20+ fontes
+  - Prompt Caching (80% latency reduction, 90% token savings)
+  - Model Tiering/Routing (90-97% cost reduction)
+  - Context Engineering (minimal viable context)
+  - Two-Threshold Compression Architecture
+  - MCP Tool Search (46.9% context reduction)
+  - Plan-and-Execute Pattern (90% cost reduction)
+  - Claude Code specific optimizations
 
 ### 2026-02-02 - Competitor Analysis & Missing Features
 - ✅ **Análise de Competidores**: Windsurf, Cursor, Cline, Aider, VS 2026

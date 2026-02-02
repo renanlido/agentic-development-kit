@@ -25,8 +25,9 @@ let lastRenderTime = 0
 let renderInterval: NodeJS.Timeout | null = null
 let verboseMode = false
 let logLines: string[] = []
+let lastLineCount = 0
 
-const RENDER_INTERVAL = 250
+const RENDER_INTERVAL = 200
 
 export function setVerboseMode(enabled: boolean): void {
   verboseMode = enabled
@@ -58,6 +59,7 @@ export function initWaveProgress(
   }
 
   logLines = []
+  lastLineCount = 0
 
   if (!verboseMode) {
     renderProgress()
@@ -149,6 +151,66 @@ export function completeWaveProgress(): void {
   }
 
   currentState = null
+  lastLineCount = 0
+}
+
+export function abortWaveProgress(): void {
+  if (renderInterval) {
+    clearInterval(renderInterval)
+    renderInterval = null
+  }
+
+  if (currentState && !verboseMode) {
+    clearProgressDisplay()
+    renderAbortSummary()
+  }
+
+  currentState = null
+  lastLineCount = 0
+}
+
+function renderAbortSummary(): void {
+  if (!currentState) return
+
+  const totalDuration = Date.now() - currentState.startTime
+  const completed = Array.from(currentState.tasks.values()).filter(
+    (t) => t.status === 'completed'
+  ).length
+  const running = Array.from(currentState.tasks.values()).filter((t) => t.status === 'running').length
+
+  console.log()
+  console.log(
+    chalk.yellow.bold(`Wave ${currentState.waveIndex}/${currentState.totalWaves}`) +
+      chalk.gray(` interrupted after ${formatDuration(totalDuration)}`)
+  )
+  console.log(chalk.gray('─'.repeat(70)))
+
+  for (const task of currentState.tasks.values()) {
+    const statusIcon =
+      task.status === 'completed'
+        ? chalk.green('✓')
+        : task.status === 'running'
+          ? chalk.yellow('⊘')
+          : chalk.gray('○')
+
+    const statusText =
+      task.status === 'running' ? chalk.yellow(' (interrupted)') : ''
+
+    const taskElapsed =
+      task.status === 'pending' ? '' : ` (${formatDuration(Date.now() - task.startTime)})`
+
+    console.log(
+      `${statusIcon} ${chalk.bold(`Task ${task.taskId}`)}: ${truncate(task.taskTitle, 40)}${statusText}` +
+        chalk.gray(taskElapsed)
+    )
+  }
+
+  console.log(chalk.gray('─'.repeat(70)))
+  console.log(
+    chalk.yellow(`${completed} completed, ${running} interrupted`) +
+      chalk.gray(` │ Ctrl+C detected`)
+  )
+  console.log()
 }
 
 function formatToolAction(toolName: string, input?: Record<string, unknown>): string {
@@ -271,20 +333,17 @@ function renderProgress(): void {
   lines.push(chalk.gray('─'.repeat(70)))
 
   clearProgressDisplay()
-  process.stdout.write(lines.join('\n'))
+  const output = lines.join('\n') + '\n'
+  process.stdout.write(output)
+  lastLineCount = lines.length
 }
 
 function clearProgressDisplay(): void {
-  if (!currentState) return
+  if (lastLineCount === 0) return
 
-  const lineCount = currentState.tasks.size * 2 + 4
-
-  for (let i = 0; i < lineCount; i++) {
-    process.stdout.write('\x1b[2K')
-    process.stdout.write('\x1b[1A')
+  for (let i = 0; i < lastLineCount; i++) {
+    process.stdout.write('\x1b[1A\x1b[2K')
   }
-  process.stdout.write('\x1b[2K')
-  process.stdout.write('\r')
 }
 
 function renderFinalSummary(): void {
