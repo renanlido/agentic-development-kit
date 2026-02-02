@@ -25,10 +25,10 @@
   - Modificar cli.ts (v2)
 
 #### Critérios de Aceite
-- [~] `adk3 feature <name>` é reconhecido e chama FeatureV3Command.feature()
-- [~] `adk3 feature autopilot <name>` é reconhecido e chama FeatureV3Command.autopilot()
-- [ ] Flags --resume, --parallel, --agents funcionam
-- [ ] Testes unitários passam
+- [x] `adk3 feature <name>` é reconhecido e chama FeatureV3Command.feature()
+- [x] `adk3 feature autopilot <name>` é reconhecido e chama FeatureV3Command.autopilot()
+- [x] Flags --resume, --parallel, --agents funcionam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/cli-v3.ts` - modificar
@@ -52,10 +52,10 @@
   - Modificar claude.ts (v2)
 
 #### Critérios de Aceite
-- [ ] Nova sessão criada com UUID válido via --session-id
-- [ ] Sessão existente retomada via --resume
-- [ ] Métricas de execução capturadas (tokens, duração)
-- [ ] Testes com mocks passam
+- [x] Nova sessão criada com UUID válido via --session-id
+- [x] Sessão existente retomada via --resume
+- [x] Métricas de execução capturadas (tokens, duração)
+- [x] Testes com mocks passam
 
 #### Arquivos Envolvidos
 - `src/utils/claude-v3.ts` - modificar
@@ -166,14 +166,14 @@
   - Implementar auto-captura (será em task separada)
 
 #### Critérios de Aceite
-- [ ] decisions.md criado com template ADR
-- [ ] Decisões adicionadas com ID sequencial
-- [ ] Todas as seções populadas (context, options, decision, rationale, consequences)
-- [ ] Testes unitários passam
+- [x] decisions.md criado com template ADR
+- [x] Decisões adicionadas com ID sequencial
+- [x] Todas as seções populadas (context, options, decision, rationale, consequences)
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
-- `src/utils/memory/decisions.ts` - criar
-- `tests/utils/memory/decisions.test.ts` - criar
+- `src/utils/memory/decisions.ts` - criado
+- `tests/utils/memory/decisions.test.ts` - criado
 
 ---
 
