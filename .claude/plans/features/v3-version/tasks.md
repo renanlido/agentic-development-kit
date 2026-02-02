@@ -78,10 +78,10 @@
   - Modificar comportamento do Claude CLI
 
 #### Critérios de Aceite
-- [ ] Função detectClaudeCapabilities() retorna flags disponíveis
-- [ ] Sistema funciona mesmo se flags não disponíveis
-- [ ] Log de warning quando usando fallback
-- [ ] Testes passam
+- [x] Função detectClaudeCapabilities() retorna flags disponíveis
+- [x] Sistema funciona mesmo se flags não disponíveis
+- [x] Log de warning quando usando fallback
+- [x] Testes passam
 
 #### Arquivos Envolvidos
 - `src/utils/claude-v3.ts` - modificar
@@ -221,11 +221,11 @@
 
 #### Critérios de Aceite
 - [~] MemoryLoader.loadForPhase() carrega contexto correto
-- [ ] Tier 1 sempre incluso
-- [ ] Tier 2 incluso quando sessão ativa
-- [ ] Tier 3 carregado sob demanda
-- [ ] Limite de 20K tokens respeitado
-- [ ] Testes unitários passam
+- [x] Tier 1 sempre incluso
+- [x] Tier 2 incluso quando sessão ativa
+- [x] Tier 3 carregado sob demanda
+- [x] Limite de 20K tokens respeitado
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/memory/loader.ts` - criar
@@ -255,7 +255,7 @@
 - [ ] Paths, line numbers, nomes preservados
 - [ ] Explicações redundantes removidas
 - [ ] COMPACTED_STATE.md gerado corretamente
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/memory/compactor.ts` - criar
@@ -317,7 +317,7 @@
 - [x] Read-before-write protocol incluso
 - [x] Instruções para gerar feature_list.json
 - [x] Instruções para gerar init.sh
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/prompts/initializer.ts` - criar
@@ -376,7 +376,7 @@
 - [ ] Detecta sem feature_list.json → Initializer Agent
 - [ ] Detecta com feature_list.json → Coding Agent
 - [ ] Estado carregado corretamente
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/commands/feature-v3.ts` - modificar
@@ -405,7 +405,7 @@
 - [ ] Implement inicia após aprovação
 - [ ] Sessão salva entre fases
 - [ ] Usuário pode sair e retomar
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/commands/feature-v3.ts` - modificar
@@ -434,7 +434,7 @@
 - [ ] Auto-correção tenta até 3x
 - [ ] Escala para humano após 3 falhas
 - [ ] feature_list.json atualizado
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/commands/feature-v3.ts` - modificar
@@ -461,7 +461,7 @@
 - [ ] Auto-correção tenta até 3x
 - [ ] Feature marcada como completa quando QA passa
 - [ ] Escala para humano se necessário
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/commands/feature-v3.ts` - modificar
@@ -601,7 +601,7 @@
 - [ ] SharedStateManager.addDecision() propaga decisão
 - [ ] SharedStateManager.markTaskCompleted() atualiza status
 - [ ] Atomic writes previnem corrupção
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/parallel/shared-state.ts` - criar
@@ -628,7 +628,7 @@
 - [ ] SharedStateManager.claimFile() registra ownership
 - [ ] SharedStateManager.releaseFile() libera arquivo
 - [ ] SharedStateManager.canEdit() verifica permissão
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/parallel/shared-state.ts` - modificar
@@ -656,7 +656,7 @@
 - [ ] ResultAggregator.mergeDecisions() consolida decisões
 - [ ] ResultAggregator.calculateMetrics() agrega métricas
 - [ ] Conflitos detectados e reportados
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/parallel/aggregator.ts` - criar
@@ -737,7 +737,7 @@
 - [ ] Funções extraídas com nome, linha, signature
 - [ ] Classes extraídas com métodos
 - [ ] Imports e exports rastreados
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/indexer/parser.ts` - criar
@@ -764,7 +764,7 @@
 - [ ] DependencyGraph.build() constrói grafo
 - [ ] imports e imported_by calculados
 - [ ] Clusters identificados por módulo
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/indexer/dependencies.ts` - criar
@@ -791,7 +791,7 @@
 - [ ] Arquivos muito importados têm score alto
 - [ ] Arquivos complexos têm score alto
 - [ ] Scores normalizados 0-1
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/indexer/importance.ts` - criar
@@ -819,7 +819,7 @@
 - [ ] IndexStorage.load() carrega índices
 - [ ] QueryEngine.search() busca por termo
 - [ ] Atualização incremental funciona
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/indexer/storage.ts` - criar
@@ -878,7 +878,7 @@
 - [ ] MemoryStorage.list() lista por tipo
 - [ ] MemoryStorage.search() busca por termo
 - [ ] MemoryStorage.prune() remove antigas
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/memories/storage.ts` - criar
@@ -908,7 +908,7 @@
 - [ ] Decisões extraídas com rationale
 - [ ] Patterns extraídos com exemplo
 - [ ] Soluções extraídas com context
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/memories/detector.ts` - criar
@@ -937,7 +937,7 @@
 - [ ] Ordenado por usage
 - [ ] Limite de 5 memórias
 - [ ] Formatação markdown correta
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/memories/injector.ts` - criar
@@ -998,7 +998,7 @@
 - [ ] Status de agentes visível
 - [ ] Atividade recente mostra últimas 5 ações
 - [ ] Funciona em terminal 80x24
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/tui/progress.ts` - criar
@@ -1026,7 +1026,7 @@
 - [ ] Wave atual visível
 - [ ] Métricas agregadas (tokens, tempo)
 - [ ] Atualiza em tempo real
-- [ ] Testes unitários passam
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/tui/dashboard.ts` - criar
