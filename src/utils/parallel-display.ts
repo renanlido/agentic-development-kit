@@ -201,7 +201,7 @@ export class ParallelDisplayManager {
 
     const header =
       completed === total
-        ? chalk.green(`✔ ${total} agents finished │ ${totalTools} total tools`)
+        ? chalk.green(`✔ ${total} subagents finished │ ${totalTools} total tools`)
         : chalk.cyan(`⏳ ${total - completed} running · ${completed}/${total} done`) +
           chalk.gray(` │ ${totalTools} tools`) +
           (elapsedStr ? chalk.dim(` │ ${elapsedStr}`) : '')
@@ -256,7 +256,7 @@ export class ParallelDisplayManager {
 
   renderInitial(): void {
     if (!this.isTerminalSupported) {
-      console.log(`   ${chalk.cyan(`⏳ ${this.agents.size} agents starting...`)}`)
+      console.log(`   ${chalk.cyan(`⏳ ${this.agents.size} subagents starting...`)}`)
       this.agents.forEach((agent, _, map) => {
         const agentArray = Array.from(map.values())
         const index = agentArray.indexOf(agent)

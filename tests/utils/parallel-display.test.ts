@@ -56,7 +56,7 @@ describe('ParallelDisplayManager', () => {
 
       const action = display.extractActionFromEvent(event)
 
-      expect(action).toBe('Reading file.ts...')
+      expect(action).toBe('📖 .../to/file.ts')
     })
 
     it('should extract Write tool action', () => {
@@ -76,7 +76,7 @@ describe('ParallelDisplayManager', () => {
 
       const action = display.extractActionFromEvent(event)
 
-      expect(action).toBe('Writing output.ts...')
+      expect(action).toBe('✏️ .../to/output.ts')
     })
 
     it('should extract Edit tool action', () => {
@@ -96,7 +96,7 @@ describe('ParallelDisplayManager', () => {
 
       const action = display.extractActionFromEvent(event)
 
-      expect(action).toBe('Editing component.tsx...')
+      expect(action).toBe('📝 .../src/component.tsx')
     })
 
     it('should extract Bash tool action', () => {
@@ -116,7 +116,7 @@ describe('ParallelDisplayManager', () => {
 
       const action = display.extractActionFromEvent(event)
 
-      expect(action).toBe('Running: npm...')
+      expect(action).toBe('⚡ npm run test')
     })
 
     it('should extract Grep tool action', () => {
@@ -136,7 +136,7 @@ describe('ParallelDisplayManager', () => {
 
       const action = display.extractActionFromEvent(event)
 
-      expect(action).toBe('Searching for "function\\s+render"...')
+      expect(action).toBe('🔎 grep "function\\s+render"')
     })
 
     it('should extract Glob tool action', () => {
@@ -156,7 +156,7 @@ describe('ParallelDisplayManager', () => {
 
       const action = display.extractActionFromEvent(event)
 
-      expect(action).toBe('Finding files: **/*.test.ts...')
+      expect(action).toBe('🔍 **/*.test.ts')
     })
 
     it('should extract Task tool action', () => {
@@ -176,10 +176,10 @@ describe('ParallelDisplayManager', () => {
 
       const action = display.extractActionFromEvent(event)
 
-      expect(action).toBe('Spawning agent: Analyze codebase structure...')
+      expect(action).toBe('🤖 Analyze codebase struc...')
     })
 
-    it('should extract text delta from stream event', () => {
+    it('should return null for stream text_delta events', () => {
       const display = new ParallelDisplayManager()
       const event: StreamEvent = {
         type: 'stream_event',
@@ -191,10 +191,10 @@ describe('ParallelDisplayManager', () => {
 
       const action = display.extractActionFromEvent(event)
 
-      expect(action).toBe('Analyzing the file structure')
+      expect(action).toBeNull()
     })
 
-    it('should extract content block delta from stream event', () => {
+    it('should return null for stream content_block_delta events', () => {
       const display = new ParallelDisplayManager()
       const event: StreamEvent = {
         type: 'stream_event',
@@ -209,7 +209,7 @@ describe('ParallelDisplayManager', () => {
 
       const action = display.extractActionFromEvent(event)
 
-      expect(action).toBe('Processing dependencies')
+      expect(action).toBeNull()
     })
 
     it('should return null for empty text', () => {
@@ -263,7 +263,7 @@ describe('ParallelDisplayManager', () => {
 
       const action = display.extractActionFromEvent(event)
 
-      expect(action).toBe('Using UnknownTool...')
+      expect(action).toBe('🔧 UnknownTool')
     })
   })
 
@@ -390,7 +390,7 @@ describe('ParallelDisplayManager', () => {
 
       const display = new ParallelDisplayManager()
       display.registerAgent('1.1', 'Test')
-      display.render()
+      display.renderInitial()
 
       const hasAnsiCodes = outputBuffer.some((chunk) => chunk.includes('\x1B['))
       expect(hasAnsiCodes).toBe(false)
@@ -402,7 +402,8 @@ describe('ParallelDisplayManager', () => {
 
       const display = new ParallelDisplayManager()
       display.registerAgent('1.1', 'Test')
-      display.render()
+      display.renderInitial()
+      display.cleanup()
 
       process.env.CI = originalCI
     })
@@ -418,34 +419,44 @@ describe('ParallelDisplayManager', () => {
   })
 
   describe('action truncation', () => {
-    it('should truncate long actions', () => {
-      const display = new ParallelDisplayManager({ maxActionLength: 20 })
+    it('should truncate long task descriptions (25 char limit)', () => {
+      const display = new ParallelDisplayManager()
       const event: StreamEvent = {
-        type: 'stream_event',
-        event: {
-          type: 'text_delta',
-          text: 'This is a very long action that should be truncated',
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              name: 'Task',
+              input: { description: 'This is a very long description that should be truncated' },
+            },
+          ],
         },
       }
 
       const action = display.extractActionFromEvent(event)
 
-      expect(action).toBe('This is a very lo...')
+      expect(action).toBe('🤖 This is a very long de...')
     })
 
-    it('should not truncate short actions', () => {
-      const display = new ParallelDisplayManager({ maxActionLength: 100 })
+    it('should not truncate short task descriptions', () => {
+      const display = new ParallelDisplayManager()
       const event: StreamEvent = {
-        type: 'stream_event',
-        event: {
-          type: 'text_delta',
-          text: 'Short action',
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              name: 'Task',
+              input: { description: 'Short' },
+            },
+          ],
         },
       }
 
       const action = display.extractActionFromEvent(event)
 
-      expect(action).toBe('Short action')
+      expect(action).toBe('🤖 Short')
     })
   })
 })

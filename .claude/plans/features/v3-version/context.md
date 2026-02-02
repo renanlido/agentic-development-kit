@@ -46,9 +46,11 @@ All tasks done → QA Feature Complete → Pass? → DONE
 ## 2. CRITICAL CONSTRAINTS
 
 **DO NOT TOUCH** (v2 frozen):
+
 - `src/cli.ts`, `src/commands/feature.ts`, `src/utils/claude.ts`
 
 **CREATE NEW** (v3):
+
 - `src/cli-v3.ts`, `src/commands/feature-v3.ts`, `src/utils/claude-v3.ts`
 - `src/utils/session-store.ts`, `src/utils/memory/*.ts`
 
@@ -57,11 +59,13 @@ All tasks done → QA Feature Complete → Pass? → DONE
 ## 3. ARCHITECTURE: DUAL AGENT SYSTEM
 
 ### 3.1 Initializer Agent (First Run)
+
 - **Trigger**: No `feature_list.json` found
 - **Actions**: Analyze PRD → Generate `feature_list.json` + `init.sh` → Initial commit
 - **Outcome**: Ready-to-code environment
 
 ### 3.2 Coding Agent (Subsequent Runs)
+
 - **Trigger**: `feature_list.json` exists
 - **Loop**: Read State → Select Task → Implement (TDD) → Update JSON → Commit → Repeat
 
@@ -168,7 +172,9 @@ npm run type-check  # PASS/FAIL
 ```
 
 ## Next Session Should
+
 1. [Next step 1]
+
 ```
 
 ### 4.4 Loading Rules
@@ -293,6 +299,7 @@ Token Count
 ### 7.1 inject-memory.sh (PreToolUse)
 
 Injects into every tool call:
+
 - `core-state.json` content
 - Active constraints
 - Anti-stub protocol reminder
@@ -300,12 +307,14 @@ Injects into every tool call:
 ### 7.2 auto-checkpoint.sh (Stop)
 
 Creates checkpoint on session end:
+
 - Timestamp, feature, core state
 - Git status, last commit
 
 ### 7.3 validate-no-stub.sh (Write)
 
 Blocks writes containing:
+
 - `throw new Error.*Not implemented`
 - `TODO:`, `FIXME:`
 - `// stub`, `pass  # stub`
@@ -316,6 +325,7 @@ Blocks writes containing:
 ## 8. CONTEXT READING GUARANTEE (5 LAYERS)
 
 ### Problem
+
 AI agents read only 10-20% of available context, leading to incomplete implementations.
 
 ### Solution: 5 Layers
@@ -471,6 +481,7 @@ Wave executes → Each agent updates shared-state.json
 ## 11. CODEBASE INDEXING (Fast Context)
 
 ### 11.1 Problem
+
 Without indexing, agent must read many files to understand context, using slow glob/grep instead of semantic search.
 
 **Competitors with this feature:** Windsurf (SWE-grep, Fast Context 10x faster), Cursor (embeddings)
@@ -510,6 +521,7 @@ adk context "task"     # Find relevant files for task
 ### 11.5 Integration
 
 When task starts, system automatically:
+
 1. Semantic search by task description
 2. Expand with dependencies
 3. Filter by importance score (>0.5)
@@ -520,6 +532,7 @@ When task starts, system automatically:
 ## 12. AUTO MEMORIES (Automatic Capture)
 
 ### 12.1 Problem
+
 Current `decisions.md` is manual. User must document important decisions.
 
 **Competitors with this feature:** Windsurf (automatic memories), Cursor (Project Rules)
@@ -580,6 +593,7 @@ Relevant memories injected automatically in context:
 ## 13. VISUAL PROGRESS UI
 
 ### 13.1 Problem
+
 ADK is CLI-only. Hard to track multiple parallel agents, long task progress.
 
 **Competitors with this feature:** VS 2026 (Cloud Agent UI), Cursor (Composer), Windsurf (Cascade)
@@ -668,30 +682,36 @@ interface FeatureTest {
 ## 15. IMPLEMENTATION ROADMAP
 
 ### Phase 1: Infrastructure
+
 - [ ] `src/cli-v3.ts` (entry point)
 - [ ] `src/utils/session-store.ts`
 - [ ] `src/utils/claude-v3.ts`
 
 ### Phase 2: Memory System
+
 - [ ] `src/utils/memory/core-state.ts`
 - [ ] `src/utils/memory/session-notes.ts`
 - [ ] `src/utils/memory/compactor.ts`
 
 ### Phase 3: Agent Logic
+
 - [ ] `src/utils/prompts/initializer.ts`
 - [ ] `src/utils/prompts/coding.ts`
 - [ ] `src/utils/feature-list.ts`
 
 ### Phase 4: Commands
+
 - [ ] `src/commands/feature-v3.ts`
 - [ ] `adk memory status|checkpoint|compact|restore`
 
 ### Phase 5: Hooks
+
 - [ ] `inject-memory.sh`
 - [ ] `auto-checkpoint.sh`
 - [ ] `validate-no-stub.sh`
 
 ### Phase 6: Integration
+
 - [ ] Add `"adk3": "node dist/cli-v3.js"` to package.json
 - [ ] Full test with real feature
 
@@ -755,6 +775,7 @@ PRINCIPLE: "Find smallest set of high-signal tokens"
 ### 17.3 What to Preserve vs Compress
 
 **PRESERVE:**
+
 - Session intent (original objective)
 - File paths and line numbers
 - Artifact trail (what was modified)
@@ -762,6 +783,7 @@ PRINCIPLE: "Find smallest set of high-signal tokens"
 - Breadcrumbs (re-fetch references)
 
 **COMPRESS:**
+
 - Redundant explanations
 - Processed tool outputs
 - Failed attempts (keep only lesson)

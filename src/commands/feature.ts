@@ -25,6 +25,7 @@ import {
 import { HistoryTracker } from '../utils/history-tracker'
 import { logger } from '../utils/logger'
 import { getModelForPhase } from '../utils/model-router'
+import { ParallelDisplayManager } from '../utils/parallel-display'
 import {
   type FeatureProgress,
   isStepCompleted,
@@ -2831,13 +2832,15 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 
         if (shouldExit) break
 
-        console.log(chalk.gray(`\n⏳ Próxima task em ${COOLDOWN_MS / 1000}s... (Ctrl+C para pausar)`))
+        console.log(
+          chalk.gray(`\n⏳ Próxima task em ${COOLDOWN_MS / 1000}s... (Ctrl+C para pausar)`)
+        )
         await this.sleep(COOLDOWN_MS, () => shouldExit)
       }
     } finally {
       process.removeListener('SIGINT', exitHandler)
       if (childProcess !== null) {
-        (childProcess as ReturnType<typeof spawn>).kill('SIGKILL')
+        ;(childProcess as ReturnType<typeof spawn>).kill('SIGKILL')
       }
     }
 
@@ -4781,29 +4784,124 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
 
     const prompt = this.buildParallelWavePrompt(name, wave.tasks, hooksDir, specContent)
 
+    const displayManager = new ParallelDisplayManager()
+
+    const taskIdToAgentId = new Map<string, string>()
+    const toolUseIdToAgentId = new Map<string, string>()
+    const agentMetrics = new Map<string, { toolCount: number; tokenCount: number }>()
+
+    for (const task of wave.tasks) {
+      const agentId = displayManager.registerAgent(task.id, task.title)
+      taskIdToAgentId.set(task.id, agentId)
+      agentMetrics.set(agentId, { toolCount: 0, tokenCount: 0 })
+    }
+
+    displayManager.renderInitial()
+
+    let currentAgentId: string | null = null
+
+    const onEvent = (event: {
+      type: string
+      message?: {
+        content?: Array<{
+          type: string
+          name?: string
+          input?: Record<string, unknown>
+          tool_use_id?: string
+          id?: string
+        }>
+      }
+    }) => {
+      if (event.type === 'assistant' && event.message?.content) {
+        for (const block of event.message.content) {
+          if (block.type === 'tool_use') {
+            if (block.name === 'Task' && block.input) {
+              const taskDescription = block.input.description as string
+              const taskPrompt = block.input.prompt as string
+
+              let matchedTaskId: string | null = null
+              for (const task of wave.tasks) {
+                if (taskPrompt?.includes(task.id) || taskDescription?.includes(task.id)) {
+                  matchedTaskId = task.id
+                  break
+                }
+              }
+
+              if (matchedTaskId) {
+                currentAgentId = taskIdToAgentId.get(matchedTaskId) || null
+                if (currentAgentId && block.id) {
+                  toolUseIdToAgentId.set(block.id, currentAgentId)
+                }
+              }
+            }
+
+            if (currentAgentId) {
+              const action = displayManager.extractActionFromEvent(
+                event as Parameters<typeof displayManager.extractActionFromEvent>[0]
+              )
+              if (action) {
+                displayManager.updateAction(currentAgentId, action)
+              }
+              displayManager.incrementToolCount(currentAgentId)
+              const metrics = agentMetrics.get(currentAgentId)
+              if (metrics) {
+                metrics.toolCount++
+              }
+            }
+          }
+        }
+      }
+
+      if (event.type === 'user' && event.message?.content) {
+        for (const block of event.message.content) {
+          if (block.type === 'tool_result' && block.tool_use_id) {
+            const agentId = toolUseIdToAgentId.get(block.tool_use_id)
+            if (agentId) {
+              const metrics = agentMetrics.get(agentId)
+              displayManager.markCompleted(agentId, metrics?.toolCount, metrics?.tokenCount)
+              toolUseIdToAgentId.delete(block.tool_use_id)
+            }
+          }
+        }
+      }
+    }
+
     try {
       await executeHeadlessWithMetrics(prompt, {
         model: options.model as ModelType | undefined,
-        showProgress: true,
+        showProgress: false,
+        onEvent,
       })
 
-      return wave.tasks.map((task) => ({
-        taskId: task.id,
-        taskTitle: task.title,
-        toolCount: 0,
-        tokenCount: 0,
-        durationMs: Date.now() - startTime,
-        status: 'success' as const,
-      }))
-    } catch (error) {
-      return wave.tasks.map((task) => ({
-        taskId: task.id,
-        taskTitle: task.title,
-        toolCount: 0,
-        tokenCount: 0,
-        durationMs: Date.now() - startTime,
-        status: 'error' as const,
-      }))
+      displayManager.cleanup()
+
+      return wave.tasks.map((task) => {
+        const agentId = taskIdToAgentId.get(task.id)
+        const metrics = agentId ? agentMetrics.get(agentId) : undefined
+        return {
+          taskId: task.id,
+          taskTitle: task.title,
+          toolCount: metrics?.toolCount || 0,
+          tokenCount: metrics?.tokenCount || 0,
+          durationMs: Date.now() - startTime,
+          status: 'success' as const,
+        }
+      })
+    } catch {
+      displayManager.cleanup()
+
+      return wave.tasks.map((task) => {
+        const agentId = taskIdToAgentId.get(task.id)
+        const metrics = agentId ? agentMetrics.get(agentId) : undefined
+        return {
+          taskId: task.id,
+          taskTitle: task.title,
+          toolCount: metrics?.toolCount || 0,
+          tokenCount: metrics?.tokenCount || 0,
+          durationMs: Date.now() - startTime,
+          status: 'error' as const,
+        }
+      })
     }
   }
 
@@ -4825,18 +4923,33 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
       .join('\n')
 
     return `
-# Execução Paralela de Tasks - Feature: ${name}
+# Execução Paralela - Feature: ${name}
 
-Você deve executar as seguintes tasks **EM PARALELO** usando a ferramenta **Task**.
+Execute as tasks abaixo **EM PARALELO** usando a ferramenta **Task**.
 
-IMPORTANTE:
-- Use a ferramenta Task para lançar um subagent para CADA task
-- Lance TODOS os subagents em paralelo (na mesma mensagem)
-- Cada subagent deve implementar sua task de forma independente
-- Use subagent_type="feature-developer" para tasks de código
-- Use subagent_type="unit-test-specialist" para tasks de teste
+## INSTRUÇÃO CRÍTICA
 
-## Tasks para Executar em Paralelo
+Você DEVE usar a ferramenta Task para spawnar subagents.
+Faça TODAS as chamadas Task em uma ÚNICA mensagem para execução paralela.
+
+Exemplo de chamada Task:
+\`\`\`json
+{
+  "subagent_type": "feature-developer",
+  "description": "Implementar Task X.X",
+  "prompt": "Implemente a Task X.X: [descrição]. Siga TDD..."
+}
+\`\`\`
+
+## Subagents Disponíveis
+
+| subagent_type | Uso |
+|---------------|-----|
+| feature-developer | Implementação de código de produção |
+| unit-test-specialist | Criação de testes unitários |
+| e2e-test-specialist | Testes end-to-end |
+
+## Tasks para Executar
 
 ${taskDescriptions}
 
@@ -4852,7 +4965,8 @@ Cada subagent deve:
 
 ## Execução
 
-Lance todos os subagents agora em paralelo. Use uma única mensagem com múltiplas chamadas da ferramenta Task.
+Agora, faça múltiplas chamadas da ferramenta Task em paralelo (uma para cada task acima).
+NÃO implemente diretamente - delegue para os subagents.
 `
   }
 
