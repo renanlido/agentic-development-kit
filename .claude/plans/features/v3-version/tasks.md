@@ -25,8 +25,8 @@
   - Modificar cli.ts (v2)
 
 #### Critérios de Aceite
-- [ ] `adk3 feature <name>` é reconhecido e chama FeatureV3Command.feature()
-- [ ] `adk3 feature autopilot <name>` é reconhecido e chama FeatureV3Command.autopilot()
+- [~] `adk3 feature <name>` é reconhecido e chama FeatureV3Command.feature()
+- [~] `adk3 feature autopilot <name>` é reconhecido e chama FeatureV3Command.autopilot()
 - [ ] Flags --resume, --parallel, --agents funcionam
 - [ ] Testes unitários passam
 
@@ -108,18 +108,18 @@
   - Integrar com comandos (será em task separada)
 
 #### Critérios de Aceite
-- [ ] Schema core-state.json implementado e validado com Zod
-- [ ] CoreStateManager.load() carrega ou cria estado
-- [ ] CoreStateManager.update() atualiza campos específicos
-- [ ] CoreStateManager.addDecision() mantém max 5 decisões
-- [ ] CoreStateManager.addModifiedFile() rastreia arquivos
-- [ ] Auto-compactação quando excede 2000 tokens
-- [ ] Testes unitários com >80% cobertura
+- [x] Schema core-state.json implementado e validado com Zod
+- [x] CoreStateManager.load() carrega ou cria estado
+- [x] CoreStateManager.update() atualiza campos específicos
+- [x] CoreStateManager.addDecision() mantém max 5 decisões
+- [x] CoreStateManager.addModifiedFile() rastreia arquivos
+- [x] Auto-compactação quando excede 2000 tokens
+- [x] Testes unitários com >80% cobertura
 
 #### Arquivos Envolvidos
-- `src/utils/memory/core-state.ts` - criar
-- `src/types/memory.ts` - criar
-- `tests/utils/memory/core-state.test.ts` - criar
+- `src/utils/memory/core-state.ts` - criado
+- `src/types/core-state.ts` - criado
+- `tests/utils/memory/core-state.test.ts` - criado
 
 ---
 
@@ -139,11 +139,11 @@
   - Implementar outros tiers
 
 #### Critérios de Aceite
-- [ ] session-notes.md criado com template correto
-- [ ] Timeline atualizada automaticamente
-- [ ] Seção "Key Learnings" populada
-- [ ] Seção "Files Read" rastreada
-- [ ] Testes unitários passam
+- [x] session-notes.md criado com template correto
+- [x] Timeline atualizada automaticamente
+- [x] Seção "Key Learnings" populada
+- [x] Seção "Files Read" rastreada
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/memory/session-notes.ts` - criar
@@ -192,11 +192,11 @@
   - Implementar busca semântica
 
 #### Critérios de Aceite
-- [ ] breadcrumbs.md criado com seções organizadas
-- [ ] Patterns adicionados com localização
-- [ ] Arquivos importantes com notas
-- [ ] Comandos que funcionaram registrados
-- [ ] Testes unitários passam
+- [x] breadcrumbs.md criado com seções organizadas
+- [x] Patterns adicionados com localização
+- [x] Arquivos importantes com notas
+- [x] Comandos que funcionaram registrados
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
 - `src/utils/memory/breadcrumbs.ts` - criar
@@ -220,7 +220,7 @@
   - Implementar Tier 4 (project context)
 
 #### Critérios de Aceite
-- [ ] MemoryLoader.loadForPhase() carrega contexto correto
+- [~] MemoryLoader.loadForPhase() carrega contexto correto
 - [ ] Tier 1 sempre incluso
 - [ ] Tier 2 incluso quando sessão ativa
 - [ ] Tier 3 carregado sob demanda
@@ -281,18 +281,18 @@
   - Gerar lista automaticamente (será pelo Initializer Agent)
 
 #### Critérios de Aceite
-- [ ] Schema FeatureList validado com Zod
-- [ ] FeatureListManager.create() cria arquivo vazio
-- [ ] FeatureListManager.load() carrega e valida
-- [ ] FeatureListManager.updateTestStatus() atualiza status
-- [ ] FeatureListManager.getNextPending() retorna próximo teste
-- [ ] Migração de tasks.md funciona
-- [ ] Testes unitários passam
+- [x] Schema FeatureList validado com Zod
+- [x] FeatureListManager.create() cria arquivo vazio
+- [x] FeatureListManager.load() carrega e valida
+- [x] FeatureListManager.updateTestStatus() atualiza status
+- [x] FeatureListManager.getNextPending() retorna próximo teste
+- [x] Migração de tasks.md funciona
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
-- `src/utils/feature-list.ts` - criar
-- `src/types/feature-list.ts` - criar
-- `tests/utils/feature-list.test.ts` - criar
+- `src/utils/feature-list.ts` - criado
+- `src/types/feature-list.ts` - criado
+- `tests/utils/feature-list.test.ts` - criado
 
 ---
 
@@ -312,11 +312,11 @@
   - Executar o agente (será no comando feature)
 
 #### Critérios de Aceite
-- [ ] Prompt do sistema inclui missão clara
-- [ ] Anti-stub rules presentes no prompt
-- [ ] Read-before-write protocol incluso
-- [ ] Instruções para gerar feature_list.json
-- [ ] Instruções para gerar init.sh
+- [x] Prompt do sistema inclui missão clara
+- [x] Anti-stub rules presentes no prompt
+- [x] Read-before-write protocol incluso
+- [x] Instruções para gerar feature_list.json
+- [x] Instruções para gerar init.sh
 - [ ] Testes unitários passam
 
 #### Arquivos Envolvidos
@@ -342,16 +342,16 @@
   - Executar o agente (será no comando feature)
 
 #### Critérios de Aceite
-- [ ] Prompt do sistema inclui loop de trabalho
-- [ ] Anti-stub rules presentes (5 camadas)
-- [ ] TDD enforcement incluso
-- [ ] Verification checklist presente
-- [ ] Comprehension checkpoint incluso
-- [ ] Testes unitários passam
+- [x] Prompt do sistema inclui loop de trabalho
+- [x] Anti-stub rules presentes (5 camadas)
+- [x] TDD enforcement incluso
+- [x] Verification checklist presente
+- [x] Comprehension checkpoint incluso
+- [x] Testes unitários passam
 
 #### Arquivos Envolvidos
-- `src/utils/prompts/coding.ts` - criar
-- `tests/utils/prompts/coding.test.ts` - criar
+- `src/utils/prompts/coding.ts` - criado
+- `tests/utils/prompts/coding.test.ts` - criado
 
 ---
 
@@ -487,11 +487,11 @@
   - Modificar hooks existentes
 
 #### Critérios de Aceite
-- [ ] Hook injeta core-state.json em tool calls
-- [ ] Constraints anti-stub presentes na injeção
-- [ ] Task atual visível na injeção
-- [ ] Hook configurado corretamente
-- [ ] Testes de integração passam
+- [x] Hook injeta core-state.json em tool calls
+- [x] Constraints anti-stub presentes na injeção
+- [x] Task atual visível na injeção
+- [x] Hook configurado corretamente
+- [x] Testes de integração passam
 
 #### Arquivos Envolvidos
 - `.claude/hooks/inject-memory.sh` - criar
