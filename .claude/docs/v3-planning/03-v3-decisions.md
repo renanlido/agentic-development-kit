@@ -42,7 +42,7 @@
 ```
 
 ### 1.2 O que CRIAR (v3 novo):
-```
+```text
 🆕 CRIAR NOVOS ARQUIVOS:
 ├── src/cli-v3.ts                           # Entry point v3 (comando adk3)
 ├── src/commands/feature-v3.ts              # Comandos v3
@@ -54,6 +54,14 @@
 ├── src/utils/feature-list.ts               # Generator feature_list.json
 ├── src/utils/init-script.ts                # Generator init.sh
 └── src/utils/git-context.ts                # Git log reading
+```
+
+### 1.4 Flags do Claude CLI (verificado 2026-02-02):
+```bash
+-r, --resume [value]     # Resume by session ID or picker
+--session-id <uuid>      # Use specific UUID for session
+-c, --continue           # Continue most recent in current dir
+--fork-session           # New ID when resuming (use with --resume)
 ```
 
 ### 1.3 O que ABORTAR:
@@ -122,43 +130,149 @@
 
 ---
 
-## 3. FLUXO v3: Comando Único `adk3 feature work`
+## 3. FLUXO v3: Um Comando Por Domínio
 
-```
+### Filosofia ADK
+> **"Um comando por domínio, não um comando por etapa."**
+> Cada comando faz TUDO do seu domínio. Zero fragmentação. Zero paralisia por decisão.
+
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    adk3 feature work my-feature                         │
+│                      adk feature my-feature                             │
+│                                                                         │
+│  Faz TUDO: research → plan → implement → test → docs → done            │
 └─────────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
                     ┌─────────────────┐
-                    │ É primeira      │
-                    │ sessão?         │
+                    │ Feature existe? │
                     └────────┬────────┘
                              │
               ┌──────────────┴──────────────┐
               │                             │
               ▼                             ▼
     ┌─────────────────┐          ┌─────────────────┐
-    │ SIM             │          │ NÃO             │
-    │ Initializer     │          │ Coding Agent    │
-    │ Agent           │          │ Loop            │
+    │ NÃO             │          │ SIM             │
+    │ → Criar +       │          │ → Continuar     │
+    │   Inicializar   │          │   de onde parou │
     └────────┬────────┘          └────────┬────────┘
              │                            │
              ▼                            ▼
     ┌─────────────────┐          ┌─────────────────┐
-    │ 1. Gerar PRD    │          │ 1. pwd          │
-    │ 2. Gerar        │          │ 2. Ler progress │
-    │    feature_list │          │ 3. Ler feature  │
-    │ 3. Gerar init.sh│          │    _list        │
-    │ 4. Git commit   │          │ 4. git log -20  │
-    │ 5. Salvar       │          │ 5. ./init.sh    │
-    │    session ID   │          │ 6. Trabalhar 1  │
-    └─────────────────┘          │    feature      │
-                                 │ 7. Testar e2e   │
-                                 │ 8. passes: true │
-                                 │ 9. Git commit   │
-                                 │ 10. Repetir     │
+    │ Initializer:    │          │ Coding Agent:   │
+    │ 1. Estrutura    │          │ 1. Detectar     │
+    │ 2. feature_list │          │    estado atual │
+    │ 3. init.sh      │          │ 2. Próxima task │
+    │ 4. Git commit   │          │ 3. Implementar  │
+    └────────┬────────┘          │ 4. Testar e2e   │
+             │                   │ 5. Commit       │
+             └───────────────────│ 6. Loop até     │
+                                 │    100% done    │
                                  └─────────────────┘
+```
+
+### Comandos v3 (Um por Domínio)
+
+| Comando | Domínio | O que faz |
+|---------|---------|-----------|
+| `adk feature <name>` | Features | Interativo com validações manuais entre fases |
+| `adk feature autopilot <name>` | Features | Automático com QA por task + escalonamento |
+| `adk docs [target]` | Documentação | Analisa → Gera → Organiza → Done |
+| `adk workflow daily` | Workflow | Update → Identify → Prioritize → Done |
+
+### Fluxo do Autopilot (Detalhado)
+
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    adk feature autopilot <name>                         │
+└─────────────────────────────────────────────────────────────────────────┘
+                              │
+         ┌────────────────────┴────────────────────┐
+         │           FASES COM VALIDAÇÃO           │
+         └────────────────────┬────────────────────┘
+                              │
+    ┌─────────────────────────┼─────────────────────────┐
+    │                         │                         │
+    ▼                         ▼                         ▼
+┌────────┐              ┌────────┐              ┌────────────┐
+│Research│──►[Validar]  │  Plan  │──►[Validar]  │ Implement  │
+└────────┘   Refinar?   └────────┘   Refinar?   └─────┬──────┘
+             ou Seguir              ou Seguir         │
+                                                      │
+         ┌────────────────────────────────────────────┘
+         │         LOOP AUTOMÁTICO COM QA
+         └────────────────────┬────────────────────────
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │     Task N      │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │    QA Task      │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              │                             │
+           Passou                        Falhou
+              │                             │
+              ▼                             ▼
+     ┌────────────────┐           ┌─────────────────┐
+     │  Próxima Task  │           │ Criar correções │
+     └────────────────┘           │ e tentar de novo│
+                                  └────────┬────────┘
+                                           │
+                                  Falhou 3x?
+                                           │
+                              ┌────────────┴────────────┐
+                              │                         │
+                             Não                       Sim
+                              │                         │
+                              ▼                         ▼
+                    ┌─────────────────┐      ┌─────────────────┐
+                    │  Loop correção  │      │  PEDE AJUDA AO  │
+                    └─────────────────┘      │     USUÁRIO     │
+                                             └─────────────────┘
+```
+
+**Regras do Autopilot:**
+1. **Entre fases** (Research → Plan → Implement): Validação manual obrigatória
+2. **Dentro de Implement**: Loop automático task por task
+3. **QA por task**: Cada task passa por QA antes de ir para próxima
+4. **QA Final**: Ao completar TODAS as tasks, QA da feature completa
+5. **Auto-correção**: Se QA falha, cria direcionamentos e tenta corrigir
+6. **Escalonamento**: Se falhar 3x, pede ajuda ao humano
+
+### QA em Duas Camadas
+
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         IMPLEMENTAÇÃO                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  CAMADA 1: QA POR TASK (durante implementação)                         │
+│  ─────────────────────────────────────────────────                      │
+│  Task 1 → Implementa → QA Task ──► Task 2                              │
+│  Task 2 → Implementa → QA Task ──► Task 3                              │
+│  Task N → Implementa → QA Task ──► ✓ Tasks completas                   │
+│                                          │                              │
+│                                          ▼                              │
+│  CAMADA 2: QA FINAL (feature completa)                                 │
+│  ─────────────────────────────────────────────                          │
+│                               ┌─────────────────┐                       │
+│                               │   QA FINAL      │                       │
+│                               │ Feature completa│                       │
+│                               └────────┬────────┘                       │
+│                                        │                                │
+│                         ┌──────────────┴──────────────┐                 │
+│                      Passou                        Falhou               │
+│                         │                             │                 │
+│                         ▼                    Cria correções             │
+│                      ✅ DONE                 Tenta novamente            │
+│                                              (max 3x → humano)          │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -262,6 +376,195 @@ touch src/utils/init-script.ts
 # 4. NUNCA:
 # npm link  ← PROIBIDO até v3 validado
 ```
+
+---
+
+## 8. OBJETIVOS ESTRATÉGICOS v3
+
+### 8.1 Sistema Coeso de Recursos ADK
+
+Integração completa de todos os recursos em um fluxo unificado:
+
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    SISTEMA INTEGRADO ADK v3                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐ │
+│  │   HOOKS     │   │   SKILLS    │   │   MEMORY    │   │   AGENTS    │ │
+│  │             │   │             │   │             │   │             │ │
+│  │ • inject    │   │ • commit    │   │ • core-state│   │ •Initializer│ │
+│  │ • validate  │   │ • review    │   │ • session   │   │ • Coding    │ │
+│  │ • checkpoint│   │ • docs      │   │ • decisions │   │ • QA        │ │
+│  └──────┬──────┘   └──────┬──────┘   └──────┬──────┘   └──────┬──────┘ │
+│         │                 │                 │                 │         │
+│         └─────────────────┴────────┬────────┴─────────────────┘         │
+│                                    │                                    │
+│                            ┌───────▼───────┐                           │
+│                            │  CONSTRAINTS  │                           │
+│                            │               │                           │
+│                            │ • No Stubs    │                           │
+│                            │ • Read-First  │                           │
+│                            │ • Test-After  │                           │
+│                            └───────────────┘                           │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 8.2 Injeção Automática de Contexto
+
+O contexto é injetado automaticamente baseado em **fase** e **task**:
+
+| Fase | Contexto Injetado Automaticamente |
+|------|-----------------------------------|
+| **Research** | PRD, constraints, project guidelines |
+| **Plan** | PRD, research.md, architecture patterns |
+| **Implement** | Plan, task atual, arquivos relacionados, decisions |
+| **QA** | Implementation, test patterns, acceptance criteria |
+
+```typescript
+interface ContextInjection {
+  phase: 'research' | 'plan' | 'implement' | 'qa'
+  currentTask?: TaskState
+  autoInject: {
+    coreState: CoreState       // Sempre
+    relevantFiles: string[]    // Baseado na task
+    recentDecisions: string[]  // Últimas 5
+    constraints: string[]      // Sempre
+  }
+}
+```
+
+### 8.3 Feedback Loop Inteligente
+
+Quando QA encontra problemas, o sistema pode **voltar fases** se necessário:
+
+```text
+                        QA ENCONTROU PROBLEMA
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │ Classificar Problema │
+                    └──────────┬──────────┘
+                               │
+         ┌─────────────────────┼─────────────────────┐
+         │                     │                     │
+    IMPLEMENTATION         PLANNING              RESEARCH
+      BUG/ERROR           ARQUITETURA          REQUISITOS
+         │                     │                     │
+         ▼                     ▼                     ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│ Corrigir código │  │ Revisar plan    │  │ Revisar PRD     │
+│ (loop normal)   │  │ com usuário     │  │ com usuário     │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
+```
+
+**Classificação de Problemas:**
+
+| Severidade | Tipo | Ação |
+|------------|------|------|
+| **HIGH** | Bug de implementação | Corrige automaticamente (3x) |
+| **MEDIUM** | Problema de design | Pausa, apresenta opções ao usuário |
+| **LOW** | Melhoria sugerida | Registra para próxima iteração |
+
+### 8.4 Detecção de Loops Infinitos
+
+Sistema detecta e previne desperdício de recursos:
+
+```typescript
+interface LoopDetection {
+  maxAttempts: {
+    perTask: 3          // Máximo 3 tentativas por task
+    perPhase: 10        // Máximo 10 tasks falhando na fase
+    totalSession: 30    // Máximo 30 falhas totais na sessão
+  }
+  patterns: {
+    sameError: 2        // Mesmo erro 2x = escalar
+    similarFix: 3       // Mesma correção 3x = loop detectado
+    noProgress: 5       // 5 iterações sem progresso = parar
+  }
+  action: 'pause' | 'escalate' | 'abort'
+}
+```
+
+**Sinais de Loop Infinito:**
+1. Mesmo erro aparece após correção
+2. Mesma correção sendo aplicada repetidamente
+3. Nenhum teste novo passando após N iterações
+4. Token usage aumentando sem progresso
+
+### 8.5 Enriquecimento de Contexto pelo Usuário
+
+Para problemas **MEDIUM/LOW**, usuário pode enriquecer o contexto:
+
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│  ⚠️  PROBLEMA DETECTADO (MEDIUM)                                        │
+│                                                                         │
+│  Descrição: Componente X não está seguindo pattern Y                    │
+│                                                                         │
+│  Opções:                                                                │
+│  [1] Corrigir automaticamente (usar pattern Y)                         │
+│  [2] Manter atual (adicionar exceção documentada)                      │
+│  [3] Fornecer direcionamento específico                                │
+│                                                                         │
+│  > 3                                                                    │
+│                                                                         │
+│  Seu direcionamento:                                                    │
+│  > Usar pattern Z neste caso porque [motivo]. Ver referência em...     │
+│                                                                         │
+│  ✓ Direcionamento adicionado ao contexto. Continuando...               │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 8.6 Gerenciamento de Contexto para Assertividade
+
+Sistema garante que o contexto necessário é sempre lido:
+
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    CONTEXT MANAGEMENT LAYERS                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  TIER 1: CORE STATE (sempre presente)                                  │
+│  ─────────────────────────────────────                                  │
+│  • currentTask: { id, status, files }                                  │
+│  • recentDecisions: últimas 5 decisões                                 │
+│  • constraints: regras ativas                                          │
+│  • sessionFiles: arquivos modificados                                  │
+│                                                                         │
+│  TIER 2: TASK CONTEXT (carregado por task)                             │
+│  ─────────────────────────────────────────                              │
+│  • Arquivos relacionados à task (auto-detectados)                      │
+│  • Testes existentes para os arquivos                                  │
+│  • Histórico de mudanças recentes (git diff)                           │
+│                                                                         │
+│  TIER 3: FEATURE CONTEXT (carregado sob demanda)                       │
+│  ──────────────────────────────────────────────                         │
+│  • PRD, research.md, implementation-plan.md                            │
+│  • Decisões de arquitetura                                             │
+│  • Padrões do projeto                                                  │
+│                                                                         │
+│  TIER 4: PROJECT CONTEXT (referência quando necessário)                │
+│  ──────────────────────────────────────────────────────                 │
+│  • CLAUDE.md, guidelines.md                                            │
+│  • Convenções globais                                                  │
+│  • Dependências e integrações                                          │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Regras de Carregamento:**
+1. **Tier 1**: Sempre injetado no início de cada ação
+2. **Tier 2**: Carregado automaticamente baseado na task
+3. **Tier 3**: Carregado quando agente precisa de contexto de feature
+4. **Tier 4**: Carregado apenas quando explicitamente necessário
+
+**Anti-Patterns Prevenidos:**
+- ❌ Implementar sem ler código existente (força Read-First)
+- ❌ Criar stubs ou TODOs (constraint No-Stubs)
+- ❌ Esquecer testes (constraint Test-After)
+- ❌ Perder decisões anteriores (injeta recentDecisions)
 
 ---
 

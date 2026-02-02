@@ -259,31 +259,84 @@ Begin by running the session start checklist.
 
 ## Modificações no Fluxo de Feature
 
-### Antes (ADK atual):
+### Antes (ADK v2 - FRAGMENTADO):
 
-```
+```text
 feature new      → Cria estrutura básica
 feature research → Nova sessão Claude
-feature plan     → Nova sessão Claude  
+feature plan     → Nova sessão Claude
 feature implement → Nova sessão Claude
+feature qa       → Nova sessão Claude
+feature docs     → Nova sessão Claude
+feature finish   → Nova sessão Claude
 ```
 
-### Depois (com long-running):
+**Problema**: 7 comandos = 7 decisões do usuário = paralisia por análise.
 
+### Depois (ADK v3 - UM COMANDO POR DOMÍNIO):
+
+```text
+adk feature <name>  → FAZ TUDO AUTOMATICAMENTE:
+                      │
+                      ├─ Não existe? → Initializer Agent:
+                      │                - Cria estrutura
+                      │                - Gera feature_list.json
+                      │                - Cria init.sh
+                      │                - Git commit inicial
+                      │
+                      └─ Existe? → Coding Agent (loop):
+                                   - Lê progress + git log
+                                   - Detecta onde parou
+                                   - Trabalha próxima task
+                                   - Testa e2e
+                                   - Commit + update progress
+                                   - Repete até 100% completo
 ```
-feature new      → Initializer Agent:
-                   - Gera feature_list.json
-                   - Cria init.sh
-                   - Cria claude-progress.txt
-                   - Git commit inicial
 
-feature work     → Coding Agent (loop):
-                   - Lê progress + git log
-                   - Roda init.sh
-                   - Trabalha UMA feature
-                   - Testa e2e
-                   - Commit + update progress
-                   - Repete até feature_list completa
+**Filosofia ADK**: Um comando por domínio, não um comando por etapa.
+
+| Comando | Modo | O que faz |
+|---------|------|-----------|
+| `adk feature <name>` | Interativo | Validação manual entre cada fase |
+| `adk feature autopilot <name>` | Automático | QA por task + escalonamento inteligente |
+| `adk docs` | Automático | Analisa → Gera → Organiza → Done |
+| `adk workflow daily` | Automático | Update → Identify → Prioritize → Done |
+
+### Fluxo Autopilot com QA em 2 Camadas
+
+```text
+Research ──► [Validar: Refinar/Seguir?]
+                    │
+Plan ──────► [Validar: Refinar/Seguir?]
+                    │
+Implement ─► LOOP AUTOMÁTICO:
+             │
+             │  ╔═══════════════════════════════════════╗
+             │  ║  CAMADA 1: QA POR TASK                ║
+             │  ╚═══════════════════════════════════════╝
+             │
+             ├─► Task 1 → Implementa → QA Task → Passou? → Task 2
+             │                                   Falhou? → Corrige (3x) → Humano
+             │
+             ├─► Task 2 → Implementa → QA Task → Passou? → Task 3
+             │
+             └─► Task N → Implementa → QA Task → Passou? ───┐
+                                                            │
+             ╔═══════════════════════════════════════╗      │
+             ║  CAMADA 2: QA FINAL (Feature completa)║◄─────┘
+             ╚═══════════════════════════════════════╝
+                          │
+                          ▼
+                    QA Feature
+                          │
+              ┌───────────┴───────────┐
+           Passou                  Falhou
+              │                       │
+              ▼                  Corrige (3x)
+            DONE                      │
+                              Ainda falha?
+                                      │
+                              Pede ajuda humana
 ```
 
 ---

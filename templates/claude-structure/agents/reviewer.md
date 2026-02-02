@@ -6,7 +6,7 @@ tools:
   - Glob
   - Grep
   - Bash
-model: sonnet
+model: haiku
 ---
 
 # Code Reviewer Agent

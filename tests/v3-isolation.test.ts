@@ -1,6 +1,6 @@
+import path from 'node:path'
 import { describe, expect, it } from '@jest/globals'
 import fs from 'fs-extra'
-import path from 'node:path'
 
 describe('V3 Isolation', () => {
   const projectRoot = path.join(__dirname, '..')

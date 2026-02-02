@@ -13,8 +13,8 @@ describe('SessionInfoV3 types', () => {
       metadata: {
         model: 'sonnet',
         exitCode: 0,
-        duration: 1800000
-      }
+        duration: 1800000,
+      },
     }
 
     expect(validSession.id).toBe('session-123')
@@ -30,7 +30,7 @@ describe('SessionInfoV3 types', () => {
       startedAt: '2026-01-25T10:00:00Z',
       lastActivity: '2026-01-25T10:00:00Z',
       status: 'interrupted' as const,
-      resumable: false
+      resumable: false,
     }
 
     expect(minimalSession.metadata).toBeUndefined()
@@ -47,7 +47,7 @@ describe('SessionInfoV3 types', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status,
-        resumable: false
+        resumable: false,
       }
 
       expect(['active', 'completed', 'interrupted']).toContain(session.status)
@@ -62,7 +62,7 @@ describe('ClaudeV3Options types', () => {
       resume: 'session-123',
       printSessionId: true,
       timeout: 300000,
-      onOutput: (chunk: string) => console.log(chunk)
+      onOutput: (chunk: string) => console.log(chunk),
     }
 
     expect(validOptions.model).toBe('sonnet')
@@ -92,7 +92,7 @@ describe('ClaudeV3Result types', () => {
       output: 'Command executed successfully',
       sessionId: 'claude-abc-123',
       exitCode: 0,
-      duration: 5000
+      duration: 5000,
     }
 
     expect(validResult.output).toBe('Command executed successfully')
@@ -105,7 +105,7 @@ describe('ClaudeV3Result types', () => {
       output: 'Output without session',
       sessionId: null,
       exitCode: 1,
-      duration: 2000
+      duration: 2000,
     }
 
     expect(resultNoSession.sessionId).toBeNull()

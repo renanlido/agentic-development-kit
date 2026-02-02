@@ -7,7 +7,15 @@ import ora from 'ora'
 import { createClickUpProvider } from '../providers/clickup/index.js'
 import type { LocalFeature, ProviderSpecificConfig } from '../providers/types.js'
 import type { ModelType } from '../types/model'
-import { executeClaudeCommand } from '../utils/claude'
+import type { AgentExecutionMetrics, WaveCompletionSummary } from '../types/parallel'
+import {
+  type AgentConfig,
+  detectTaskType,
+  formatAgentHeader,
+  getAgentForTask,
+  loadAgentPrompt,
+} from '../utils/agent-router'
+import { executeClaudeCommand, executeHeadlessWithMetrics } from '../utils/claude'
 import { getIntegrationConfig, getProviderConfig } from '../utils/config.js'
 import {
   getClaudePath as getClaudePathUtil,
@@ -25,8 +33,15 @@ import {
   updateStepStatus,
 } from '../utils/progress'
 import { parseSpecFromMarkdown, validateSpec } from '../utils/spec-utils'
+import { printStreamHeader } from '../utils/stream-parser'
 import { SyncEngine } from '../utils/sync-engine'
+import { parseTasksForParallel } from '../utils/task-parser'
 import { loadTemplate } from '../utils/templates'
+import {
+  createSchedulePlan,
+  formatSchedulePlan,
+  type SchedulerConfig,
+} from '../utils/wave-scheduler'
 import { setupClaudeSymlink } from '../utils/worktree-utils'
 import { memoryCommand } from './memory'
 
@@ -41,6 +56,8 @@ interface FeatureOptions {
   model?: string
   loop?: boolean
   headless?: boolean
+  parallel?: boolean
+  dryRun?: boolean
 }
 
 interface QuickOptions {
@@ -417,8 +434,15 @@ path: ${featurePath}
     }
   }
 
-  private async loadContext(options: FeatureOptions): Promise<string> {
+  private async loadContext(options: FeatureOptions, featureName?: string): Promise<string> {
     let context = ''
+
+    if (featureName) {
+      const featureContextPath = path.join(this.getFeaturePath(featureName), 'context.md')
+      if (await fs.pathExists(featureContextPath)) {
+        context = await fs.readFile(featureContextPath, 'utf-8')
+      }
+    }
 
     if (options.context) {
       const contextPath = path.resolve(options.context)
@@ -436,9 +460,11 @@ path: ${featurePath}
               contents.push(`# File: ${file}\n\n${content}`)
             }
           }
-          context = contents.join('\n\n---\n\n')
+          const explicitContext = contents.join('\n\n---\n\n')
+          context = context ? `${context}\n\n---\n\n${explicitContext}` : explicitContext
         } else {
-          context = await fs.readFile(contextPath, 'utf-8')
+          const explicitContext = await fs.readFile(contextPath, 'utf-8')
+          context = context ? `${context}\n\n---\n\n${explicitContext}` : explicitContext
         }
       }
     }
@@ -567,7 +593,7 @@ path: ${featurePath}
 
       await fs.ensureDir(state.featurePath)
 
-      const contextFromOptions = await this.loadContext(options)
+      const contextFromOptions = await this.loadContext(options, name)
       const hasContext = contextFromOptions && contextFromOptions.trim().length > 0
 
       const prdPath = path.join(state.featurePath, 'prd.md')
@@ -680,8 +706,17 @@ Output: Salve o PRD em ${prdPath}
 `
 
           const prdModel = getModelForPhase('prd', options.model as ModelType | undefined)
+
+          if (options.headless) {
+            spinner.stop()
+            printStreamHeader('PRD', name)
+          }
+
           await executeClaudeCommand(prdPrompt, { model: prdModel, headless: options.headless })
-          spinner.succeed('PRD gerado a partir do contexto')
+
+          if (!options.headless) {
+            spinner.succeed('PRD gerado a partir do contexto')
+          }
         } else {
           const prdTemplate = await loadTemplate('prd-template.md')
           const date = new Date().toISOString().split('T')[0]
@@ -833,7 +868,7 @@ ${featureContext}
       progress = updateStepStatus(progress, 'research', 'in_progress')
       await saveProgress(name, progress)
 
-      let contextContent = await this.loadContext(options)
+      let contextContent = await this.loadContext(options, name)
 
       if (phaseCheck?.action === 'refine' && (await fs.pathExists(researchPath))) {
         const existingContent = await fs.readFile(researchPath, 'utf-8')
@@ -921,9 +956,17 @@ Estrutura do research.md:
 `
 
       const researchModel = getModelForPhase('research', options.model as ModelType | undefined)
+
+      if (options.headless) {
+        spinner.stop()
+        printStreamHeader('Research', name)
+      }
+
       await executeClaudeCommand(prompt, { model: researchModel, headless: options.headless })
 
-      spinner.succeed('Research concluído')
+      if (!options.headless) {
+        spinner.succeed('Research concluído')
+      }
 
       progress = updateStepStatus(progress, 'research', 'completed')
       await saveProgress(name, progress)
@@ -1062,9 +1105,17 @@ IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
 `
 
       const planModel = getModelForPhase('planning', options.model as ModelType | undefined)
+
+      if (options.headless) {
+        spinner.stop()
+        printStreamHeader('Arquitetura', name)
+      }
+
       await executeClaudeCommand(prompt, { model: planModel, headless: options.headless })
 
-      spinner.succeed('Plano criado')
+      if (!options.headless) {
+        spinner.succeed('Plano criado')
+      }
 
       progress = updateStepStatus(progress, 'arquitetura', 'completed')
       await saveProgress(name, progress)
@@ -1114,20 +1165,29 @@ IMPORTANTE: Este é apenas o plano. NÃO IMPLEMENTE AINDA.
 
       spinner.stop()
 
-      const phaseCheck = await this.checkPhaseExists('tasks', 'Tasks', tasksPath, 'Plano')
+      let phaseCheck: PhaseCheckResult | null = null
 
-      if (phaseCheck) {
-        if (phaseCheck.action === 'next') {
-          let progress = await loadProgress(name)
-          progress = updateStepStatus(progress, 'tasks', 'completed')
-          await saveProgress(name, progress)
-          console.log(chalk.green('✓ Tasks marcadas como concluídas'))
-          console.log(chalk.yellow(`\nPróximo: adk feature plan ${name}`))
+      if (options.headless) {
+        if (await fs.pathExists(tasksPath)) {
+          console.log(chalk.green('✓ Tasks já existem, pulando...'))
           return
         }
+      } else {
+        phaseCheck = await this.checkPhaseExists('tasks', 'Tasks', tasksPath, 'Plano')
 
-        if (phaseCheck.action === 'redo') {
-          await fs.remove(tasksPath)
+        if (phaseCheck) {
+          if (phaseCheck.action === 'next') {
+            let progress = await loadProgress(name)
+            progress = updateStepStatus(progress, 'tasks', 'completed')
+            await saveProgress(name, progress)
+            console.log(chalk.green('✓ Tasks marcadas como concluídas'))
+            console.log(chalk.yellow(`\nPróximo: adk feature plan ${name}`))
+            return
+          }
+
+          if (phaseCheck.action === 'redo') {
+            await fs.remove(tasksPath)
+          }
         }
       }
 
@@ -1156,19 +1216,54 @@ ${refineContext}
       }
 
       const prompt = `
-PHASE: TASK BREAKDOWN
+PHASE: TASK BREAKDOWN (Vertical Slicing)
 
 Feature: ${name}
 Input: .claude/plans/features/${name}/${inputFile}
 PRD: .claude/plans/features/${name}/prd.md
 ${existingTasksContext}
-## Workflow
+## PASSO 1: Avaliar Complexidade
 
-1. Leia o PRD e research completamente
-2. Extraia requisitos funcionais
-3. Quebre em tasks atomicas e testaveis
-4. Ordene: testes ANTES de implementacao (TDD)
-5. Identifique dependencias entre tasks
+Antes de criar tasks, classifique a feature:
+
+| Complexidade | Características | Target Tasks |
+|--------------|-----------------|--------------|
+| **Simples** | 1-2 arquivos, lógica direta, sem dependências externas | 3-8 tasks |
+| **Média** | 3-5 arquivos, algumas integrações, lógica moderada | 8-15 tasks |
+| **Complexa** | 6+ arquivos, múltiplas integrações, lógica complexa | 15-25 tasks |
+| **Épico** | Sistema novo, muitas dependências, arquitetura nova | 30-60 tasks |
+
+⚠️ NUNCA exceda 60 tasks. Se precisar de mais, a feature deve ser dividida em sub-features.
+
+## PASSO 2: Vertical Slicing
+
+Cada task deve ser um "slice vertical" que entrega valor completo:
+
+✅ BOM (Vertical): "Implementar endpoint GET /users com teste e validação"
+❌ RUIM (Horizontal): "Criar controller", "Criar service", "Criar repository", "Criar teste"
+
+Uma task vertical inclui TODAS as camadas necessárias para UMA funcionalidade:
+- Teste + Implementação + Integração = 1 Task
+
+## PASSO 3: Agrupar por Funcionalidade
+
+Agrupe operações relacionadas em uma única task:
+
+✅ BOM: "CRUD de usuários" (inclui create, read, update, delete)
+❌ RUIM: 4 tasks separadas para cada operação CRUD
+
+✅ BOM: "Validação de formulário de cadastro" (todos os campos)
+❌ RUIM: 1 task por campo de validação
+
+## PASSO 4: Consolidar Micro-Tasks
+
+Se identificar tasks muito pequenas (< 30 min), consolide:
+
+| Micro-Tasks | Consolidar Em |
+|-------------|---------------|
+| "Criar type X", "Criar type Y", "Criar type Z" | "Definir tipos/interfaces do módulo" |
+| "Adicionar import A", "Adicionar import B" | (incorporar na task que usa) |
+| "Criar arquivo config", "Adicionar variável env" | "Configurar ambiente do módulo" |
 
 ## Output: .claude/plans/features/${name}/tasks.md
 
@@ -1176,28 +1271,62 @@ Estrutura:
 \`\`\`markdown
 # Tasks: ${name}
 
-## Task 1: [nome descritivo]
-- Tipo: Test | Implementation | Config
-- Prioridade: P0 | P1 | P2
-- Dependencias: [lista ou "nenhuma"]
-- Acceptance Criteria:
-  - [ ] Criterio 1
-  - [ ] Criterio 2
+**Complexidade:** [Simples|Média|Complexa|Épico]
+**Total de Tasks:** [N] (target: X-Y baseado na complexidade)
 
-## Task 2: [nome descritivo]
-...
+---
+
+## Task 1: [Nome descritivo - verbo no infinitivo]
+
+**Tipo:** Feature | Refactor | Bugfix | Config | Docs
+**Estimativa:** [P|M|G] (Pequena <2h | Média 2-4h | Grande 4-8h)
+**Dependências:** [lista ou "nenhuma"]
+
+### Escopo
+- O que FAZER: [lista objetiva]
+- O que NÃO FAZER: [limites claros]
+
+### Critérios de Aceite
+- [ ] Critério 1 (testável e verificável)
+- [ ] Critério 2
+
+### Arquivos Envolvidos
+- \`path/to/file.ts\` - [criar|modificar]
+
+---
+
+## Task 2: [...]
 \`\`\`
 
-IMPORTANTE:
-- Testes SEMPRE vem antes da implementacao correspondente
-- Tasks devem ser atomicas (1-2 horas de trabalho max)
-- Cada task deve ter criterios de aceitacao claros
+## Regras de Ouro
+
+1. **TDD**: Testes são PARTE da task de implementação, não tasks separadas
+2. **Completude**: Cada task deve deixar o sistema em estado funcional
+3. **Independência**: Minimize dependências entre tasks
+4. **Verificabilidade**: Critérios de aceite devem ser sim/não
+5. **Tamanho**: Tasks de 2-8 horas são ideais (nem muito pequenas, nem muito grandes)
+
+## Anti-Patterns a Evitar
+
+❌ Uma task por arquivo
+❌ Uma task por função/método
+❌ Separar "criar teste" de "implementar"
+❌ Tasks de configuração triviais separadas
+❌ Mais de 60 tasks para qualquer feature
 `
 
       const tasksModel = getModelForPhase('planning', options.model as ModelType | undefined)
+
+      if (options.headless) {
+        spinner.stop()
+        printStreamHeader('Tasks', name)
+      }
+
       await executeClaudeCommand(prompt, { model: tasksModel, headless: options.headless })
 
-      spinner.succeed('Tasks criadas')
+      if (!options.headless) {
+        spinner.succeed('Tasks criadas')
+      }
 
       progress = updateStepStatus(progress, 'tasks', 'completed')
       await saveProgress(name, progress)
@@ -1277,11 +1406,25 @@ IMPORTANTE:
         const result = await this.setupWorktree(name, baseBranch)
 
         if (result.success && result.worktreePath) {
-          const isCurrentDir = result.worktreePath === process.cwd()
+          let isCurrentDir = false
+          try {
+            const normalizedWorktreePath = fs.realpathSync(result.worktreePath)
+            const normalizedCwd = fs.realpathSync(process.cwd())
+            isCurrentDir = normalizedWorktreePath === normalizedCwd
+          } catch {
+            isCurrentDir = result.worktreePath === process.cwd()
+          }
+
           if (isCurrentDir) {
             console.log()
             console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
             console.log()
+          } else if (options.headless) {
+            console.log()
+            console.log(chalk.cyan('📂 Executando no worktree em modo headless'))
+            console.log(chalk.gray(`   Worktree: ${result.worktreePath}`))
+            console.log()
+            process.chdir(result.worktreePath)
           } else {
             console.log()
             console.log(chalk.cyan('📂 Configuração de Worktree'))
@@ -1318,6 +1461,12 @@ IMPORTANTE:
       }
 
       spinner.text = 'Iniciando implementação...'
+
+      if (options.parallel) {
+        spinner.stop()
+        await this.implementParallel(name, options, featurePath, specValidation.specContent)
+        return
+      }
 
       let phase = options.phase || 'all'
 
@@ -1373,6 +1522,90 @@ Após ler o checkpoint, continue do ponto correto.
 `
       }
 
+      let activeAgentSection = ''
+      let detectedAgent: AgentConfig | null = null
+
+      const tasksFilePath = path.join(featurePath, 'tasks.md')
+      if (await fs.pathExists(tasksFilePath)) {
+        try {
+          const tasksContent = await fs.readFile(tasksFilePath, 'utf-8')
+          const parsedDoc = parseTasksForParallel(tasksContent, name)
+          const pendingTask = parsedDoc.tasks.find(
+            (t) => t.status === 'pending' || t.status === 'in_progress'
+          )
+
+          if (pendingTask) {
+            const taskType = detectTaskType(pendingTask.title, pendingTask.type || '')
+            detectedAgent = getAgentForTask(taskType)
+
+            const agentPrompt = await loadAgentPrompt(detectedAgent.promptPath)
+
+            if (agentPrompt) {
+              activeAgentSection = `
+${formatAgentHeader(detectedAgent)}
+
+📋 PRÓXIMA TASK: ${pendingTask.title}
+📌 TIPO DETECTADO: ${taskType}
+
+<agent-guidelines>
+${agentPrompt}
+</agent-guidelines>
+
+IMPORTANTE: Siga as diretrizes do agente acima para esta task.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`
+              if (!options.headless) {
+                spinner.stop()
+                console.log(chalk.cyan(`\n🤖 Agente selecionado: ${detectedAgent.name}`))
+                console.log(chalk.gray(`   Task: ${pendingTask.title}`))
+                console.log(chalk.gray(`   Tipo: ${taskType}`))
+                console.log()
+                spinner.start('Executando implementação...')
+              }
+            }
+          }
+        } catch {
+          // Fallback silencioso - continua sem roteamento
+        }
+      }
+
+      const agentSection = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 SISTEMA DE AGENTES ESPECIALISTAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Para cada task, IDENTIFIQUE O TIPO e USE O AGENTE ESPECIALISTA apropriado:
+
+| Tipo de Task | Agente | Foco |
+|--------------|--------|------|
+| Feature/Refactor/Bugfix | feature-developer | Codigo de producao, patterns, arquitetura |
+| Unit Test / Integration Test | unit-test-specialist | Testes unitarios, mocks, coverage |
+| E2E Test | e2e-test-specialist | Testes end-to-end, cenarios de usuario |
+| Docs | documenter | Documentacao tecnica |
+
+COMO IDENTIFICAR O TIPO:
+- Se menciona "test unitario", "unit test", ".unit.test" → unit-test-specialist
+- Se menciona "e2e", "end-to-end", "playwright", "cypress" → e2e-test-specialist
+- Se menciona "documentar", "readme", "docs" → documenter
+- Demais casos (criar, implementar, refatorar) → feature-developer
+
+WORKFLOW POR TASK:
+1. Leia a task
+2. Identifique o tipo (keywords acima)
+3. Carregue o agente: .claude/agents/specialists/<agente>.md
+4. Siga as diretrizes do agente especialista
+5. Complete a task seguindo o workflow do agente
+
+AGENTES DISPONIVEIS:
+- .claude/agents/specialists/feature-developer.md
+- .claude/agents/specialists/unit-test-specialist.md
+- .claude/agents/specialists/e2e-test-specialist.md
+- .claude/agents/documenter.md
+
+IMPORTANTE: Cada agente tem regras e workflow especificos. LEIA o agente antes de executar a task.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`
+
       const prompt = `
 PHASE 3: IMPLEMENTATION (TDD)
 
@@ -1382,6 +1615,7 @@ Tasks: .claude/plans/features/${name}/tasks.md
 Target Phase: ${phase}
 ${specSection}
 ${checkpointContext}
+${activeAgentSection || agentSection}
 IMPORTANTE: TDD - TESTES PRIMEIRO
 
 CRITICAL: TASK TRACKING
@@ -1453,28 +1687,56 @@ NÃO implemente múltiplas tasks na mesma sessão - o contexto fica sujo.
 Não avance para próxima fase até todas as tasks estarem [x].
 `
 
-      spinner.text = 'Executando implementação com Claude Code...'
       const implModel = getModelForPhase('implement', options.model as ModelType | undefined)
-      await executeClaudeCommand(prompt, { model: implModel, headless: options.headless, cwd: process.cwd() })
 
-      spinner.text = 'Verificando progresso das tasks...'
+      if (options.headless) {
+        spinner.stop()
+        printStreamHeader('Implementação', name)
+      } else {
+        spinner.text = 'Executando implementação com Claude Code...'
+      }
+
+      await executeClaudeCommand(prompt, {
+        model: implModel,
+        headless: options.headless,
+        cwd: process.cwd(),
+      })
+
+      if (!options.headless) {
+        spinner.text = 'Verificando progresso das tasks...'
+      }
       const taskStatus = await this.checkTasksCompletion(name)
 
       if (taskStatus.allDone) {
-        spinner.succeed('Implementação concluída - todas as tasks completas!')
+        if (!options.headless) {
+          spinner.succeed('Implementação concluída - todas as tasks completas!')
+        }
         progress = updateStepStatus(progress, 'implementacao', 'completed')
-        console.log(chalk.green(`✓ ${taskStatus.completed}/${taskStatus.total} tasks concluídas (100%)`))
+        console.log(
+          chalk.green(`✓ ${taskStatus.completed}/${taskStatus.total} tasks concluídas (100%)`)
+        )
       } else {
-        spinner.succeed(`Sessão de implementação finalizada`)
+        if (!options.headless) {
+          spinner.succeed(`Sessão de implementação finalizada`)
+        }
         progress = updateStepStatus(progress, 'implementacao', 'in_progress')
-        console.log(chalk.yellow(`⚠️  ${taskStatus.completed}/${taskStatus.total} tasks concluídas (${taskStatus.percentage}%)`))
-        console.log(chalk.gray(`   Ainda restam ${taskStatus.total - taskStatus.completed} tasks pendentes`))
+        console.log(
+          chalk.yellow(
+            `⚠️  ${taskStatus.completed}/${taskStatus.total} tasks concluídas (${taskStatus.percentage}%)`
+          )
+        )
+        console.log(
+          chalk.gray(`   Ainda restam ${taskStatus.total - taskStatus.completed} tasks pendentes`)
+        )
       }
 
       await saveProgress(name, progress)
       await this.syncProgressState(name, 'arquitetura', 'implementacao', 'adk feature implement')
 
-      await this.setActiveFocus(name, taskStatus.allDone ? 'implementação concluída' : 'implementação em andamento')
+      await this.setActiveFocus(
+        name,
+        taskStatus.allDone ? 'implementação concluída' : 'implementação em andamento'
+      )
       await memoryCommand.save(name, { phase: 'implement' })
       await this.syncFeatureToRemote(name, progress, options.noSync)
 
@@ -1513,41 +1775,63 @@ Não avance para próxima fase até todas as tasks estarem [x].
         const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
 
         if (await fs.pathExists(worktreeDir)) {
-          console.log()
-          console.log(chalk.yellow('⚠️  QA deve ser executado no worktree da feature.'))
-          console.log()
-          console.log(chalk.white(`  cd ${worktreeDir}`))
-          console.log(chalk.white(`  adk feature qa ${name}`))
-          console.log()
-          return
-        }
-
-        const result = await this.setupWorktree(name, baseBranch)
-
-        if (result.success && result.worktreePath) {
-          const isCurrentDir = result.worktreePath === process.cwd()
-          if (isCurrentDir) {
+          if (options.headless) {
             console.log()
-            console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
+            console.log(chalk.cyan('📂 Executando QA no worktree em modo headless'))
+            console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
             console.log()
+            process.chdir(worktreeDir)
           } else {
             console.log()
-            console.log(chalk.cyan('📂 Configuração de Worktree'))
-            console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
-            console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
-            console.log(chalk.gray(`   Base: ${baseBranch}`))
+            console.log(chalk.yellow('⚠️  QA deve ser executado no worktree da feature.'))
             console.log()
-            console.log(chalk.green(`✓ Worktree criado: ${result.worktreePath}`))
-            console.log()
-            console.log(chalk.yellow('Execute o QA no worktree:'))
-            console.log(chalk.white(`  cd ${result.worktreePath}`))
+            console.log(chalk.white(`  cd ${worktreeDir}`))
             console.log(chalk.white(`  adk feature qa ${name}`))
             console.log()
             return
           }
         } else {
-          spinner.fail(`Erro ao criar worktree: ${result.error}`)
-          process.exit(1)
+          const result = await this.setupWorktree(name, baseBranch)
+
+          if (result.success && result.worktreePath) {
+            let isCurrentDir = false
+            try {
+              const normalizedWorktreePath = fs.realpathSync(result.worktreePath)
+              const normalizedCwd = fs.realpathSync(process.cwd())
+              isCurrentDir = normalizedWorktreePath === normalizedCwd
+            } catch {
+              isCurrentDir = result.worktreePath === process.cwd()
+            }
+
+            if (isCurrentDir) {
+              console.log()
+              console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
+              console.log()
+            } else if (options.headless) {
+              console.log()
+              console.log(chalk.cyan('📂 Executando QA no worktree em modo headless'))
+              console.log(chalk.gray(`   Worktree: ${result.worktreePath}`))
+              console.log()
+              process.chdir(result.worktreePath)
+            } else {
+              console.log()
+              console.log(chalk.cyan('📂 Configuração de Worktree'))
+              console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
+              console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
+              console.log(chalk.gray(`   Base: ${baseBranch}`))
+              console.log()
+              console.log(chalk.green(`✓ Worktree criado: ${result.worktreePath}`))
+              console.log()
+              console.log(chalk.yellow('Execute o QA no worktree:'))
+              console.log(chalk.white(`  cd ${result.worktreePath}`))
+              console.log(chalk.white(`  adk feature qa ${name}`))
+              console.log()
+              return
+            }
+          } else {
+            spinner.fail(`Erro ao criar worktree: ${result.error}`)
+            process.exit(1)
+          }
         }
       }
 
@@ -1676,9 +1960,17 @@ Se encontrar issues CRITICAL ou HIGH, o status deve ser FAIL.
 `
 
       const qaModel = getModelForPhase('qa', options.model as ModelType | undefined)
+
+      if (options.headless) {
+        spinner.stop()
+        printStreamHeader('QA', name)
+      }
+
       await executeClaudeCommand(prompt, { model: qaModel, headless: options.headless })
 
-      spinner.succeed('QA concluído')
+      if (!options.headless) {
+        spinner.succeed('QA concluído')
+      }
 
       progress = updateStepStatus(progress, 'qa', 'completed')
       await saveProgress(name, progress)
@@ -1715,41 +2007,63 @@ Se encontrar issues CRITICAL ou HIGH, o status deve ser FAIL.
         const worktreeDir = path.join(mainRepo, '.worktrees', featureSlug)
 
         if (await fs.pathExists(worktreeDir)) {
-          console.log()
-          console.log(chalk.yellow('⚠️  Docs deve ser executado no worktree da feature.'))
-          console.log()
-          console.log(chalk.white(`  cd ${worktreeDir}`))
-          console.log(chalk.white(`  adk feature docs ${name}`))
-          console.log()
-          return
-        }
-
-        const result = await this.setupWorktree(name, baseBranch)
-
-        if (result.success && result.worktreePath) {
-          const isCurrentDir = result.worktreePath === process.cwd()
-          if (isCurrentDir) {
+          if (options.headless) {
             console.log()
-            console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
+            console.log(chalk.cyan('📂 Executando docs no worktree em modo headless'))
+            console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
             console.log()
+            process.chdir(worktreeDir)
           } else {
             console.log()
-            console.log(chalk.cyan('📂 Configuração de Worktree'))
-            console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
-            console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
-            console.log(chalk.gray(`   Base: ${baseBranch}`))
+            console.log(chalk.yellow('⚠️  Docs deve ser executado no worktree da feature.'))
             console.log()
-            console.log(chalk.green(`✓ Worktree criado: ${result.worktreePath}`))
-            console.log()
-            console.log(chalk.yellow('Execute docs no worktree:'))
-            console.log(chalk.white(`  cd ${result.worktreePath}`))
+            console.log(chalk.white(`  cd ${worktreeDir}`))
             console.log(chalk.white(`  adk feature docs ${name}`))
             console.log()
             return
           }
         } else {
-          spinner.fail(`Erro ao criar worktree: ${result.error}`)
-          process.exit(1)
+          const result = await this.setupWorktree(name, baseBranch)
+
+          if (result.success && result.worktreePath) {
+            let isCurrentDir = false
+            try {
+              const normalizedWorktreePath = fs.realpathSync(result.worktreePath)
+              const normalizedCwd = fs.realpathSync(process.cwd())
+              isCurrentDir = normalizedWorktreePath === normalizedCwd
+            } catch {
+              isCurrentDir = result.worktreePath === process.cwd()
+            }
+
+            if (isCurrentDir) {
+              console.log()
+              console.log(chalk.green(`✓ Já está na branch da feature: feature/${featureSlug}`))
+              console.log()
+            } else if (options.headless) {
+              console.log()
+              console.log(chalk.cyan('📂 Executando docs no worktree em modo headless'))
+              console.log(chalk.gray(`   Worktree: ${result.worktreePath}`))
+              console.log()
+              process.chdir(result.worktreePath)
+            } else {
+              console.log()
+              console.log(chalk.cyan('📂 Configuração de Worktree'))
+              console.log(chalk.gray(`   Worktree: ${worktreeDir}`))
+              console.log(chalk.gray(`   Branch: feature/${featureSlug}`))
+              console.log(chalk.gray(`   Base: ${baseBranch}`))
+              console.log()
+              console.log(chalk.green(`✓ Worktree criado: ${result.worktreePath}`))
+              console.log()
+              console.log(chalk.yellow('Execute docs no worktree:'))
+              console.log(chalk.white(`  cd ${result.worktreePath}`))
+              console.log(chalk.white(`  adk feature docs ${name}`))
+              console.log()
+              return
+            }
+          } else {
+            spinner.fail(`Erro ao criar worktree: ${result.error}`)
+            process.exit(1)
+          }
         }
       }
 
@@ -1833,9 +2147,17 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 `
 
       const docsModel = getModelForPhase('docs', options.model as ModelType | undefined)
+
+      if (options.headless) {
+        spinner.stop()
+        printStreamHeader('Documentação', name)
+      }
+
       await executeClaudeCommand(prompt, { model: docsModel, headless: options.headless })
 
-      spinner.succeed('Documentação gerada')
+      if (!options.headless) {
+        spinner.succeed('Documentação gerada')
+      }
 
       progress = updateStepStatus(progress, 'docs', 'completed')
       await saveProgress(name, progress)
@@ -2204,7 +2526,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 
     const files = await fs.readdir(snapshotDir)
     const snapshots = files
-      .filter(f => f.endsWith('.json'))
+      .filter((f) => f.endsWith('.json'))
       .sort()
       .reverse()
 
@@ -2218,7 +2540,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
     return {
       inProgressTask: content.tasks?.inProgressTask,
       nextTask: content.tasks?.nextTask,
-      timestamp: content.timestamp
+      timestamp: content.timestamp,
     }
   }
 
@@ -2241,16 +2563,81 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
     let completed = 0
     let total = 0
 
+    const taskHeaderRegex = /^###?\s+Task\s+\d+(?:\.\d+)?/i
+    const criteriaHeaderRegex = /^###\s+Crit[ée]rios\s+de\s+Aceite/i
+    const acceptanceHeaderRegex = /^###\s+Acceptance/i
+
+    interface TaskInfo {
+      hasHeaderCheckbox: boolean
+      headerCompleted: boolean
+      criteriaTotal: number
+      criteriaCompleted: number
+    }
+
+    let currentTask: TaskInfo | null = null
+    let inCriteriaSection = false
+    const tasks: TaskInfo[] = []
+
     for (const line of lines) {
-      if (/^\s*- \[x\]/i.test(line)) {
-        completed++
-        total++
-      } else if (/^\s*- \[ \]/i.test(line)) {
-        total++
-      } else if (/^\s*- \[~\]/i.test(line)) {
-        total++
-      } else if (/^\s*- \[!\]/i.test(line)) {
-        total++
+      const trimmed = line.trim()
+
+      if (taskHeaderRegex.test(trimmed)) {
+        if (currentTask) {
+          tasks.push(currentTask)
+        }
+
+        const hasCheckbox =
+          /\[x\]/i.test(trimmed) || /\[~\]/i.test(trimmed) || /\[ \]/i.test(trimmed)
+        const isCompleted = /\[x\]/i.test(trimmed)
+
+        currentTask = {
+          hasHeaderCheckbox: hasCheckbox,
+          headerCompleted: isCompleted,
+          criteriaTotal: 0,
+          criteriaCompleted: 0,
+        }
+        inCriteriaSection = false
+        continue
+      }
+
+      if (!currentTask) continue
+
+      if (criteriaHeaderRegex.test(trimmed) || acceptanceHeaderRegex.test(trimmed)) {
+        inCriteriaSection = true
+        continue
+      }
+
+      if (
+        /^###?\s+/.test(trimmed) &&
+        !criteriaHeaderRegex.test(trimmed) &&
+        !acceptanceHeaderRegex.test(trimmed)
+      ) {
+        inCriteriaSection = false
+      }
+
+      if (inCriteriaSection && /^-\s*\[/.test(trimmed)) {
+        currentTask.criteriaTotal++
+        if (/\[x\]/i.test(trimmed)) {
+          currentTask.criteriaCompleted++
+        }
+      }
+    }
+
+    if (currentTask) {
+      tasks.push(currentTask)
+    }
+
+    total = tasks.length
+
+    for (const task of tasks) {
+      if (task.hasHeaderCheckbox) {
+        if (task.headerCompleted) {
+          completed++
+        }
+      } else if (task.criteriaTotal > 0) {
+        if (task.criteriaCompleted === task.criteriaTotal) {
+          completed++
+        }
       }
     }
 
@@ -2273,15 +2660,76 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
     console.log(chalk.gray('Ctrl+C a qualquer momento para pausar'))
     console.log()
 
-    const state = await this.getFeatureState(name)
+    let state = await this.getFeatureState(name)
+
     if (!state.exists) {
-      logger.error(`Feature "${name}" não encontrada. Crie primeiro com: adk feature new ${name}`)
-      process.exit(1)
+      console.log(chalk.yellow(`⚡ Feature "${name}" não existe. Criando automaticamente...`))
+      const createArgs = ['feature', 'new', name, '--headless']
+      if (_options.context) {
+        createArgs.push('-c', _options.context)
+      }
+      if (_options.description) {
+        createArgs.push('-d', _options.description)
+      }
+      try {
+        execFileSync('adk', createArgs, { stdio: 'inherit' })
+      } catch {
+        logger.error(`Falha ao criar feature "${name}".`)
+        process.exit(1)
+      }
+      state = await this.getFeatureState(name)
+    }
+
+    if (!state.hasResearch) {
+      console.log(chalk.yellow(`⚡ Research não encontrado. Gerando automaticamente...`))
+      const researchArgs = ['feature', 'research', name, '--headless']
+      try {
+        execFileSync('adk', researchArgs, { stdio: 'inherit' })
+      } catch {
+        logger.error(`Falha ao gerar research para "${name}".`)
+      }
+      state = await this.getFeatureState(name)
     }
 
     if (!state.hasTasks) {
-      logger.error(`Tasks não encontradas para "${name}". Execute primeiro: adk feature autopilot ${name}`)
-      process.exit(1)
+      console.log(chalk.yellow(`⚡ Tasks não encontradas. Gerando automaticamente...`))
+      const tasksArgs = ['feature', 'tasks', name, '--headless']
+      try {
+        execFileSync('adk', tasksArgs, { stdio: 'inherit' })
+      } catch {
+        logger.error(`Falha ao gerar tasks para "${name}".`)
+      }
+      state = await this.getFeatureState(name)
+
+      if (!state.hasTasks) {
+        logger.error(`Tasks não foram geradas para "${name}". Verifique o PRD.`)
+        process.exit(1)
+      }
+    }
+
+    if (!state.hasPlan) {
+      console.log(chalk.yellow(`⚡ Plan não encontrado. Gerando automaticamente...`))
+      const planArgs = ['feature', 'plan', name, '--headless']
+      try {
+        execFileSync('adk', planArgs, { stdio: 'inherit' })
+      } catch {
+        logger.error(`Falha ao gerar plan para "${name}".`)
+      }
+      state = await this.getFeatureState(name)
+    }
+
+    if (_options.context) {
+      const featurePath = this.getFeaturePath(name)
+      const contextPath = path.join(featurePath, 'context.md')
+      const sourceContextPath = path.resolve(_options.context)
+      if (await fs.pathExists(sourceContextPath)) {
+        const contextContent = await fs.readFile(sourceContextPath, 'utf-8')
+        await fs.writeFile(
+          contextPath,
+          `# Contexto Adicional\n\n> Importado de: ${_options.context}\n\n${contextContent}`
+        )
+        console.log(chalk.green(`✓ Contexto salvo em: ${contextPath}`))
+      }
     }
 
     const featureSlug = name.replace(/[^a-zA-Z0-9-]/g, '-')
@@ -2299,19 +2747,30 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
       iteration++
 
       const taskStatus = await this.checkTasksCompletion(name)
+      const progress = await loadProgress(name)
+      const implementDone = isStepCompleted(progress, 'implementacao')
 
-      console.log(chalk.cyan(`\n📊 Iteração ${iteration} - Tasks: ${taskStatus.completed}/${taskStatus.total} (${taskStatus.percentage}%)`))
+      console.log(
+        chalk.cyan(
+          `\n📊 Iteração ${iteration} - Tasks: ${taskStatus.completed}/${taskStatus.total} (${taskStatus.percentage}%)`
+        )
+      )
 
-      if (taskStatus.allDone) {
-        console.log(chalk.green('\n✅ Todas as tasks completas!'))
+      if (taskStatus.allDone || implementDone) {
+        console.log(chalk.green('\n✅ Implementação concluída!'))
         console.log(chalk.gray(`Próximo passo: adk feature qa ${name}`))
         return
       }
 
-      console.log(chalk.gray(`\nExecutando: adk feature implement ${name} --phase All --headless`))
+      const implementArgs = ['feature', 'implement', name, '--phase', 'All', '--headless']
+      if (_options.parallel) {
+        implementArgs.push('--parallel')
+      }
+
+      console.log(chalk.gray(`\nExecutando: adk ${implementArgs.join(' ')}`))
 
       try {
-        execFileSync('adk', ['feature', 'implement', name, '--phase', 'All', '--headless'], {
+        execFileSync('adk', implementArgs, {
           stdio: 'inherit',
           cwd,
         })
@@ -2319,8 +2778,12 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
         console.log(chalk.yellow('\n⚠️  Sessão de implementação encerrada'))
 
         const updatedStatus = await this.checkTasksCompletion(name)
-        if (updatedStatus.allDone) {
-          console.log(chalk.green('\n✅ Todas as tasks completas!'))
+        const updatedProgress = await loadProgress(name)
+        const implementNowDone = isStepCompleted(updatedProgress, 'implementacao')
+
+        if (updatedStatus.allDone || implementNowDone) {
+          console.log(chalk.green('\n✅ Implementação concluída!'))
+          console.log(chalk.gray(`Próximo passo: adk feature qa ${name}`))
           return
         }
       }
@@ -2365,8 +2828,14 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 
         const taskStatus = await this.checkTasksCompletion(name)
         if (!taskStatus.allDone) {
-          console.log(chalk.yellow(`⚠️  ${taskStatus.completed}/${taskStatus.total} tasks concluídas (${taskStatus.percentage}%)`))
-          console.log(chalk.gray(`   ${taskStatus.total - taskStatus.completed} tasks ainda pendentes\n`))
+          console.log(
+            chalk.yellow(
+              `⚠️  ${taskStatus.completed}/${taskStatus.total} tasks concluídas (${taskStatus.percentage}%)`
+            )
+          )
+          console.log(
+            chalk.gray(`   ${taskStatus.total - taskStatus.completed} tasks ainda pendentes\n`)
+          )
         }
       }
     }
@@ -2376,8 +2845,21 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
     const featurePath = state.featurePath
     const prdPath = path.join(featurePath, 'prd.md')
     const planPath = path.join(featurePath, 'implementation-plan.md')
+    const contextPath = path.join(featurePath, 'context.md')
 
     await fs.ensureDir(featurePath)
+
+    if (options.context) {
+      const sourceContextPath = path.resolve(options.context)
+      if (await fs.pathExists(sourceContextPath)) {
+        const contextContent = await fs.readFile(sourceContextPath, 'utf-8')
+        await fs.writeFile(
+          contextPath,
+          `# Contexto Adicional\n\n> Importado de: ${options.context}\n\n${contextContent}`
+        )
+        console.log(chalk.green(`✓ Contexto salvo em: ${contextPath}`))
+      }
+    }
 
     let progress = await loadProgress(name)
 
@@ -2681,9 +3163,9 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
       const docsDone = isStepCompleted(progress, 'docs')
 
       const taskStatus = await this.checkTasksCompletion(name)
-      const implementReallyDone = implementDone && taskStatus.allDone
+      const implementReallyDone = implementDone || taskStatus.allDone
 
-      if (implementReallyDone && qaDone && docsDone) {
+      if (implementDone && qaDone && docsDone) {
         console.log(chalk.green('✓ Implementação já concluída, pulando etapa 5'))
         console.log(chalk.green('✓ QA já concluído, pulando etapa 6'))
         console.log(chalk.green('✓ Documentação já concluída, pulando etapa 7'))
@@ -2720,7 +3202,11 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
             if (!taskStatus.allDone) {
               console.log()
               console.log(chalk.cyan('📋 Progresso das tasks:'))
-              console.log(chalk.gray(`   ${taskStatus.completed}/${taskStatus.total} concluídas (${taskStatus.percentage}%)`))
+              console.log(
+                chalk.gray(
+                  `   ${taskStatus.completed}/${taskStatus.total} concluídas (${taskStatus.percentage}%)`
+                )
+              )
             }
           } else if (!qaDone) {
             console.log(chalk.gray(`  adk feature qa ${name}`))
@@ -2764,7 +3250,9 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
               console.log()
               console.log(chalk.yellow('As próximas etapas serão executadas no worktree.'))
               console.log(
-                chalk.yellow('Múltiplos agentes podem trabalhar em paralelo em worktrees diferentes.')
+                chalk.yellow(
+                  'Múltiplos agentes podem trabalhar em paralelo em worktrees diferentes.'
+                )
               )
             }
           } else {
@@ -2779,6 +3267,9 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 
         if (!implementReallyDone) {
           const implementArgs = ['feature', 'implement', name, '--phase', 'All']
+          if (options.parallel) {
+            implementArgs.push('--parallel')
+          }
           await executePhase(implementArgs, 'implementacao', 5, 'IMPLEMENTAÇÃO (TDD)', worktreePath)
 
           progress = await loadProgress(name)
@@ -2790,8 +3281,16 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
             console.log(chalk.yellow('⚠️  IMPLEMENTAÇÃO INCOMPLETA'))
             console.log(chalk.yellow('━'.repeat(50)))
             console.log()
-            console.log(chalk.white(`   ${updatedTaskStatus.completed}/${updatedTaskStatus.total} tasks concluídas (${updatedTaskStatus.percentage}%)`))
-            console.log(chalk.gray(`   Restam ${updatedTaskStatus.total - updatedTaskStatus.completed} tasks pendentes em tasks.md`))
+            console.log(
+              chalk.white(
+                `   ${updatedTaskStatus.completed}/${updatedTaskStatus.total} tasks concluídas (${updatedTaskStatus.percentage}%)`
+              )
+            )
+            console.log(
+              chalk.gray(
+                `   Restam ${updatedTaskStatus.total - updatedTaskStatus.completed} tasks pendentes em tasks.md`
+              )
+            )
             console.log()
             console.log(chalk.cyan('📝 Para continuar implementando:'))
             console.log(chalk.gray(`   adk feature autopilot ${name}`))
@@ -3892,11 +4391,15 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
           else if (state.tokenUsage.level === 'handoff') levelColor = chalk.red
 
           console.log(`  Level: ${levelColor(state.tokenUsage.level.toUpperCase())}`)
-          console.log(`  Last Checked: ${new Date(state.tokenUsage.lastChecked).toLocaleString('pt-BR')}`)
+          console.log(
+            `  Last Checked: ${new Date(state.tokenUsage.lastChecked).toLocaleString('pt-BR')}`
+          )
 
           if (state.lastCompaction) {
             console.log(chalk.cyan('\n📦 Last Compaction:'))
-            console.log(`  When: ${new Date(state.lastCompaction.timestamp).toLocaleString('pt-BR')}`)
+            console.log(
+              `  When: ${new Date(state.lastCompaction.timestamp).toLocaleString('pt-BR')}`
+            )
             console.log(`  Level: ${state.lastCompaction.level}`)
             console.log(
               `  Saved: ${state.lastCompaction.savedTokens.toLocaleString()} tokens (${state.lastCompaction.tokensBefore.toLocaleString()} → ${state.lastCompaction.tokensAfter.toLocaleString()})`
@@ -3921,7 +4424,9 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
         console.log(`Última atualização: ${progress.lastUpdated}`)
 
         console.log(chalk.cyan('\n🔢 Token Usage:'))
-        console.log(`  Current: ${status.currentTokens.toLocaleString()} tokens (${status.usagePercentage.toFixed(1)}%)`)
+        console.log(
+          `  Current: ${status.currentTokens.toLocaleString()} tokens (${status.usagePercentage.toFixed(1)}%)`
+        )
         console.log(`  Max: ${status.maxTokens.toLocaleString()} tokens`)
 
         let levelColor = chalk.green
@@ -3978,7 +4483,9 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
 
       const status = await manager.getContextStatus(name)
 
-      spinner.info(`Token usage atual: ${status.currentTokens.toLocaleString()} (${status.usagePercentage.toFixed(1)}%)`)
+      spinner.info(
+        `Token usage atual: ${status.currentTokens.toLocaleString()} (${status.usagePercentage.toFixed(1)}%)`
+      )
 
       if (options.dryRun) {
         spinner.info('Modo dry-run: nenhuma mudança será aplicada')
@@ -3993,9 +4500,7 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
           console.log(chalk.green('\nℹ️  Contexto está OK, compactação não necessária'))
         } else {
           console.log(
-            chalk.yellow(
-              '\n⚠️  Compactação recomendada. Execute sem --dry-run para aplicar.'
-            )
+            chalk.yellow('\n⚠️  Compactação recomendada. Execute sem --dry-run para aplicar.')
           )
         }
 
@@ -4035,6 +4540,285 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
       logger.error(error instanceof Error ? error.message : String(error))
       process.exit(1)
     }
+  }
+
+  private async implementParallel(
+    name: string,
+    options: FeatureOptions,
+    featurePath: string,
+    _specContent?: string
+  ): Promise<void> {
+    const tasksPath = path.join(featurePath, 'tasks.md')
+
+    if (!(await fs.pathExists(tasksPath))) {
+      console.log(chalk.red('tasks.md not found. Run tasks first.'))
+      console.log(chalk.gray(`   adk feature tasks ${name}`))
+      process.exit(1)
+    }
+
+    const tasksContent = await fs.readFile(tasksPath, 'utf-8')
+    const tasksDoc = parseTasksForParallel(tasksContent, name)
+
+    if (tasksDoc.totalTasks === 0) {
+      console.log(chalk.yellow('No tasks found in tasks.md'))
+      process.exit(1)
+    }
+
+    const maxParallelTasks = 3
+    const schedulerConfig: SchedulerConfig = {
+      maxParallelTasks,
+      forceSequential: ['migration', 'seed', 'config', 'setup', 'infraestrutura'],
+      prioritizeByEstimate: true,
+    }
+
+    console.log()
+    console.log(chalk.cyan.bold('Parallel Implementation Mode'))
+    console.log(chalk.gray('─'.repeat(60)))
+    console.log(chalk.gray('Model: opus (implementation) | Retry: enabled | Agents: 3'))
+
+    try {
+      const plan = createSchedulePlan(tasksDoc, schedulerConfig)
+
+      console.log(formatSchedulePlan(plan))
+
+      if (options.dryRun) {
+        console.log(chalk.yellow('\nDry-run mode: plan displayed, no execution'))
+        console.log(chalk.gray(`   To execute: adk feature implement ${name} --parallel`))
+        return
+      }
+
+      console.log(chalk.gray('─'.repeat(60)))
+      console.log()
+
+      let confirm = true
+      if (!options.headless) {
+        const response = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'confirm',
+            message: `Execute ${plan.totalTasks} tasks in ${plan.totalWaves} waves with up to ${maxParallelTasks} parallel agents?`,
+            default: true,
+          },
+        ])
+        confirm = response.confirm
+      }
+
+      if (!confirm) {
+        console.log(chalk.yellow('Execution cancelled'))
+        return
+      }
+
+      const completedTaskIds = new Set<string>()
+      let waveNumber = 0
+
+      for (const wave of plan.waves) {
+        waveNumber++
+        console.log()
+        console.log(
+          chalk.cyan.bold(`Wave ${waveNumber}/${plan.totalWaves}`) +
+            chalk.gray(` (${wave.tasks.length} tasks)`)
+        )
+
+        if (wave.conflicts.length > 0) {
+          console.log(chalk.yellow('Conflicts detected - executing sequentially'))
+          for (const conflict of wave.conflicts) {
+            console.log(chalk.gray(`   ${conflict}`))
+          }
+        }
+
+        if (wave.parallelizable && wave.tasks.length > 1) {
+          const metrics = await this.executeWaveParallel(name, wave, options, _specContent)
+          this.displayWaveSummary({
+            waveNumber,
+            agents: metrics,
+            totalDurationMs: Math.max(...metrics.map((m) => m.durationMs)),
+            parallelized: true,
+          })
+        } else {
+          await this.executeWaveSequential(name, wave, options, _specContent)
+        }
+
+        for (const task of wave.tasks) {
+          completedTaskIds.add(task.id)
+        }
+
+        console.log(chalk.green(`Wave ${waveNumber} complete`))
+      }
+
+      console.log()
+      console.log(chalk.green.bold('Parallel implementation complete!'))
+      console.log(chalk.gray(`   Tasks: ${plan.totalTasks}`))
+      console.log(chalk.gray(`   Waves: ${plan.totalWaves}`))
+      console.log(chalk.gray(`   Estimated speedup: ${plan.estimatedSpeedup}`))
+
+      if (plan.estimatedCost !== undefined) {
+        console.log(chalk.gray(`   Estimated cost: $${plan.estimatedCost.toFixed(4)}`))
+      }
+
+      let progress = await loadProgress(name)
+      progress = updateStepStatus(progress, 'implementacao', 'completed')
+      await saveProgress(name, progress)
+
+      console.log()
+      console.log(chalk.yellow('Next step:'))
+      console.log(chalk.gray(`  adk feature qa ${name}`))
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Circular dependency')) {
+        console.log(chalk.red(`${error.message}`))
+        console.log(chalk.gray('   Review dependencies in tasks.md'))
+        process.exit(1)
+      }
+      throw error
+    }
+  }
+
+  private displayWaveSummary(summary: WaveCompletionSummary): void {
+    const agentCount = summary.agents.length
+    const allSuccess = summary.agents.every((a) => a.status === 'success')
+    const statusIcon = allSuccess ? chalk.green('⏺') : chalk.yellow('⏺')
+
+    console.log()
+    console.log(`${statusIcon} ${agentCount} agent${agentCount > 1 ? 's' : ''} finished`)
+
+    summary.agents.forEach((agent, index) => {
+      const isLast = index === summary.agents.length - 1
+      const prefix = isLast ? '   └─' : '   ├─'
+
+      const tokenStr =
+        agent.tokenCount > 1000
+          ? `${(agent.tokenCount / 1000).toFixed(1)}k tokens`
+          : `${agent.tokenCount} tokens`
+
+      const modelTag = agent.model ? chalk.dim(`[${agent.model}]`) : ''
+      const statusSuffix = agent.status === 'success' ? '' : chalk.red(' ✗')
+
+      console.log(
+        chalk.gray(prefix) +
+          ` Task ${agent.taskId} ${modelTag}` +
+          chalk.gray(` · ${agent.toolCount} tool uses · ${tokenStr}`) +
+          statusSuffix
+      )
+    })
+  }
+
+  private async executeWaveParallel(
+    name: string,
+    wave: { tasks: Array<{ id: string; title: string }> },
+    options: FeatureOptions,
+    specContent?: string
+  ): Promise<AgentExecutionMetrics[]> {
+    const hooksDir = path.join(process.cwd(), '.claude', 'hooks')
+
+    const promises = wave.tasks.map(async (task) => {
+      const taskSpinner = ora({
+        text: chalk.yellow(`Task ${task.id}: ${task.title}`),
+        prefixText: `  `,
+      }).start()
+
+      const prompt = this.buildTaskPrompt(name, task, hooksDir, specContent)
+      const startTime = Date.now()
+
+      try {
+        const result = await executeHeadlessWithMetrics(prompt, {
+          model: options.model as ModelType | undefined,
+          collectMetrics: true,
+          showProgress: false,
+        })
+        taskSpinner.succeed(chalk.green(`Task ${task.id}: ${task.title}`))
+
+        return {
+          taskId: task.id,
+          taskTitle: task.title,
+          toolCount: result.metrics?.toolCount || 0,
+          tokenCount: result.metrics?.tokenCount || 0,
+          durationMs: result.metrics?.durationMs || Date.now() - startTime,
+          costUsd: result.metrics?.costUsd,
+          status: 'success' as const,
+        }
+      } catch (error) {
+        taskSpinner.fail(chalk.red(`Task ${task.id}: ${task.title}`))
+
+        return {
+          taskId: task.id,
+          taskTitle: task.title,
+          toolCount: 0,
+          tokenCount: 0,
+          durationMs: Date.now() - startTime,
+          status: 'error' as const,
+        }
+      }
+    })
+
+    return Promise.all(promises)
+  }
+
+  private async executeWaveSequential(
+    name: string,
+    wave: { tasks: Array<{ id: string; title: string }> },
+    options: FeatureOptions,
+    specContent?: string
+  ): Promise<void> {
+    const hooksDir = path.join(process.cwd(), '.claude', 'hooks')
+
+    for (const task of wave.tasks) {
+      const taskSpinner = ora({
+        text: chalk.yellow(`Task ${task.id}: ${task.title}`),
+        prefixText: `  `,
+      }).start()
+
+      const prompt = this.buildTaskPrompt(name, task, hooksDir, specContent)
+
+      try {
+        await executeClaudeCommand(prompt, {
+          model: options.model as ModelType | undefined,
+          headless: true,
+        })
+        taskSpinner.succeed(chalk.green(`Task ${task.id}: ${task.title}`))
+      } catch (error) {
+        taskSpinner.fail(chalk.red(`Task ${task.id}: ${task.title}`))
+        throw error
+      }
+    }
+  }
+
+  private buildTaskPrompt(
+    name: string,
+    task: { id: string; title: string },
+    hooksDir: string,
+    specContent?: string
+  ): string {
+    const specSection = specContent
+      ? `
+## Spec (Especificação Formal)
+
+<spec>
+${specContent}
+</spec>
+
+IMPORTANTE: A implementação DEVE seguir a spec acima.
+`
+      : ''
+
+    return `
+IMPLEMENTAÇÃO DE TASK ESPECÍFICA (TDD)
+
+Feature: ${name}
+Task: ${task.id} - ${task.title}
+Tasks File: .claude/plans/features/${name}/tasks.md
+${specSection}
+INSTRUÇÕES:
+
+1. Leia a task ${task.id} completa em tasks.md
+2. Marque como in_progress: ${hooksDir}/mark-task.sh ${name} "Task ${task.id}" in_progress
+3. Implemente seguindo TDD:
+   - Escreva testes primeiro
+   - Implemente o código
+   - Verifique que testes passam
+4. Marque como completed: ${hooksDir}/mark-task.sh ${name} "Task ${task.id}" completed
+5. Faça commit das mudanças
+
+FOCO: Implemente APENAS a Task ${task.id}. Não toque em outras tasks.
+`
   }
 }
 

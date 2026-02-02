@@ -64,7 +64,10 @@ export async function listAvailableTemplates(): Promise<string[]> {
   return templates
 }
 
-export async function copyClaudeStructure(targetDir: string): Promise<void> {
+export async function copyClaudeStructure(
+  targetDir: string,
+  options: { force?: boolean } = {}
+): Promise<void> {
   const claudeStructureDir = path.join(TEMPLATES_DIR, 'claude-structure')
 
   if (!(await fs.pathExists(claudeStructureDir))) {
@@ -82,7 +85,7 @@ export async function copyClaudeStructure(targetDir: string): Promise<void> {
     const destDir = path.join(targetClaudeDir, dir)
 
     if (await fs.pathExists(srcDir)) {
-      await copyDirectoryRecursive(srcDir, destDir)
+      await copyDirectoryRecursive(srcDir, destDir, options.force)
     }
   }
 
@@ -90,13 +93,18 @@ export async function copyClaudeStructure(targetDir: string): Promise<void> {
     const srcPath = path.join(claudeStructureDir, file)
     const destPath = path.join(targetClaudeDir, file)
 
-    if ((await fs.pathExists(srcPath)) && !(await fs.pathExists(destPath))) {
-      await fs.copy(srcPath, destPath)
+    const shouldCopy = options.force || !(await fs.pathExists(destPath))
+    if ((await fs.pathExists(srcPath)) && shouldCopy) {
+      await fs.copy(srcPath, destPath, { overwrite: true })
     }
   }
 }
 
-async function copyDirectoryRecursive(srcDir: string, destDir: string): Promise<void> {
+async function copyDirectoryRecursive(
+  srcDir: string,
+  destDir: string,
+  force = false
+): Promise<void> {
   await fs.ensureDir(destDir)
 
   const items = await fs.readdir(srcDir)
@@ -108,9 +116,12 @@ async function copyDirectoryRecursive(srcDir: string, destDir: string): Promise<
     const stat = await fs.stat(srcPath)
 
     if (stat.isDirectory()) {
-      await copyDirectoryRecursive(srcPath, destPath)
-    } else if (stat.isFile() && !(await fs.pathExists(destPath))) {
-      await fs.copy(srcPath, destPath)
+      await copyDirectoryRecursive(srcPath, destPath, force)
+    } else if (stat.isFile()) {
+      const shouldCopy = force || !(await fs.pathExists(destPath))
+      if (shouldCopy) {
+        await fs.copy(srcPath, destPath, { overwrite: true })
+      }
     }
   }
 }

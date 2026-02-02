@@ -180,6 +180,8 @@ Detailed docs in `.claude/docs/`:
 | ADK v2 Hooks | [hooks-v2.md](.claude/docs/hooks-v2.md) |
 | Worktree Symlinks | [worktree.md](.claude/docs/worktree.md) |
 | Context Compaction & Token Management | [context-compaction.md](.claude/docs/context-compaction.md) |
+| Task Decomposition Algorithm | [task-decomposition.md](.claude/docs/task-decomposition.md) |
+| Parallel Task Execution | [parallel-task-execution.md](.claude/docs/parallel-task-execution.md) |
 
 ## Quick Reference
 
@@ -196,6 +198,15 @@ adk feature research my-feature
 adk feature plan my-feature
 adk feature implement my-feature
 adk workflow qa my-feature
+```
+
+### Parallel Task Execution
+```bash
+adk feature implement <name> --parallel              # Execute tasks in parallel
+adk feature implement <name> --parallel --agents 4   # Use 4 parallel agents
+adk feature implement <name> --parallel --dry-run    # Preview execution plan
+adk feature autopilot <name> --parallel              # Autopilot with parallel implementation
+adk feature autopilot <name> --parallel --agents 4   # Autopilot with 4 agents
 ```
 
 ### State Management

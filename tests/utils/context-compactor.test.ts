@@ -1,9 +1,9 @@
-import { ContextCompactor } from '../../src/utils/context-compactor'
-import { TokenCounter } from '../../src/utils/token-counter'
-import { SnapshotManager } from '../../src/utils/snapshot-manager'
-import * as fs from 'fs-extra'
-import * as path from 'node:path'
 import * as os from 'node:os'
+import * as path from 'node:path'
+import * as fs from 'fs-extra'
+import { ContextCompactor } from '../../src/utils/context-compactor'
+import { SnapshotManager } from '../../src/utils/snapshot-manager'
+import { TokenCounter } from '../../src/utils/token-counter'
 
 jest.mock('../../src/utils/token-counter')
 jest.mock('../../src/utils/snapshot-manager')
@@ -25,9 +25,7 @@ describe('ContextCompactor', () => {
     mockTokenCounter = new TokenCounter() as jest.Mocked<TokenCounter>
     mockSnapshotManager = new SnapshotManager() as jest.Mocked<SnapshotManager>
 
-    mockSnapshotManager.createSnapshot = jest
-      .fn()
-      .mockResolvedValue('snapshot-' + Date.now())
+    mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue('snapshot-' + Date.now())
 
     mockTokenCounter.count = jest.fn().mockResolvedValue({
       count: 1000,
@@ -221,7 +219,12 @@ More regular content
       const snapshotId = 'backup-' + Date.now()
       mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue(snapshotId)
 
-      const snapshotPath = path.join(tempDir, '.claude/plans/features/.snapshots', feature, snapshotId)
+      const snapshotPath = path.join(
+        tempDir,
+        '.claude/plans/features/.snapshots',
+        feature,
+        snapshotId
+      )
       await fs.ensureDir(snapshotPath)
       await fs.copy(featurePath, snapshotPath)
 
@@ -383,7 +386,12 @@ Rationale: Cost effective
       const snapshotId = 'backup-' + Date.now()
       mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue(snapshotId)
 
-      const snapshotPath = path.join(tempDir, '.claude/plans/features/.snapshots', feature, snapshotId)
+      const snapshotPath = path.join(
+        tempDir,
+        '.claude/plans/features/.snapshots',
+        feature,
+        snapshotId
+      )
       await fs.ensureDir(snapshotPath)
       await fs.copy(featurePath, snapshotPath)
 
@@ -424,7 +432,12 @@ Rationale: Cost effective
       const snapshotId = 'backup-' + Date.now()
       mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue(snapshotId)
 
-      const snapshotPath = path.join(tempDir, '.claude/plans/features/.snapshots', feature, snapshotId)
+      const snapshotPath = path.join(
+        tempDir,
+        '.claude/plans/features/.snapshots',
+        feature,
+        snapshotId
+      )
       await fs.ensureDir(snapshotPath)
       await fs.copy(featurePath, snapshotPath)
 
@@ -517,16 +530,18 @@ Final content
       const snapshotId = 'backup-' + Date.now()
       mockSnapshotManager.createSnapshot = jest.fn().mockResolvedValue(snapshotId)
 
-      const snapshotPath = path.join(tempDir, '.claude/plans/features/.snapshots', feature, snapshotId)
+      const snapshotPath = path.join(
+        tempDir,
+        '.claude/plans/features/.snapshots',
+        feature,
+        snapshotId
+      )
       await fs.ensureDir(snapshotPath)
       await fs.copy(featurePath, snapshotPath)
 
       const compactionResult = await contextCompactor.compact(feature)
 
-      const canRevert = await contextCompactor.revertCompaction(
-        feature,
-        compactionResult.historyId
-      )
+      const canRevert = await contextCompactor.revertCompaction(feature, compactionResult.historyId)
       expect(canRevert).toBe(true)
     })
   })

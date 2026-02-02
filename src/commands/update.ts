@@ -118,6 +118,26 @@ export async function updateCommand(options: UpdateOptions): Promise<void> {
       }
     }
 
+    if (options.all) {
+      const settingsSrc = path.join(claudeStructureDir, 'settings.json')
+      const settingsDest = path.join(claudePath, 'settings.json')
+
+      if (await fs.pathExists(settingsSrc)) {
+        if (await fs.pathExists(settingsDest)) {
+          const srcContent = await fs.readFile(settingsSrc, 'utf-8')
+          const destContent = await fs.readFile(settingsDest, 'utf-8')
+
+          if (srcContent !== destContent) {
+            updates.push({ category: 'config', file: 'settings.json', status: 'update' })
+          } else {
+            updates.push({ category: 'config', file: 'settings.json', status: 'skip' })
+          }
+        } else {
+          updates.push({ category: 'config', file: 'settings.json', status: 'new' })
+        }
+      }
+    }
+
     const newFiles = updates.filter((u) => u.status === 'new')
     const updatedFiles = updates.filter((u) => u.status === 'update')
     const skippedFiles = updates.filter((u) => u.status === 'skip')
@@ -180,8 +200,17 @@ export async function updateCommand(options: UpdateOptions): Promise<void> {
       await fs.ensureDir(backupDir)
 
       for (const update of updatedFiles) {
-        const srcFile = path.join(claudePath, update.category, update.file)
-        const backupFile = path.join(backupDir, update.category, update.file)
+        let srcFile: string
+        let backupFile: string
+
+        if (update.category === 'config') {
+          srcFile = path.join(claudePath, update.file)
+          backupFile = path.join(backupDir, update.file)
+        } else {
+          srcFile = path.join(claudePath, update.category, update.file)
+          backupFile = path.join(backupDir, update.category, update.file)
+        }
+
         await fs.ensureDir(path.dirname(backupFile))
         await fs.copy(srcFile, backupFile)
       }
@@ -193,8 +222,16 @@ export async function updateCommand(options: UpdateOptions): Promise<void> {
 
     let applied = 0
     for (const update of [...newFiles, ...updatedFiles]) {
-      const srcFile = path.join(claudeStructureDir, update.category, update.file)
-      const destFile = path.join(claudePath, update.category, update.file)
+      let srcFile: string
+      let destFile: string
+
+      if (update.category === 'config') {
+        srcFile = path.join(claudeStructureDir, update.file)
+        destFile = path.join(claudePath, update.file)
+      } else {
+        srcFile = path.join(claudeStructureDir, update.category, update.file)
+        destFile = path.join(claudePath, update.category, update.file)
+      }
 
       await fs.ensureDir(path.dirname(destFile))
       await fs.copy(srcFile, destFile, { overwrite: true })

@@ -167,7 +167,6 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      
       jest.mocked(contextCompactor.compact).mockResolvedValue({
         originalTokens: 56000,
         compactedTokens: 40000,
@@ -198,7 +197,6 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      
       jest.mocked(contextCompactor.summarize).mockResolvedValue({
         summary: 'Summarized content',
         preservedDecisions: ['Decision 1'],
@@ -226,7 +224,6 @@ describe('StateManager - Token Integration', () => {
         canContinue: false,
       }
 
-      
       jest.mocked(contextCompactor.createHandoffDocument).mockResolvedValue({
         feature: featureName,
         currentTask: 'Current task',
@@ -265,7 +262,6 @@ describe('StateManager - Token Integration', () => {
         items: [],
       }
 
-      
       jest.mocked(contextCompactor.compact).mockResolvedValue(mockResult)
 
       const manager = new StateManager()
@@ -290,7 +286,6 @@ describe('StateManager - Token Integration', () => {
         items: [],
       }
 
-      
       jest.mocked(contextCompactor.compact).mockResolvedValue(mockResult)
 
       const manager = new StateManager()
@@ -316,7 +311,6 @@ describe('StateManager - Token Integration', () => {
         items: [],
       }
 
-
       jest.mocked(contextCompactor.compact).mockResolvedValue(mockResult)
 
       const manager = new StateManager()
@@ -340,7 +334,6 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      
       jest.mocked(contextCompactor.getContextStatus).mockResolvedValue(mockStatus)
 
       const manager = new StateManager()
@@ -362,7 +355,6 @@ describe('StateManager - Token Integration', () => {
         canContinue: true,
       }
 
-      
       jest.mocked(contextCompactor.getContextStatus).mockResolvedValue(mockStatus)
 
       const manager = new StateManager()

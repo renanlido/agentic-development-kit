@@ -1,4 +1,4 @@
-import { TokenCounter, resetEncoder } from '../../src/utils/token-counter'
+import { resetEncoder, TokenCounter } from '../../src/utils/token-counter'
 
 const mockCountTokens = jest.fn()
 

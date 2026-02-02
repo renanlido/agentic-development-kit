@@ -4,14 +4,29 @@ import os from 'node:os'
 import path from 'node:path'
 import * as readline from 'node:readline'
 import { ModelType } from '../types/model'
+import type { CollectedMetrics, StreamEventCallback } from '../types/parallel'
+import type { StreamEvent } from '../types/stream-events'
 import { logger } from './logger'
-import { parseAndDisplayStream } from './stream-parser'
+import {
+  disableMetricsCollection,
+  enableMetricsCollection,
+  getCollectedMetrics,
+  parseAndDisplayStream,
+} from './stream-parser'
 
 export interface ClaudeCommandOptions {
   model?: ModelType
   headless?: boolean
   showProgress?: boolean
   cwd?: string
+  collectMetrics?: boolean
+  enableTokenStreaming?: boolean
+  onEvent?: StreamEventCallback
+}
+
+export interface HeadlessResult {
+  success: boolean
+  metrics?: CollectedMetrics
 }
 
 const VALID_MODELS = new Set<string>([ModelType.OPUS, ModelType.SONNET, ModelType.HAIKU])
@@ -45,28 +60,50 @@ export async function executeClaudeCommand(
 }
 
 async function executeHeadless(prompt: string, options: ClaudeCommandOptions): Promise<string> {
+  const result = await executeHeadlessWithMetrics(prompt, options)
+  return result.success ? '' : ''
+}
+
+export async function executeHeadlessWithMetrics(
+  prompt: string,
+  options: ClaudeCommandOptions = {}
+): Promise<HeadlessResult> {
   const validatedModel = validateModel(options.model)
-  const args = ['-p', '--dangerously-skip-permissions', '--output-format', 'stream-json', '--verbose']
+  const enableStreaming = options.enableTokenStreaming !== false
+  const args = [
+    '-p',
+    '--dangerously-skip-permissions',
+    '--output-format',
+    'stream-json',
+    '--verbose',
+    ...(enableStreaming ? ['--include-partial-messages'] : []),
+  ]
 
   if (validatedModel) {
     args.push('--model', validatedModel)
   }
 
   const showProgress = options.showProgress !== false
+  const collectMetrics = options.collectMetrics === true
+
+  if (collectMetrics) {
+    enableMetricsCollection()
+  }
 
   logger.debug(`Executing headless: claude ${args.join(' ')}`)
 
   return new Promise((resolve, reject) => {
+    const stderrMode = showProgress ? 'inherit' : 'pipe'
     const child = spawn('claude', args, {
-      stdio: ['pipe', 'pipe', 'inherit'],
+      stdio: ['pipe', 'pipe', stderrMode],
       cwd: options.cwd || process.cwd(),
     })
 
-    child.stdin.write(prompt)
-    child.stdin.end()
+    child.stdin!.write(prompt)
+    child.stdin!.end()
 
     const rl = readline.createInterface({
-      input: child.stdout,
+      input: child.stdout!,
       crlfDelay: Infinity,
     })
 
@@ -74,12 +111,22 @@ async function executeHeadless(prompt: string, options: ClaudeCommandOptions): P
       if (showProgress) {
         parseAndDisplayStream(line)
       }
+      if (options.onEvent) {
+        try {
+          const event = JSON.parse(line) as StreamEvent
+          options.onEvent(event)
+        } catch {}
+      }
     })
 
     child.on('close', (code) => {
       rl.close()
+      const metrics = collectMetrics ? getCollectedMetrics() : undefined
+      if (collectMetrics) {
+        disableMetricsCollection()
+      }
       if (code === 0) {
-        resolve('')
+        resolve({ success: true, metrics: metrics || undefined })
       } else {
         reject(new Error(`Claude exited with code ${code}`))
       }
@@ -87,6 +134,9 @@ async function executeHeadless(prompt: string, options: ClaudeCommandOptions): P
 
     child.on('error', (err) => {
       rl.close()
+      if (collectMetrics) {
+        disableMetricsCollection()
+      }
       reject(new Error(`Failed to start Claude: ${err.message}`))
     })
   })

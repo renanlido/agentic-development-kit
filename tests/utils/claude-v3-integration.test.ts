@@ -32,8 +32,8 @@ describe('Claude V3 Integration', () => {
         metadata: {
           model: 'sonnet',
           exitCode: 0,
-          duration: 5000
-        }
+          duration: 5000,
+        },
       }
 
       await sessionStore.save('test-feature', session)
@@ -52,7 +52,7 @@ describe('Claude V3 Integration', () => {
         startedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
         status: 'active',
-        resumable: true
+        resumable: true,
       }
 
       await sessionStore.save('recent-test', recentSession)
@@ -74,7 +74,7 @@ describe('Claude V3 Integration', () => {
         startedAt: oldDate.toISOString(),
         lastActivity: oldDate.toISOString(),
         status: 'active',
-        resumable: true
+        resumable: true,
       }
 
       await sessionStore.save('old-test', oldSession)
@@ -94,7 +94,7 @@ describe('Claude V3 Integration', () => {
           startedAt: new Date(Date.now() - i * 1000).toISOString(),
           lastActivity: new Date(Date.now() - i * 1000).toISOString(),
           status: 'completed',
-          resumable: false
+          resumable: false,
         })
       }
 
@@ -115,13 +115,13 @@ describe('Claude V3 Integration', () => {
         startedAt: oldTime,
         lastActivity: oldTime,
         status: 'active',
-        resumable: true
+        resumable: true,
       })
 
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
 
       await sessionStore.update('update-test', 'session-update', {
-        status: 'completed'
+        status: 'completed',
       })
 
       const updated = await sessionStore.get('update-test')
@@ -141,11 +141,11 @@ describe('Claude V3 Integration', () => {
         startedAt: startTime,
         lastActivity: startTime,
         status: 'active',
-        resumable: true
+        resumable: true,
       })
 
       await sessionStore.update('preserve-test', 'session-preserve', {
-        status: 'completed'
+        status: 'completed',
       })
 
       const updated = await sessionStore.get('preserve-test')

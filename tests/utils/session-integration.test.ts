@@ -1,13 +1,13 @@
-import fs from 'fs-extra'
+import { spawn } from 'node:child_process'
 import os from 'node:os'
 import path from 'node:path'
-import { spawn } from 'node:child_process'
+import fs from 'fs-extra'
 import { executeWithSessionTracking } from '../../src/utils/claude-v3.js'
 import { sessionStore } from '../../src/utils/session-store.js'
 
 jest.mock('node:child_process', () => ({
   spawn: jest.fn(),
-  spawnSync: jest.fn(() => ({ status: 0 }))
+  spawnSync: jest.fn(() => ({ status: 0 })),
 }))
 
 const mockSpawn = spawn as jest.MockedFunction<typeof spawn>
@@ -29,18 +29,20 @@ describe('Session Integration Tests', () => {
         }
         return mockProcess
       }),
-      kill: jest.fn()
+      kill: jest.fn(),
     }
 
-    mockProcess.stdout.on.mockImplementation((event: string, callback: (data: Buffer) => void): any => {
-      if (event === 'data') {
-        setTimeout(() => {
-          callback(Buffer.from('Session ID: abc-123-def\n'))
-          callback(Buffer.from('Test output\n'))
-        }, 5)
+    mockProcess.stdout.on.mockImplementation(
+      (event: string, callback: (data: Buffer) => void): any => {
+        if (event === 'data') {
+          setTimeout(() => {
+            callback(Buffer.from('Session ID: abc-123-def\n'))
+            callback(Buffer.from('Test output\n'))
+          }, 5)
+        }
+        return mockProcess.stdout
       }
-      return mockProcess.stdout
-    })
+    )
 
     mockProcess.stderr.on.mockImplementation(() => mockProcess.stderr)
 
@@ -55,10 +57,7 @@ describe('Session Integration Tests', () => {
 
   describe('executeWithSessionTracking', () => {
     it('should save session after execution', async () => {
-      const result = await executeWithSessionTracking(
-        'test-feature',
-        'Test prompt'
-      )
+      const result = await executeWithSessionTracking('test-feature', 'Test prompt')
 
       expect(result.sessionId).toBe('abc-123-def')
       expect(result.exitCode).toBe(0)
@@ -83,15 +82,12 @@ describe('Session Integration Tests', () => {
     })
 
     it('should not resume if session is not resumable', async () => {
-      await executeWithSessionTracking(
-        'test-feature',
-        'First prompt'
-      )
+      await executeWithSessionTracking('test-feature', 'First prompt')
 
       const session = await sessionStore.get('test-feature')
       if (session) {
         await sessionStore.update('test-feature', session.id, {
-          resumable: false
+          resumable: false,
         })
       }
 
@@ -107,7 +103,7 @@ describe('Session Integration Tests', () => {
       const firstSession = await sessionStore.get('test-feature')
       const firstActivity = firstSession?.lastActivity
 
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise((resolve) => setTimeout(resolve, 100))
 
       await executeWithSessionTracking('test-feature', 'Second prompt')
       const secondSession = await sessionStore.get('test-feature')
@@ -131,26 +127,25 @@ describe('Session Integration Tests', () => {
           }
           return mockProcessWithError
         }),
-        kill: jest.fn()
+        kill: jest.fn(),
       }
 
-      mockProcessWithError.stdout.on.mockImplementation((event: string, callback: (data: Buffer) => void): any => {
-        if (event === 'data') {
-          setTimeout(() => {
-            callback(Buffer.from('Session ID: error-session\n'))
-          }, 5)
+      mockProcessWithError.stdout.on.mockImplementation(
+        (event: string, callback: (data: Buffer) => void): any => {
+          if (event === 'data') {
+            setTimeout(() => {
+              callback(Buffer.from('Session ID: error-session\n'))
+            }, 5)
+          }
+          return mockProcessWithError.stdout
         }
-        return mockProcessWithError.stdout
-      })
+      )
 
       mockProcessWithError.stderr.on.mockImplementation(() => mockProcessWithError.stderr)
 
       mockSpawn.mockReturnValue(mockProcessWithError as any)
 
-      const result = await executeWithSessionTracking(
-        'test-feature-error',
-        'Test prompt'
-      )
+      const result = await executeWithSessionTracking('test-feature-error', 'Test prompt')
 
       expect(result.exitCode).toBe(1)
 
@@ -163,7 +158,7 @@ describe('Session Integration Tests', () => {
       const firstSession = await sessionStore.get('test-feature')
       const originalStartedAt = firstSession?.startedAt
 
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise((resolve) => setTimeout(resolve, 100))
 
       await executeWithSessionTracking('test-feature', 'Second prompt')
       const secondSession = await sessionStore.get('test-feature')
@@ -176,7 +171,7 @@ describe('Session Integration Tests', () => {
       const firstSession = await sessionStore.get('test-feature')
       const originalSessionId = firstSession?.id
 
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise((resolve) => setTimeout(resolve, 100))
 
       await executeWithSessionTracking('test-feature', 'Second prompt')
       const secondSession = await sessionStore.get('test-feature')
@@ -188,7 +183,7 @@ describe('Session Integration Tests', () => {
 
     it('should store execution metadata', async () => {
       await executeWithSessionTracking('test-feature', 'Test prompt', {
-        model: 'opus'
+        model: 'opus',
       })
 
       const savedSession = await sessionStore.get('test-feature')
@@ -201,20 +196,14 @@ describe('Session Integration Tests', () => {
 
   describe('Session recovery after interruption', () => {
     it('should be able to resume after process interruption', async () => {
-      const firstResult = await executeWithSessionTracking(
-        'test-feature',
-        'First prompt'
-      )
+      const firstResult = await executeWithSessionTracking('test-feature', 'First prompt')
 
       expect(firstResult.sessionId).toBe('abc-123-def')
 
       const savedSession = await sessionStore.get('test-feature')
       expect(savedSession?.resumable).toBe(true)
 
-      const secondResult = await executeWithSessionTracking(
-        'test-feature',
-        'Resume prompt'
-      )
+      const secondResult = await executeWithSessionTracking('test-feature', 'Resume prompt')
 
       expect(secondResult.sessionId).toBe('abc-123-def')
 
@@ -234,7 +223,7 @@ describe('Session Integration Tests', () => {
 
         const oldSession = {
           ...session,
-          lastActivity: oldDate.toISOString()
+          lastActivity: oldDate.toISOString(),
         }
         await sessionStore.save('test-feature', oldSession)
       }
