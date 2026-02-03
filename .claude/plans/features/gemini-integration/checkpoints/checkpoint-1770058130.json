@@ -1,0 +1,6 @@
+{
+  "timestamp": "2026-02-02T18:48:50Z",
+  "feature": "gemini-integration",
+  "coreState": null,
+  "gitStatus": " D .claude/agents/_templates/README.md| D .claude/agents/_templates/_base-agent.md| D .claude/agents/_templates/analyzer-template.md| D .claude/agents/_templates/executor-template.md| D .claude/agents/_templates/generator-template.md| D .claude/agents/_templates/validator-template.md| D .claude/agents/analyzer.md| D .claude/agents/architect.md| D .claude/agents/documenter.md| D .claude/agents/implementer.md| D .claude/agents/prd-creator.md| D .claude/agents/reviewer-secondary.md| D .claude/agents/reviewer.md| D .claude/agents/specialists/e2e-test-specialist.md| D .claude/agents/specialists/feature-developer.md| D .claude/agents/specialists/unit-test-specialist.md| D .claude/agents/task-breakdown.md| D .claude/agents/tester.md| D .claude/docs/architecture-report-2026-01-30.md| D .claude/docs/context-cleanup-strategy.md"
+}
