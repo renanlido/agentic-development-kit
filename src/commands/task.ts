@@ -25,8 +25,9 @@ class TaskCommand {
   private program: Command
 
   constructor() {
-    this.program = new Command('task')
-      .description('Manage tasks for features (AI-friendly interface)')
+    this.program = new Command('task').description(
+      'Manage tasks for features (AI-friendly interface)'
+    )
 
     this.setupCommands()
   }
@@ -36,8 +37,15 @@ class TaskCommand {
       .command('add')
       .description('Add a new task to the current feature')
       .option('-d, --description <text>', 'Task description (required for AI usage)')
-      .option('-f, --feature <name>', 'Feature name (auto-detects from active-focus if not provided)')
-      .option('-t, --type <type>', 'Task type: Feature, Refactor, Bugfix, Config, Docs, Test', 'Feature')
+      .option(
+        '-f, --feature <name>',
+        'Feature name (auto-detects from active-focus if not provided)'
+      )
+      .option(
+        '-t, --type <type>',
+        'Task type: Feature, Refactor, Bugfix, Config, Docs, Test',
+        'Feature'
+      )
       .option('-e, --estimate <size>', 'Estimate: P (small), M (medium), G (large)', 'M')
       .option('--deps <ids>', 'Comma-separated dependency task IDs (e.g., "1,2,3")')
       .option('--sync', 'Sync with PRD and other docs using AI agent')
@@ -109,7 +117,12 @@ class TaskCommand {
       featureName = selected
     }
 
-    const featurePath = this.getFeaturePath(featureName!)
+    if (!featureName) {
+      logger.error('Feature name is required')
+      process.exit(1)
+    }
+
+    const featurePath = this.getFeaturePath(featureName)
     const tasksPath = path.join(featurePath, 'tasks.md')
 
     if (!(await fs.pathExists(tasksPath))) {
@@ -136,12 +149,10 @@ class TaskCommand {
 
     try {
       const content = await fs.readFile(tasksPath, 'utf-8')
-      const doc = parseTasksForParallel(content, featureName!)
+      const doc = parseTasksForParallel(content, featureName)
 
       const newTaskId = doc.totalTasks + 1
-      const deps = options.dependencies
-        ? options.dependencies.split(',').map((d) => d.trim())
-        : []
+      const deps = options.dependencies ? options.dependencies.split(',').map((d) => d.trim()) : []
       const depsStr = deps.length > 0 ? `Task ${deps.join(', Task ')}` : 'nenhuma'
 
       const newTaskContent = `
@@ -194,7 +205,7 @@ class TaskCommand {
   }
 
   private async listTasks(options: TaskStatusOptions): Promise<void> {
-    let featureName = options.feature || (await this.getActiveFeature())
+    const featureName = options.feature || (await this.getActiveFeature())
 
     if (!featureName) {
       logger.error('No feature specified. Use -f <name> or set active focus.')
@@ -238,11 +249,15 @@ class TaskCommand {
     }
 
     console.log()
-    console.log(chalk.gray(`Total: ${doc.totalTasks} | Completed: ${doc.completedTasks} | Pending: ${doc.pendingTasks}`))
+    console.log(
+      chalk.gray(
+        `Total: ${doc.totalTasks} | Completed: ${doc.completedTasks} | Pending: ${doc.pendingTasks}`
+      )
+    )
   }
 
   private async showStatus(options: TaskStatusOptions): Promise<void> {
-    let featureName = options.feature || (await this.getActiveFeature())
+    const featureName = options.feature || (await this.getActiveFeature())
 
     if (!featureName) {
       logger.error('No feature specified. Use -f <name> or set active focus.')
@@ -271,13 +286,15 @@ class TaskCommand {
     console.log(`Progress: [${chalk.green(bar)}] ${percentage}%`)
     console.log()
     console.log(`  ${chalk.green('✓')} Completed:   ${doc.completedTasks}`)
-    console.log(`  ${chalk.yellow('◐')} In Progress: ${doc.tasks.filter((t) => t.status === 'in_progress').length}`)
+    console.log(
+      `  ${chalk.yellow('◐')} In Progress: ${doc.tasks.filter((t) => t.status === 'in_progress').length}`
+    )
     console.log(`  ${chalk.gray('○')} Pending:     ${doc.pendingTasks}`)
     console.log(`  ${chalk.cyan('Σ')} Total:       ${doc.totalTasks}`)
   }
 
   private async markComplete(taskId: string, options: TaskStatusOptions): Promise<void> {
-    let featureName = options.feature || (await this.getActiveFeature())
+    const featureName = options.feature || (await this.getActiveFeature())
 
     if (!featureName) {
       logger.error('No feature specified. Use -f <name> or set active focus.')
@@ -305,7 +322,7 @@ class TaskCommand {
   }
 
   private async syncDocs(options: TaskStatusOptions): Promise<void> {
-    let featureName = options.feature || (await this.getActiveFeature())
+    const featureName = options.feature || (await this.getActiveFeature())
 
     if (!featureName) {
       logger.error('No feature specified. Use -f <name> or set active focus.')

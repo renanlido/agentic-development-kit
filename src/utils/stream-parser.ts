@@ -67,6 +67,7 @@ let streamingText = ''
 let isStreaming = false
 
 let metricsCollector: CollectedMetrics | null = null
+let outputCollector: string[] | null = null
 
 export function enableMetricsCollection(): void {
   metricsCollector = { toolCount: 0, tokenCount: 0, durationMs: 0 }
@@ -78,6 +79,18 @@ export function disableMetricsCollection(): void {
 
 export function getCollectedMetrics(): CollectedMetrics | null {
   return metricsCollector ? { ...metricsCollector } : null
+}
+
+export function enableOutputCollection(): void {
+  outputCollector = []
+}
+
+export function disableOutputCollection(): void {
+  outputCollector = null
+}
+
+export function getCollectedOutput(): string | null {
+  return outputCollector ? outputCollector.join('') : null
 }
 
 export function resetCollectedMetrics(): void {
@@ -228,6 +241,9 @@ function handleStreamEvent(event: StreamEvent): void {
       process.stdout.write(colors.muted('💭 '))
     }
     streamingText += text
+    if (outputCollector) {
+      outputCollector.push(text)
+    }
     process.stdout.write(text)
   }
 }

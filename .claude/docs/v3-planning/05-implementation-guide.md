@@ -1,6 +1,6 @@
 # Guia de Implementação ADK v3
 
-**Data**: 02/02/2026
+**Data**: 2026-02-02
 **Status**: PRONTO PARA EXECUÇÃO
 **Contexto**: Migração para arquitetura de Agentes de Longa Duração (Long-Running Agents).
 

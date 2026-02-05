@@ -46,6 +46,20 @@ export async function migrateHooksConfig(): Promise<MigrationResult> {
     }
   }
 
+  const adkDir = getAdkDir()
+  const configPath = path.join(adkDir, 'config.json')
+  const alreadyMigrated = await fs.pathExists(configPath)
+
+  if (alreadyMigrated) {
+    const config = await fs.readJson(configPath)
+    if (config.hooks && Object.keys(config.hooks).length > 0) {
+      return {
+        success: true,
+        message: 'Hooks already migrated - skipping',
+      }
+    }
+  }
+
   const backupPath = path.join(path.dirname(settingsPath), `settings.backup-${Date.now()}.json`)
 
   try {

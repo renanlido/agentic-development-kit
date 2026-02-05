@@ -1,6 +1,0 @@
-{
-  "timestamp": "2026-02-02T20:30:16Z",
-  "feature": "v3-version",
-  "coreState": null,
-  "gitStatus": " M .claude/docs/v3-planning/optimized-context.md| M .claude/plans/features/v3-version/checkpoints/latest.json| M .claude/plans/features/v3-version/context.md| M .claude/plans/features/v3-version/progress.md| M src/commands/feature.ts| M src/utils/parallel-display.ts| M tests/utils/parallel-display.test.ts|?? .claude/plans/features/v3-version/checkpoints/checkpoint-1770060911.json|?? .claude/plans/features/v3-version/checkpoints/checkpoint-1770061821.json|?? .claude/plans/features/v3-version/checkpoints/checkpoint-1770062271.json"
-}

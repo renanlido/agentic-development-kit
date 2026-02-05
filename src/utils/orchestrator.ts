@@ -14,8 +14,8 @@ import {
 } from './result-aggregator'
 import { analyzeTaskComplexity, type ParsedTaskForParallel } from './task-parser'
 import {
-  executeWaveWithProgress,
   type ExtendedWaveOptions,
+  executeWaveWithProgress,
   formatWaveResult,
   type Wave,
 } from './wave-executor'
@@ -128,6 +128,7 @@ export class WaveOrchestrator {
       stopOnError: this.options.stopOnError,
       verbose: this.options.verbose,
       totalWaves: this.waves.length,
+      maxConcurrentAgents: this.options.maxConcurrentAgents || 2,
     }
 
     for (const wave of this.waves) {

@@ -1,0 +1,13 @@
+{
+  "id": "session-1770086027776-sxnllq8",
+  "claudeSessionId": "abc-123-def",
+  "feature": "test-feature",
+  "startedAt": "2026-02-03T02:33:47.799Z",
+  "lastActivity": "2026-02-03T02:33:47.800Z",
+  "status": "active",
+  "resumable": true,
+  "metadata": {
+    "exitCode": 0,
+    "duration": 927
+  }
+}

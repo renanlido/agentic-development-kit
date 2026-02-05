@@ -1,13 +1,13 @@
 import path from 'node:path'
 import chalk from 'chalk'
 import { ModelType } from '../types/model'
-import type { StreamEvent } from '../types/stream-events'
 import type {
   EnhancedTask,
   TaskExecutionResult,
   WaveExecutionOptions,
   WaveExecutionResult,
 } from '../types/parallel'
+import type { StreamEvent } from '../types/stream-events'
 import {
   type AgentSelectionResult,
   getAgentConfig,
@@ -24,6 +24,49 @@ import {
   setVerboseMode,
 } from './wave-progress'
 import { createWorktree, getChangedFilesInWorktree, removeWorktree } from './worktree-utils'
+
+const DEFAULT_MAX_CONCURRENT_AGENTS = 2
+
+async function executeWithConcurrencyLimit<T, R>(
+  items: T[],
+  maxConcurrent: number,
+  executor: (item: T) => Promise<R>
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length)
+  let currentIndex = 0
+  let activeCount = 0
+
+  return new Promise((resolve) => {
+    const executeNext = (): void => {
+      while (activeCount < maxConcurrent && currentIndex < items.length) {
+        const index = currentIndex++
+        activeCount++
+
+        executor(items[index])
+          .then((value) => {
+            results[index] = { status: 'fulfilled', value }
+          })
+          .catch((reason) => {
+            results[index] = { status: 'rejected', reason }
+          })
+          .finally(() => {
+            activeCount--
+            if (currentIndex < items.length) {
+              executeNext()
+            } else if (activeCount === 0) {
+              resolve(results)
+            }
+          })
+      }
+
+      if (items.length === 0) {
+        resolve(results)
+      }
+    }
+
+    executeNext()
+  })
+}
 
 export interface Wave {
   index: number
@@ -43,6 +86,7 @@ export interface AgentTaskConfig {
   taskTitle: string
   onEvent?: (event: StreamEvent) => void
   verbose?: boolean
+  disableHooks?: boolean
 }
 
 async function executeAgentTask(config: AgentTaskConfig): Promise<TaskExecutionResult> {
@@ -55,6 +99,7 @@ async function executeAgentTask(config: AgentTaskConfig): Promise<TaskExecutionR
       showProgress: config.verbose || false,
       onEvent: config.onEvent,
       cwd: config.worktree || process.cwd(),
+      disableHooks: config.disableHooks ?? true,
     })
 
     const filesModified = config.worktree ? await getChangedFilesInWorktree(config.worktree) : []
@@ -131,6 +176,8 @@ export interface ExtendedWaveOptions extends WaveExecutionOptions {
   verbose?: boolean
   totalWaves?: number
   onTaskEvent?: (taskId: string, event: StreamEvent) => void
+  maxConcurrentAgents?: number
+  disableHooks?: boolean
 }
 
 export async function executeWave(
@@ -141,8 +188,9 @@ export async function executeWave(
   const startTime = Date.now()
   const taskResults: TaskExecutionResult[] = []
   const worktreePaths: string[] = []
+  const maxConcurrent = options.maxConcurrentAgents || DEFAULT_MAX_CONCURRENT_AGENTS
 
-  const taskPromises = wave.tasks.map(async (task) => {
+  const executeTask = async (task: EnhancedTask): Promise<TaskExecutionResult> => {
     const agentSelection = selectAgentAndModel(task.title, task.type, task.complexity)
     const model = selectModelForTask(task)
 
@@ -176,10 +224,11 @@ export async function executeWave(
       taskTitle: task.title,
       onEvent: eventHandler,
       verbose: options.verbose,
+      disableHooks: options.disableHooks ?? true,
     })
-  })
+  }
 
-  const results = await Promise.allSettled(taskPromises)
+  const results = await executeWithConcurrencyLimit(wave.tasks, maxConcurrent, executeTask)
 
   for (const result of results) {
     if (result.status === 'fulfilled') {
@@ -212,8 +261,7 @@ export async function executeWave(
     if (taskResult.success && taskResult.taskId !== 'unknown') {
       try {
         await updateTaskStatusInFile(tasksFilePath, taskResult.taskId, 'completed')
-      } catch {
-      }
+      } catch {}
     }
   }
 
@@ -223,8 +271,7 @@ export async function executeWave(
     for (const wt of worktreePaths) {
       try {
         await removeWorktree(wt, true)
-      } catch {
-      }
+      } catch {}
     }
   }
 

@@ -92,6 +92,7 @@ export interface WaveExecutionOptions {
   maxRetries?: number
   stopOnError?: boolean
   verbose?: boolean
+  maxConcurrentAgents?: number
 }
 
 export interface OrchestratorOptions {
@@ -102,6 +103,7 @@ export interface OrchestratorOptions {
   modelOptimize: boolean
   stopOnError: boolean
   verbose?: boolean
+  maxConcurrentAgents?: number
 }
 
 export interface OrchestratorResult {

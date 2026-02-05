@@ -56,14 +56,6 @@
 └── src/utils/git-context.ts                # Git log reading
 ```
 
-### 1.4 Flags do Claude CLI (verificado 2026-02-02):
-```bash
--r, --resume [value]     # Resume by session ID or picker
---session-id <uuid>      # Use specific UUID for session
--c, --continue           # Continue most recent in current dir
---fork-session           # New ID when resuming (use with --resume)
-```
-
 ### 1.3 O que ABORTAR:
 ```
 ❌ NÃO FAZER:
@@ -73,6 +65,14 @@
 - Migrar para Python SDK agora
 - Implementar Constitution/Steering
 - Completar tarefas pendentes de v2-fase3
+```
+
+### 1.4 Flags do Claude CLI (verificado 2026-02-02):
+```bash
+-r, --resume [value]     # Resume by session ID or picker
+--session-id <uuid>      # Use specific UUID for session
+-c, --continue           # Continue most recent in current dir
+--fork-session           # New ID when resuming (use with --resume)
 ```
 
 ---

@@ -1,0 +1,31 @@
+{
+  "$schema": "core-state-v1",
+  "version": "1.0",
+  "feature": "e2e-flow-test",
+  "updatedAt": "2026-02-03T02:33:34.871Z",
+  "currentTask": {
+    "id": "test-001",
+    "name": "Feature A",
+    "status": "completed",
+    "completedAt": "2026-02-03T02:33:34.846Z"
+  },
+  "taskProgress": {
+    "total": 0,
+    "completed": 1,
+    "inProgress": 0,
+    "pending": 0,
+    "completedIds": [
+      "test-001"
+    ]
+  },
+  "criticalDecisions": [],
+  "modifiedFiles": [],
+  "constraints": [
+    "NAO criar stubs - implementar logica real",
+    "NAO modificar codigo fora do escopo da task",
+    "SEMPRE rodar type-check apos modificacoes"
+  ],
+  "breadcrumbs": [],
+  "blockers": [],
+  "nextSteps": []
+}

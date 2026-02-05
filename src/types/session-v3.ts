@@ -37,6 +37,8 @@ export interface ClaudeV3Options {
   resume?: string
   /** Whether to request session ID in output (default: true) */
   printSessionId?: boolean
+  /** System prompt to inject (Tier 1 Memory + Protocols) */
+  systemPrompt?: string
   /** Timeout in milliseconds (default: 300000 / 5 minutes) */
   timeout?: number
   /** Callback for streaming output chunks */
@@ -55,4 +57,27 @@ export interface ClaudeV3Result {
   exitCode: number
   /** Total execution duration in milliseconds */
   duration: number
+}
+
+/**
+ * Core State (Tier 1 Memory) for session continuity.
+ * Prevents context drift by tracking immediate reality.
+ */
+export interface CoreState {
+  /** Current task being executed */
+  currentTask: {
+    id: string
+    status: 'in_progress' | 'verifying' | 'blocked'
+    startedAt: string
+  }
+  /** Files being read/modified in the current session */
+  sessionFiles: {
+    path: string
+    operation: 'read' | 'edit' | 'create'
+    lastModified: string
+  }[]
+  /** Recent critical micro-decisions (last 5) */
+  recentDecisions: string[]
+  /** Active hard constraints for the model */
+  constraints: string[]
 }

@@ -1,0 +1,8 @@
+[
+  {
+    "timestamp": "2026-02-03T02:06:24.451Z",
+    "fromPhase": "phase42",
+    "toPhase": "phase43",
+    "trigger": "test"
+  }
+]

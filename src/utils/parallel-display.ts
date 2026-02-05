@@ -6,7 +6,7 @@ export interface AgentState {
   taskTitle: string
   agentId: string
   currentAction: string
-  status: 'running' | 'completed' | 'failed'
+  status: 'running' | 'validating' | 'completed' | 'failed'
   toolCount: number
   tokenCount: number
   startTime: number
@@ -53,8 +53,7 @@ export class ParallelDisplayManager {
 
   registerAgent(taskId: string, taskTitle: string): string {
     const agentId = `agent-${this.agents.size + 1}`
-    const truncatedTitle =
-      taskTitle.length > 45 ? taskTitle.slice(0, 42) + '...' : taskTitle
+    const truncatedTitle = taskTitle.length > 45 ? taskTitle.slice(0, 42) + '...' : taskTitle
     const now = Date.now()
     this.agents.set(agentId, {
       taskId,
@@ -100,6 +99,15 @@ export class ParallelDisplayManager {
       agent.currentAction = 'Done'
       if (toolCount !== undefined) agent.toolCount = toolCount
       if (tokenCount !== undefined) agent.tokenCount = tokenCount
+      this.renderNow()
+    }
+  }
+
+  markValidating(agentId: string): void {
+    const agent = this.agents.get(agentId)
+    if (agent) {
+      agent.status = 'validating'
+      agent.currentAction = 'Validating...'
       this.renderNow()
     }
   }
@@ -156,10 +164,13 @@ export class ParallelDisplayManager {
       this.renderNow()
     } else if (!this.pendingRender) {
       this.pendingRender = true
-      setTimeout(() => {
-        this.pendingRender = false
-        this.renderNow()
-      }, throttleMs - (now - this.lastRenderTime))
+      setTimeout(
+        () => {
+          this.pendingRender = false
+          this.renderNow()
+        },
+        throttleMs - (now - this.lastRenderTime)
+      )
     }
   }
 
@@ -181,7 +192,10 @@ export class ParallelDisplayManager {
     const agentArray = Array.from(this.agents.values())
     if (agentArray.length === 0) return
 
-    const completed = agentArray.filter((a) => a.status !== 'running').length
+    const completed = agentArray.filter(
+      (a) => a.status !== 'running' && a.status !== 'validating'
+    ).length
+    const validating = agentArray.filter((a) => a.status === 'validating').length
     const total = agentArray.length
     const expectedLineCount = 1 + agentArray.length * 2
 
@@ -193,18 +207,26 @@ export class ParallelDisplayManager {
     }
 
     const totalTools = agentArray.reduce((sum, a) => sum + a.toolCount, 0)
-    const runningAgents = agentArray.filter((a) => a.status === 'running')
-    const oldestRunning = runningAgents.length > 0
-      ? Math.max(...runningAgents.map((a) => Date.now() - a.startTime))
-      : 0
+    const runningAgents = agentArray.filter(
+      (a) => a.status === 'running' || a.status === 'validating'
+    )
+    const oldestRunning =
+      runningAgents.length > 0 ? Math.max(...runningAgents.map((a) => Date.now() - a.startTime)) : 0
     const elapsedStr = oldestRunning > 0 ? this.formatDuration(oldestRunning) : ''
 
-    const header =
-      completed === total
-        ? chalk.green(`✔ ${total} subagents finished │ ${totalTools} total tools`)
-        : chalk.cyan(`⏳ ${total - completed} running · ${completed}/${total} done`) +
-          chalk.gray(` │ ${totalTools} tools`) +
-          (elapsedStr ? chalk.dim(` │ ${elapsedStr}`) : '')
+    let header: string
+    if (completed + validating === total && validating > 0) {
+      header = chalk.yellow(
+        `⏳ Validating ${validating} task${validating > 1 ? 's' : ''} │ ${totalTools} total tools`
+      )
+    } else if (completed === total) {
+      header = chalk.green(`✔ ${total} subagents finished │ ${totalTools} total tools`)
+    } else {
+      header =
+        chalk.cyan(`⏳ ${total - completed - validating} running · ${completed}/${total} done`) +
+        chalk.gray(` │ ${totalTools} tools`) +
+        (elapsedStr ? chalk.dim(` │ ${elapsedStr}`) : '')
+    }
 
     process.stdout.write(`   ${header}\n`)
 
@@ -219,6 +241,9 @@ export class ParallelDisplayManager {
       if (agent.status === 'running') {
         statusIcon = this.getSpinnerFrame()
         statusColor = chalk.cyan
+      } else if (agent.status === 'validating') {
+        statusIcon = this.getSpinnerFrame()
+        statusColor = chalk.yellow
       } else if (agent.status === 'completed') {
         statusIcon = '✓'
         statusColor = chalk.green
@@ -233,8 +258,12 @@ export class ParallelDisplayManager {
       if (agent.status === 'running') {
         const activityIndicator = this.getActivityIndicator(agent.lastActivityTime)
         metricsStr = chalk.gray(` ${activityIndicator} ${elapsed} │ ${agent.toolCount} tools`)
+      } else if (agent.status === 'validating') {
+        metricsStr = chalk.gray(` ${elapsed} │ ${agent.toolCount} tools`)
       } else if (this.options.showTokens) {
-        metricsStr = chalk.gray(` ${elapsed} │ ${agent.toolCount} tools │ ${this.formatTokens(agent.tokenCount)} tok`)
+        metricsStr = chalk.gray(
+          ` ${elapsed} │ ${agent.toolCount} tools │ ${this.formatTokens(agent.tokenCount)} tok`
+        )
       } else {
         metricsStr = chalk.gray(` ${elapsed}`)
       }
@@ -242,7 +271,7 @@ export class ParallelDisplayManager {
       const taskLine = `   ${chalk.gray(prefix)} ${statusColor(statusIcon)} Task ${agent.taskId}: ${agent.taskTitle}${metricsStr}`
       process.stdout.write(`${taskLine}\n`)
 
-      if (agent.status === 'running') {
+      if (agent.status === 'running' || agent.status === 'validating') {
         const actionLine = `   ${chalk.gray(vertLine)}   ${chalk.dim('└─')} ${chalk.gray(agent.currentAction)}`
         process.stdout.write(`${actionLine}\n`)
       } else {
@@ -301,9 +330,8 @@ export class ParallelDisplayManager {
         const filePath = input?.file_path as string
         if (filePath) {
           const parts = filePath.split('/')
-          const fileName = parts.length > 2
-            ? `.../${parts.slice(-2).join('/')}`
-            : parts.pop() || filePath
+          const fileName =
+            parts.length > 2 ? `.../${parts.slice(-2).join('/')}` : parts.pop() || filePath
           return `📖 ${fileName}`
         }
         return '📖 Reading file'
@@ -312,9 +340,8 @@ export class ParallelDisplayManager {
         const filePath = input?.file_path as string
         if (filePath) {
           const parts = filePath.split('/')
-          const fileName = parts.length > 2
-            ? `.../${parts.slice(-2).join('/')}`
-            : parts.pop() || filePath
+          const fileName =
+            parts.length > 2 ? `.../${parts.slice(-2).join('/')}` : parts.pop() || filePath
           return `✏️ ${fileName}`
         }
         return '✏️ Writing file'
@@ -323,9 +350,8 @@ export class ParallelDisplayManager {
         const filePath = input?.file_path as string
         if (filePath) {
           const parts = filePath.split('/')
-          const fileName = parts.length > 2
-            ? `.../${parts.slice(-2).join('/')}`
-            : parts.pop() || filePath
+          const fileName =
+            parts.length > 2 ? `.../${parts.slice(-2).join('/')}` : parts.pop() || filePath
           return `📝 ${fileName}`
         }
         return '📝 Editing file'

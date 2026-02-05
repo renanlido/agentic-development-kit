@@ -176,7 +176,9 @@ function renderAbortSummary(): void {
   const completed = Array.from(currentState.tasks.values()).filter(
     (t) => t.status === 'completed'
   ).length
-  const running = Array.from(currentState.tasks.values()).filter((t) => t.status === 'running').length
+  const running = Array.from(currentState.tasks.values()).filter(
+    (t) => t.status === 'running'
+  ).length
 
   console.log()
   console.log(
@@ -193,8 +195,7 @@ function renderAbortSummary(): void {
           ? chalk.yellow('⊘')
           : chalk.gray('○')
 
-    const statusText =
-      task.status === 'running' ? chalk.yellow(' (interrupted)') : ''
+    const statusText = task.status === 'running' ? chalk.yellow(' (interrupted)') : ''
 
     const taskElapsed =
       task.status === 'pending' ? '' : ` (${formatDuration(Date.now() - task.startTime)})`
@@ -309,7 +310,8 @@ function renderProgress(): void {
   lines.push(chalk.gray('─'.repeat(70)))
 
   for (const task of currentState.tasks.values()) {
-    const taskElapsed = task.status === 'pending' ? '—' : formatDuration(Date.now() - task.startTime)
+    const taskElapsed =
+      task.status === 'pending' ? '—' : formatDuration(Date.now() - task.startTime)
 
     const statusIcon =
       task.status === 'completed'
@@ -354,7 +356,10 @@ function renderFinalSummary(): void {
     (t) => t.status === 'completed'
   ).length
   const failed = Array.from(currentState.tasks.values()).filter((t) => t.status === 'failed').length
-  const totalTools = Array.from(currentState.tasks.values()).reduce((sum, t) => sum + t.toolCount, 0)
+  const totalTools = Array.from(currentState.tasks.values()).reduce(
+    (sum, t) => sum + t.toolCount,
+    0
+  )
   const totalCost = Array.from(currentState.tasks.values()).reduce((sum, t) => sum + t.cost, 0)
 
   console.log()
@@ -387,9 +392,7 @@ function renderFinalSummary(): void {
   console.log()
 }
 
-export function createTaskEventHandler(
-  taskId: string
-): (event: StreamEvent) => void {
+export function createTaskEventHandler(taskId: string): (event: StreamEvent) => void {
   return (event: StreamEvent) => {
     updateTaskProgress(taskId, event)
   }

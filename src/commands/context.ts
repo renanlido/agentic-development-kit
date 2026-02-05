@@ -25,7 +25,9 @@ class ContextCommand {
 
         for (const featureName of features) {
           const featureStat = await fs.stat(`${featuresPath}/${featureName}`)
-          if (!featureStat.isDirectory()) continue
+          if (!featureStat.isDirectory()) {
+            continue
+          }
 
           try {
             const status = await manager.getContextStatus(featureName)
@@ -64,9 +66,13 @@ class ContextCommand {
       console.log(`Usage: ${chalk.bold(`${status.usagePercentage.toFixed(1)}%`)}`)
 
       let levelColor = chalk.green
-      if (status.level === 'compact') levelColor = chalk.yellow
-      else if (status.level === 'summarize') levelColor = chalk.yellow
-      else if (status.level === 'handoff') levelColor = chalk.red
+      if (status.level === 'compact') {
+        levelColor = chalk.yellow
+      } else if (status.level === 'summarize') {
+        levelColor = chalk.yellow
+      } else if (status.level === 'handoff') {
+        levelColor = chalk.red
+      }
 
       console.log(`Level: ${levelColor(status.level.toUpperCase())}`)
       console.log(`Recommendation: ${status.recommendation}`)

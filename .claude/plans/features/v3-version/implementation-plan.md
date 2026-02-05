@@ -2,1021 +2,1718 @@
 
 **Data:** 2026-02-02
 **Status:** Ready for Implementation
-**Autor:** ADK Planning Agent
-**Baseado em:** research.md, prd.md, v3-decisions.md, context-memory-implementation.md
+**Complexidade:** Complexa
+**Total de Tasks:** 18
 
 ---
 
 ## Executive Summary
 
-This implementation plan breaks down the ADK v3 into **10 phases** with **58 tasks**. Each phase builds upon the previous one, creating a solid foundation for the v3 architecture.
+This plan details the implementation of ADK v3, transforming the CLI from 7 fragmented commands to a unified "one command per domain" architecture with hierarchical memory, session persistence, and anti-stub enforcement.
 
-**Total Estimated Story Points:** 89 SP
-**Critical Path:** Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5
-
----
-
-## Phase Overview
-
-| Phase | Name | Story Points | Description |
-|-------|------|--------------|-------------|
-| 1 | Infrastructure Expansion | 8 SP | Expand cli-v3.ts, verify Claude flags, add base commands |
-| 2 | Memory System Core | 13 SP | Implement 4-tier memory hierarchy with compaction |
-| 3 | Agent Logic | 10 SP | Create Initializer and Coding agent prompts |
-| 4 | Core Commands | 13 SP | Implement `feature <name>` and `autopilot` commands |
-| 5 | Quality Hooks | 8 SP | Anti-stub hooks, context injection, checkpoints |
-| 6 | Parallel Execution | 13 SP | Shared state, worktree management, aggregator |
-| 7 | Semantic Indexing | 10 SP | AST parsing, embeddings, search engine |
-| 8 | Auto Memories | 8 SP | Pattern detection and automatic capture |
-| 9 | Visual UI | 8 SP | TUI dashboard with Ink |
-| 10 | Integration & Testing | 8 SP | Full integration testing, documentation |
+**Key Objectives:**
+- Unified `adk feature work <name>` command (replaces 7 separate commands)
+- 4-tier memory hierarchy (Core State → Session → Feature → Project)
+- Dual-agent system (Initializer + Coding agents)
+- QA in two layers (per-task + final)
+- Anti-stub protocols with enforcement hooks
 
 ---
 
-## Phase 1: Infrastructure Expansion
+## Phase 1: Core Infrastructure
 
-**Objective:** Expand the minimal v3 infrastructure to support all planned commands.
+### Goal
+Establish the memory management foundation that enables context persistence across sessions.
 
-**Dependencies:** None (foundation phase)
-**Story Points:** 8 SP
-
-### Existing Files (Status)
-- `src/cli-v3.ts` - ✅ Exists (27 lines, minimal)
-- `src/utils/session-store.ts` - ✅ Complete (149 lines)
-- `src/utils/claude-v3.ts` - ✅ Complete (190 lines)
-- `src/types/session-v3.ts` - ✅ Complete (59 lines)
-- `src/commands/feature-v3.ts` - 🟡 Partial (95 lines, only `status` method)
-
-### Tasks
-
-#### Task 1.1: Verify Claude CLI Session Flags
-**Files:** N/A (verification task)
-**Tests:** Manual verification
-**Acceptance Criteria:**
-- [ ] Verify `--resume <uuid>` flag works
-- [ ] Verify `--session-id <uuid>` flag works
-- [ ] Verify `-c` (continue) flag works
-- [ ] Document any limitations or workarounds needed
-- [ ] Update claude-v3.ts if flag behavior differs from expected
-**Story Points:** 1 SP
-
-#### Task 1.2: Expand cli-v3.ts Commands
-**Files:** `src/cli-v3.ts`
-**Tests:** `tests/cli-v3.test.ts`
-**Acceptance Criteria:**
-- [ ] Add `feature <name>` command (calls `featureV3Command.feature()`)
-- [ ] Add `feature autopilot <name>` command (calls `featureV3Command.autopilot()`)
-- [ ] Add `--parallel` flag for autopilot
-- [ ] Add `--agents <number>` flag for parallel count
-- [ ] Add `--dry-run` flag for preview
-- [ ] Add `--resume` flag for session resume
-- [ ] Add `--continue` flag for continuation
-- [ ] All commands validated with proper error messages
-**Story Points:** 3 SP
-
-#### Task 1.3: Add package.json Entry Point
-**Files:** `package.json`
-**Tests:** Manual verification
-**Acceptance Criteria:**
-- [ ] Add `"adk3": "node dist/cli-v3.js"` to bin section
-- [ ] Verify `npm run adk3 -- --help` works
-- [ ] Verify `npm run adk3 -- feature status test` works
-**Story Points:** 1 SP
-
-#### Task 1.4: Create Types for v3 Features
-**Files:** `src/types/feature-v3.ts`
-**Tests:** `tests/types/feature-v3.test.ts`
-**Acceptance Criteria:**
-- [ ] Create `FeatureList` interface (canonical schema from implementation guide)
-- [ ] Create `FeatureTest` interface
-- [ ] Create `FeaturePhase` enum (research, plan, implement, qa)
-- [ ] Create `FeatureStatus` type
-- [ ] Create `AutopilotOptions` interface
-- [ ] Validate types with Zod schemas
-**Story Points:** 2 SP
-
-#### Task 1.5: Create Feature List Manager
-**Files:** `src/utils/feature-list.ts`
-**Tests:** `tests/utils/feature-list.test.ts`
-**Acceptance Criteria:**
-- [ ] `load(feature)` - Load feature_list.json
-- [ ] `save(feature, list)` - Save with atomic writes
-- [ ] `create(feature, tests)` - Create new feature list
-- [ ] `updateTest(feature, testId, updates)` - Update single test
-- [ ] `getSummary(feature)` - Get test counts
-- [ ] `getNextPendingTest(feature)` - Get next test to implement
-- [ ] Handle migration from tasks.md format
-**Story Points:** 1 SP
-
-### Phase 1 Checkpoint
-- [ ] `npm run adk3 -- feature test-feature` executes (stubs OK)
-- [ ] `npm run adk3 -- feature autopilot test-feature` executes (stubs OK)
-- [ ] All new types compile without errors
-- [ ] All Phase 1 tests pass
+### Overview
+| Task | Effort | Dependencies | Files |
+|------|--------|--------------|-------|
+| 1.1 Core State Manager | G (4-8h) | none | `src/utils/memory/core-state.ts`, `src/types/memory-v3.ts` |
+| 1.2 Session Notes Manager | M (2-4h) | none | `src/utils/memory/session-notes.ts` |
+| 1.3 Decisions Manager | M (2-4h) | none | `src/utils/memory/decisions-manager.ts` |
+| 1.4 Memory Directory Initializer | P (1-2h) | 1.1, 1.2, 1.3 | `src/utils/memory/initializer.ts` |
 
 ---
 
-## Phase 2: Memory System Core
+### Task 1.1: Implementar Core State Manager
 
-**Objective:** Implement the 4-tier hierarchical memory system.
+**Tipo:** Feature
+**Estimativa:** G (4-8h)
+**Dependencias:** nenhuma
+**Prioridade:** CRITICAL - Foundation for all memory operations
 
-**Dependencies:** Phase 1
-**Story Points:** 13 SP
+#### Objetivo
+Create the Tier 1 memory layer that maintains focus on "Where am I and what did I just do." This JSON file is ALWAYS present in every agent context.
 
-### Files to Create
-- `src/utils/memory/core-state.ts` - Tier 1 manager
-- `src/utils/memory/session-notes.ts` - Tier 2 manager
-- `src/utils/memory/loader.ts` - Progressive loading
-- `src/utils/memory/compactor.ts` - Enhanced compaction
+#### Escopo Detalhado
 
-### Tasks
+**O que FAZER:**
+1. Create `src/types/memory-v3.ts` with interfaces:
+   - `CoreState` (main schema)
+   - `TaskState` (current task info)
+   - `Decision` (critical decision record)
+   - `ModifiedFile` (file change record)
+   - `Breadcrumb` (reference for re-fetch)
 
-#### Task 2.1: Create Memory Directory Structure
-**Files:** `src/utils/memory/index.ts`
-**Tests:** N/A (structure task)
-**Acceptance Criteria:**
-- [ ] Create `src/utils/memory/` directory
-- [ ] Create index.ts with all exports
-- [ ] Define memory tier constants (token limits, file paths)
-**Story Points:** 1 SP
+2. Create `src/utils/memory/core-state.ts` with class `CoreStateManager`:
+   - `constructor(featureName: string)`
+   - `async load(): Promise<CoreState>` - reads core-state.json or returns default
+   - `async save(state: CoreState): Promise<void>` - atomic write (temp + move)
+   - `async updateTask(task: Partial<TaskState>): Promise<void>`
+   - `async addDecision(decision: Omit<Decision, 'timestamp'>): Promise<void>` - FIFO limit 5
+   - `async addModifiedFile(file: ModifiedFile): Promise<void>` - FIFO limit 5
+   - `async addBreadcrumb(breadcrumb: Breadcrumb): Promise<void>`
+   - `async markTaskComplete(taskId: string): Promise<void>`
+   - `async addBlocker(blocker: string): Promise<void>`
+   - `getPath(): string` - returns path to core-state.json
 
-#### Task 2.2: Implement Core State Manager (Tier 1)
-**Files:** `src/utils/memory/core-state.ts`
-**Tests:** `tests/utils/memory/core-state.test.ts`
-**Acceptance Criteria:**
-- [ ] Create `CoreState` interface matching spec
-- [ ] `load(feature)` - Load core-state.json
-- [ ] `save(feature, state)` - Save with atomic writes
-- [ ] `update(feature, updates)` - Partial update
-- [ ] `updateCurrentTask(feature, task)` - Update current task
-- [ ] `addDecision(feature, decision)` - Add decision (max 5)
-- [ ] `addModifiedFile(feature, file)` - Track modified files
-- [ ] `getTokenCount(feature)` - Count tokens (<2000 target)
-- [ ] Auto-compress when exceeding 2000 tokens
-**Story Points:** 3 SP
+3. Implement validation:
+   - Feature name validation (no path traversal)
+   - Schema validation on load
+   - Graceful handling of corrupted files (return default)
 
-#### Task 2.3: Implement Session Notes Manager (Tier 2)
-**Files:** `src/utils/memory/session-notes.ts`
-**Tests:** `tests/utils/memory/session-notes.test.ts`
-**Acceptance Criteria:**
-- [ ] `load(feature)` - Load session-notes.md
-- [ ] `save(feature, notes)` - Save as markdown
-- [ ] `addEntry(feature, entry)` - Add timeline entry
-- [ ] `addLearning(feature, learning)` - Add key learning
-- [ ] `addFileRead(feature, file)` - Track files read
-- [ ] `addCommand(feature, command, result)` - Track commands
-- [ ] `archive(feature)` - Archive to history
-**Story Points:** 2 SP
+**O que NAO FAZER:**
+- Hooks de injecao (Task 4.2)
+- Integracao com CLI (Fase 3)
+- Compaction logic (Task 5.2)
 
-#### Task 2.4: Implement Decisions Tracker (Tier 2)
-**Files:** `src/utils/memory/decisions.ts`
-**Tests:** `tests/utils/memory/decisions.test.ts`
-**Acceptance Criteria:**
-- [ ] `load(feature)` - Load decisions.md
-- [ ] `add(feature, decision)` - Add new decision with ADR format
-- [ ] `list(feature)` - List all decisions
-- [ ] `getRecent(feature, count)` - Get N most recent
-- [ ] Markdown format with Context, Options, Decision, Rationale
-**Story Points:** 2 SP
+#### Schema (core-state.json)
 
-#### Task 2.5: Implement Breadcrumbs Manager (Tier 2)
-**Files:** `src/utils/memory/breadcrumbs.ts`
-**Tests:** `tests/utils/memory/breadcrumbs.test.ts`
-**Acceptance Criteria:**
-- [ ] `load(feature)` - Load breadcrumbs.md
-- [ ] `add(feature, breadcrumb)` - Add reference for re-fetch
-- [ ] `getByType(feature, type)` - Get breadcrumbs by category
-- [ ] Support patterns, files, commands categories
-**Story Points:** 1 SP
+```json
+{
+  "$schema": "core-state-v1",
+  "version": "1.0",
+  "feature": "nome-da-feature",
+  "updatedAt": "2026-02-02T11:30:00Z",
+  "currentTask": {
+    "id": "1.3",
+    "name": "Implementar generateFixPrompt",
+    "status": "in_progress",
+    "startedAt": "2026-02-02T10:30:00Z",
+    "files": ["src/commands/feature.ts"],
+    "lines": "3273-3325"
+  },
+  "taskProgress": {
+    "total": 5,
+    "completed": 2,
+    "inProgress": 1,
+    "pending": 2,
+    "completedIds": ["1.1", "1.2"]
+  },
+  "criticalDecisions": [],
+  "modifiedFiles": [],
+  "constraints": [
+    "NAO criar stubs - implementar logica real",
+    "NAO modificar codigo fora do escopo da task",
+    "SEMPRE rodar type-check apos modificacoes"
+  ],
+  "breadcrumbs": [],
+  "blockers": [],
+  "nextSteps": []
+}
+```
 
-#### Task 2.6: Implement Progressive Loader
-**Files:** `src/utils/memory/loader.ts`
-**Tests:** `tests/utils/memory/loader.test.ts`
-**Acceptance Criteria:**
-- [ ] `loadTier1(feature)` - Always load core state
-- [ ] `loadTier2(feature)` - Load session context
-- [ ] `loadTier3(feature, phase)` - Load based on phase (research/plan/implement/qa)
-- [ ] `loadForTask(feature, task)` - Load context specific to task
-- [ ] `getTokenCount(context)` - Calculate total tokens
-- [ ] Enforce max 20K tokens per load
-- [ ] Return formatted context string
-**Story Points:** 2 SP
+#### Criterios de Aceite
+- [ ] Arquivo `src/utils/memory/core-state.ts` existe e compila
+- [ ] CoreStateManager.load() le core-state.json ou retorna default
+- [ ] CoreStateManager.save() persiste atomicamente (temp file + move)
+- [ ] CoreStateManager.updateTask() atualiza currentTask e status
+- [ ] Limite de 5 decisoes criticas e respeitado (FIFO)
+- [ ] Limite de 5 arquivos modificados recentes e respeitado
+- [ ] Path traversal prevention works
+- [ ] Testes passam com 100% de cobertura dos metodos publicos
 
-#### Task 2.7: Enhance Context Compactor for Two-Threshold
-**Files:** `src/utils/memory/compactor.ts` (extends existing context-compactor.ts)
-**Tests:** `tests/utils/memory/compactor.test.ts`
-**Acceptance Criteria:**
-- [ ] Implement T_max = 80% trigger threshold
-- [ ] Implement T_target = 50% post-compaction target
-- [ ] Define never-compress list (paths, line numbers, commands, errors)
-- [ ] Define always-compress list (explanations, failed attempts)
-- [ ] Create structured compaction template
-- [ ] Preserve artifact trail (file paths, operations, lines)
-- [ ] 24-hour revert window support
-**Story Points:** 2 SP
+#### Arquivos Envolvidos
+- `src/types/memory-v3.ts` - criar
+- `src/utils/memory/core-state.ts` - criar
+- `tests/utils/memory/core-state.test.ts` - criar
 
-### Phase 2 Checkpoint
-- [ ] Core state saves and loads correctly
-- [ ] Session notes update and archive properly
-- [ ] Decisions track with ADR format
-- [ ] Loader returns combined context under 20K tokens
-- [ ] Compactor triggers at 80% and reduces to 50%
-- [ ] All Phase 2 tests pass
+#### Padroes a Seguir
+- Atomic writes: Use temp file + fs.move (see `session-store.ts:33-48`)
+- Path construction: Use `getBasePath()` pattern (see `state-manager.ts:403-412`)
+- Validation: Use pattern from `session-store.ts:18-21`
 
 ---
 
-## Phase 3: Agent Logic
+### Task 1.2: Implementar Session Notes Manager
 
-**Objective:** Create the dual-agent prompt system (Initializer + Coding).
+**Tipo:** Feature
+**Estimativa:** M (2-4h)
+**Dependencias:** nenhuma
+**Prioridade:** HIGH - Required for session context (Tier 2)
 
-**Dependencies:** Phase 2
-**Story Points:** 10 SP
+#### Objetivo
+Create Tier 2 session context with structured markdown for session history recovery.
 
-### Files to Create
-- `src/utils/prompts/initializer.ts` - Initializer Agent prompt builder
-- `src/utils/prompts/coding.ts` - Coding Agent prompt builder
-- `src/utils/prompts/anti-stub.ts` - Anti-stub rules generator
-- `src/utils/prompts/comprehension-check.ts` - Checkpoint generator
+#### Escopo Detalhado
 
-### Tasks
+**O que FAZER:**
+1. Create `src/utils/memory/session-notes.ts` with class `SessionNotesManager`:
+   - `constructor(featureName: string)`
+   - `async initialize(objective: string): Promise<void>` - creates session-notes.md with template
+   - `async addTimelineEntry(action: string, result: string, notes?: string): Promise<void>` - append only
+   - `async addLearning(learning: string): Promise<void>`
+   - `async markFileRead(filePath: string): Promise<void>`
+   - `async addCommand(command: string, status: 'pass' | 'fail'): Promise<void>`
+   - `async updateNextSession(items: string[]): Promise<void>`
+   - `async getContent(): Promise<string>`
+   - `getPath(): string`
 
-#### Task 3.1: Create Prompts Directory Structure
-**Files:** `src/utils/prompts/index.ts`
-**Tests:** N/A (structure task)
-**Acceptance Criteria:**
-- [ ] Create `src/utils/prompts/` directory
-- [ ] Create index.ts with all exports
-- [ ] Define prompt constants (max tokens, templates)
-**Story Points:** 1 SP
+2. Template format (session-notes.md):
+   ```markdown
+   # Session Notes: {feature-name}
+   **Session ID:** sess-YYYY-MM-DD-NNN
+   **Started:** YYYY-MM-DD HH:mm
+   **Last Update:** YYYY-MM-DD HH:mm
 
-#### Task 3.2: Implement Anti-Stub Rules Generator
-**Files:** `src/utils/prompts/anti-stub.ts`
-**Tests:** `tests/utils/prompts/anti-stub.test.ts`
-**Acceptance Criteria:**
-- [ ] Define stub patterns list (TODO, FIXME, NotImplementedError, etc.)
-- [ ] `generateRules()` - Generate anti-stub section for prompts
-- [ ] `generateChecklist()` - Generate completion checklist
-- [ ] Include TDD verification loop instructions
-- [ ] Include "One File, One Step" protocol
-**Story Points:** 1 SP
+   ## Objective
+   [Objetivo claro e especifico da sessao]
 
-#### Task 3.3: Implement Comprehension Checkpoint Generator
-**Files:** `src/utils/prompts/comprehension-check.ts`
-**Tests:** `tests/utils/prompts/comprehension-check.test.ts`
-**Acceptance Criteria:**
-- [ ] `generateCheckpoint(coreState)` - Generate checkpoint questions
-- [ ] Questions: current task, modified files, decisions, constraints
-- [ ] Verification checklist format
-- [ ] "If cannot answer, read first" instructions
-**Story Points:** 1 SP
+   ## Progress Timeline
+   | Time | Action | Result | Notes |
+   |------|--------|--------|-------|
 
-#### Task 3.4: Implement Initializer Agent Prompt Builder
-**Files:** `src/utils/prompts/initializer.ts`
-**Tests:** `tests/utils/prompts/initializer.test.ts`
-**Acceptance Criteria:**
-- [ ] `buildPrompt(feature, prd, context)` - Build complete prompt
-- [ ] Include system role: "You are a software architect..."
-- [ ] Mission: Create feature_list.json and init.sh
-- [ ] Include PRD analysis instructions
-- [ ] Include output format specifications
-- [ ] Include anti-stub rules
-- [ ] Output files must be real (no stubs)
-**Story Points:** 3 SP
+   ## Key Learnings This Session
+   1.
 
-#### Task 3.5: Implement Coding Agent Prompt Builder
-**Files:** `src/utils/prompts/coding.ts`
-**Tests:** `tests/utils/prompts/coding.test.ts`
-**Acceptance Criteria:**
-- [ ] `buildPrompt(feature, coreState, context)` - Build complete prompt
-- [ ] Include system role: "You are a senior developer..."
-- [ ] Include Read-Before-Write protocol
-- [ ] Include TDD enforcement loop
-- [ ] Include anti-stub rules
-- [ ] Include comprehension checkpoint
-- [ ] Include context from memory tiers
-- [ ] Include constraints section at TOP (Critical Info First)
-- [ ] Loop instructions: Read → Analyze → Implement → Test → Commit → Repeat
-**Story Points:** 3 SP
+   ## Files Read This Session
+   - [ ]
 
-#### Task 3.6: Create Prompt Template System
-**Files:** `src/utils/prompts/templates.ts`
-**Tests:** `tests/utils/prompts/templates.test.ts`
-**Acceptance Criteria:**
-- [ ] `loadTemplate(name)` - Load prompt template
-- [ ] `renderTemplate(template, vars)` - Render with variables
-- [ ] Support markdown templates with {{variable}} placeholders
-- [ ] Template validation (required variables)
-**Story Points:** 1 SP
+   ## Commands Executed
+   ```bash
+   ```
 
-### Phase 3 Checkpoint
-- [ ] Initializer prompt generates valid instructions
-- [ ] Coding prompt includes all 5 guarantee layers
-- [ ] Anti-stub rules properly formatted
-- [ ] Comprehension checkpoint questions generated
-- [ ] All Phase 3 tests pass
+   ## Questions/Blockers
+   Nenhum no momento.
+
+   ## Next Session Should
+   1.
+   ```
+
+**O que NAO FAZER:**
+- Archive automatico (sera feito no compactor)
+- Integracao com checkpoint
+
+#### Criterios de Aceite
+- [ ] Arquivo `src/utils/memory/session-notes.ts` existe e compila
+- [ ] SessionNotesManager.initialize() cria session-notes.md com template correto
+- [ ] addTimelineEntry() adiciona entrada com timestamp na tabela markdown
+- [ ] addLearning() adiciona item na secao Key Learnings
+- [ ] markFileRead() atualiza checklist de Files Read
+- [ ] Append-only pattern is followed (never overwrite timeline entries)
+- [ ] Testes passam com cobertura dos metodos publicos
+
+#### Arquivos Envolvidos
+- `src/utils/memory/session-notes.ts` - criar
+- `tests/utils/memory/session-notes.test.ts` - criar
 
 ---
 
-## Phase 4: Core Commands
+### Task 1.3: Implementar Decisions Manager
 
-**Objective:** Implement the main `feature` and `autopilot` commands.
+**Tipo:** Feature
+**Estimativa:** M (2-4h)
+**Dependencias:** nenhuma
+**Prioridade:** HIGH - Required for decision tracking (Tier 2)
 
-**Dependencies:** Phase 2, Phase 3
-**Story Points:** 13 SP
+#### Objetivo
+Create ADR-style decision log for architectural choices with auto-incrementing IDs.
 
-### Files to Modify/Create
-- `src/commands/feature-v3.ts` - Expand with new methods
-- `src/utils/qa-executor.ts` - QA execution logic
-- `src/utils/autopilot-loop.ts` - Autopilot orchestration
+#### Escopo Detalhado
 
-### Tasks
+**O que FAZER:**
+1. Create `src/utils/memory/decisions-manager.ts` with class `DecisionsManager`:
+   - `constructor(featureName: string)`
+   - `async addDecision(decision: DecisionInput): Promise<string>` - returns new ID
+   - `async listDecisions(): Promise<Decision[]>` - returns all decisions
+   - `async getDecision(id: string): Promise<Decision | null>`
+   - `async getNextId(): Promise<string>` - returns "DEC-001", "DEC-002", etc.
+   - `getPath(): string`
 
-#### Task 4.1: Implement Feature State Detection
-**Files:** `src/commands/feature-v3.ts`
-**Tests:** `tests/commands/feature-v3.test.ts`
-**Acceptance Criteria:**
-- [ ] `detectState(feature)` - Detect current feature state
-- [ ] Returns: 'new' | 'research' | 'plan' | 'implement' | 'qa' | 'completed'
-- [ ] Check for feature_list.json existence
-- [ ] Check for research.md, implementation-plan.md
-- [ ] Check for pending tests in feature_list.json
-**Story Points:** 2 SP
+2. Decision format in decisions.md:
+   ```markdown
+   # Decision Log: {feature-name}
 
-#### Task 4.2: Implement Research Phase
-**Files:** `src/commands/feature-v3.ts`
-**Tests:** `tests/commands/feature-v3.test.ts`
-**Acceptance Criteria:**
-- [ ] `executeResearch(feature)` - Execute research phase
-- [ ] Load PRD as context
-- [ ] Generate research prompt
-- [ ] Execute via claude-v3
-- [ ] Save research.md output
-- [ ] Update core state with phase
-**Story Points:** 2 SP
+   ## DEC-001: [Title]
+   **Date:** YYYY-MM-DD
+   **Status:** Approved
 
-#### Task 4.3: Implement Plan Phase
-**Files:** `src/commands/feature-v3.ts`
-**Tests:** `tests/commands/feature-v3.test.ts`
-**Acceptance Criteria:**
-- [ ] `executePlan(feature)` - Execute planning phase
-- [ ] Require research.md to exist
-- [ ] Load research + PRD as context
-- [ ] Generate planning prompt
-- [ ] Execute via claude-v3
-- [ ] Save implementation-plan.md output
-- [ ] Generate feature_list.json from plan
-**Story Points:** 2 SP
+   ### Context
+   [Why this decision was needed]
 
-#### Task 4.4: Implement Single Task Execution
-**Files:** `src/commands/feature-v3.ts`
-**Tests:** `tests/commands/feature-v3.test.ts`
-**Acceptance Criteria:**
-- [ ] `executeTask(feature, testId)` - Execute single test/task
-- [ ] Load memory context (tiers 1-3)
-- [ ] Generate coding prompt for specific test
-- [ ] Execute via claude-v3 with session tracking
-- [ ] Update core state during execution
-- [ ] Update feature_list.json test status
-**Story Points:** 2 SP
+   ### Options Considered
+   1. **Option A** - Description
+   2. **Option B** - Description
 
-#### Task 4.5: Implement QA Executor
-**Files:** `src/utils/qa-executor.ts`
-**Tests:** `tests/utils/qa-executor.test.ts`
-**Acceptance Criteria:**
-- [ ] `executeQA(feature, testId)` - QA single test
-- [ ] `executeFullQA(feature)` - QA all tests
-- [ ] Parse QA results (pass/fail with details)
-- [ ] Return structured QAResult
-- [ ] Support retry count tracking
-**Story Points:** 2 SP
+   ### Decision
+   [What was decided]
 
-#### Task 4.6: Implement Interactive Feature Command
-**Files:** `src/commands/feature-v3.ts`
-**Tests:** `tests/commands/feature-v3.test.ts`
-**Acceptance Criteria:**
-- [ ] `feature(name, options)` - Main interactive command
-- [ ] Auto-detect state and continue from there
-- [ ] Manual validation between phases (inquirer prompt)
-- [ ] Options: refine, continue, skip
-- [ ] Progress display with ora spinners
-- [ ] Proper error handling and exit
-**Story Points:** 1 SP
+   ### Rationale
+   [Why this option was chosen]
 
-#### Task 4.7: Implement Autopilot Loop
-**Files:** `src/utils/autopilot-loop.ts`
-**Tests:** `tests/utils/autopilot-loop.test.ts`
-**Acceptance Criteria:**
-- [ ] `executeAutopilot(feature, options)` - Main autopilot entry
-- [ ] Layer 1: QA per task with 3x retry
-- [ ] Layer 2: Final QA with 3x retry
-- [ ] Auto-correction prompt generation
-- [ ] Escalation to human on 3x failure
-- [ ] Progress tracking and display
-- [ ] Support for `--dry-run` preview
-**Story Points:** 2 SP
+   ### Consequences
+   - Positivo:
+   - Negativo:
+   ```
 
-### Phase 4 Checkpoint
-- [ ] `adk3 feature test-feature` executes full interactive flow
-- [ ] `adk3 feature autopilot test-feature` executes automatic flow
-- [ ] QA detects and reports issues
+3. Parsing existing decisions.md:
+   - Parse headers to extract decision IDs
+   - Handle malformed files gracefully
+
+**O que NAO FAZER:**
+- Sincronizacao com core-state (Task 1.1 ja guarda ultimas 5)
+- Multi-agent shared decisions (Fase 2)
+
+#### Criterios de Aceite
+- [ ] Arquivo `src/utils/memory/decisions-manager.ts` existe e compila
+- [ ] addDecision() cria entrada com ID auto-incrementado
+- [ ] listDecisions() retorna todas as decisoes do arquivo
+- [ ] getDecision(id) retorna decisao especifica
+- [ ] Parse de decisions.md existente funciona corretamente
+- [ ] Handles missing/malformed files gracefully
+- [ ] Testes passam
+
+#### Arquivos Envolvidos
+- `src/utils/memory/decisions-manager.ts` - criar
+- `tests/utils/memory/decisions-manager.test.ts` - criar
+
+---
+
+### Task 1.4: Implementar Memory Directory Initializer
+
+**Tipo:** Feature
+**Estimativa:** P (1-2h)
+**Dependencias:** Task 1.1, 1.2, 1.3
+**Prioridade:** MEDIUM - Orchestrates memory structure creation
+
+#### Objetivo
+Create unified initializer that sets up complete memory directory structure for a feature.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Create `src/utils/memory/initializer.ts` with function:
+   ```typescript
+   async function initializeMemoryStructure(
+     featureName: string,
+     options?: { force?: boolean }
+   ): Promise<InitResult>
+   ```
+
+2. Create directories:
+   - `.claude/plans/features/{name}/memory/`
+   - `.claude/plans/features/{name}/memory/archive/`
+   - `.claude/plans/features/{name}/checkpoints/`
+   - `.claude/plans/features/{name}/sessions/`
+
+3. Create initial files:
+   - `memory/core-state.json` (using CoreStateManager default)
+   - `memory/session-notes.md` (using SessionNotesManager template)
+   - `memory/decisions.md` (empty template)
+   - `memory/breadcrumbs.md` (reference template)
+
+4. Return object with created paths:
+   ```typescript
+   interface InitResult {
+     created: string[]
+     skipped: string[]
+     memoryPath: string
+     checkpointsPath: string
+   }
+   ```
+
+**O que NAO FAZER:**
+- Migracao de features v2 (Task 4.3)
+- Overwrite existing files unless force=true
+
+#### Criterios de Aceite
+- [ ] initializeMemoryStructure() cria diretorios memory/, checkpoints/, sessions/
+- [ ] Arquivos iniciais sao criados com templates corretos
+- [ ] Se diretorios/arquivos existem, nao sobrescreve (unless force=true)
+- [ ] Retorna objeto com paths criados
+- [ ] Integration with CoreStateManager, SessionNotesManager, DecisionsManager
+- [ ] Testes passam
+
+#### Arquivos Envolvidos
+- `src/utils/memory/initializer.ts` - criar
+- `tests/utils/memory/initializer.test.ts` - criar
+
+---
+
+## Phase 2: Prompt System
+
+### Goal
+Create the agent prompts that drive the dual-agent architecture.
+
+### Overview
+| Task | Effort | Dependencies | Files |
+|------|--------|--------------|-------|
+| 2.1 Feature List Generator | M (2-4h) | none | `src/utils/feature-list.ts`, `src/types/feature-list.ts` |
+| 2.2 Initializer Agent Prompt | M (2-4h) | 2.1 | `src/utils/prompts/initializer-agent.ts` |
+| 2.3 Coding Agent Prompt | M (2-4h) | 2.1 | `src/utils/prompts/coding-agent.ts` |
+| 2.4 QA Agent Prompt | M (2-4h) | 2.1 | `src/utils/prompts/qa-agent.ts` |
+
+---
+
+### Task 2.1: Implementar Feature List Generator
+
+**Tipo:** Feature
+**Estimativa:** M (2-4h)
+**Dependencias:** nenhuma
+**Prioridade:** CRITICAL - Core artifact for agent workflow
+
+#### Objetivo
+Create the FeatureList manager that handles the `feature_list.json` schema - the central artifact that guides Coding Agent through tasks.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Create `src/types/feature-list.ts` with interfaces:
+   ```typescript
+   interface FeatureList {
+     feature: string
+     version: "1.0.0"
+     created: string
+     updated: string
+     tests: FeatureTest[]
+     summary: Summary
+   }
+
+   interface FeatureTest {
+     id: string
+     description: string
+     category: "functional" | "ui" | "integration" | "api" | "performance"
+     steps: string[]
+     status: "pending" | "passing" | "failing"
+     files?: string[]
+     lastTested?: string
+     evidence?: string
+   }
+
+   interface Summary {
+     total: number
+     passing: number
+     failing: number
+     pending: number
+   }
+   ```
+
+2. Create `src/utils/feature-list.ts` with class `FeatureListManager`:
+   - `constructor(featureName: string)`
+   - `async create(tests: FeatureTest[]): Promise<FeatureList>`
+   - `async load(): Promise<FeatureList | null>`
+   - `async save(list: FeatureList): Promise<void>`
+   - `async updateTestStatus(testId: string, status: FeatureTest['status'], evidence?: string): Promise<void>`
+   - `async getSummary(): Promise<Summary>`
+   - `async getNextPendingTest(): Promise<FeatureTest | null>`
+   - `async isComplete(): Promise<boolean>`
+   - `getPath(): string`
+
+3. Validation:
+   - Validate schema on load
+   - Auto-update `updated` timestamp on save
+   - Auto-recalculate summary on status update
+
+**O que NAO FAZER:**
+- Geracao automatica de testes a partir do PRD (sera feito pelo agente)
+- Conversao de tasks.md (Task 4.3)
+
+#### Criterios de Aceite
+- [ ] Arquivo `src/utils/feature-list.ts` existe e compila
+- [ ] create() gera feature_list.json com estrutura correta
+- [ ] load() le e valida feature_list.json existente
+- [ ] updateTestStatus() atualiza status e recalcula summary
+- [ ] getSummary() retorna { total, passing, failing, pending }
+- [ ] getNextPendingTest() returns first pending test
+- [ ] isComplete() returns true when all tests passing
+- [ ] Testes passam
+
+#### Arquivos Envolvidos
+- `src/types/feature-list.ts` - criar
+- `src/utils/feature-list.ts` - criar
+- `tests/utils/feature-list.test.ts` - criar
+
+---
+
+### Task 2.2: Implementar Initializer Agent Prompt
+
+**Tipo:** Feature
+**Estimativa:** M (2-4h)
+**Dependencias:** Task 2.1
+**Prioridade:** HIGH - First-run agent
+
+#### Objetivo
+Create the prompt template for the Initializer Agent that runs on first feature execution.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Create `src/utils/prompts/initializer-agent.ts` with:
+   ```typescript
+   interface InitializerContext {
+     featureName: string
+     prdContent: string
+     researchContent?: string
+     projectStack: string
+     existingPatterns: string[]
+   }
+
+   function generateInitializerPrompt(context: InitializerContext): string
+   ```
+
+2. Prompt must include:
+   - **Mission**: Create structure, feature_list.json, init.sh, initial commit
+   - **Anti-stub constraints**: Complete implementations only
+   - **Instructions to read**: PRD and research.md
+   - **Output format**: JSON artifacts with specific schema
+   - **Success criteria**: All files created, committed
+
+3. Prompt sections:
+   ```
+   ## MISSION
+   You are an architect setting up a new feature...
+
+   ## CONTEXT
+   [PRD content, research if available]
+
+   ## CONSTRAINTS (MANDATORY)
+   - NO stubs or placeholder code
+   - Read ALL context before acting
+   - Create COMPLETE feature_list.json
+
+   ## TASKS
+   1. Read PRD thoroughly
+   2. Create feature_list.json with all acceptance criteria as tests
+   3. Create init.sh for environment setup
+   4. Create initial commit
+
+   ## OUTPUT FORMAT
+   [Structured output expectations]
+   ```
+
+**O que NAO FAZER:**
+- Execucao do prompt (Task 3.1)
+- Integration with claude-v3.ts
+
+#### Criterios de Aceite
+- [ ] Arquivo `src/utils/prompts/initializer-agent.ts` existe e compila
+- [ ] generateInitializerPrompt() retorna string com prompt completo
+- [ ] Prompt inclui missao clara: criar estrutura, feature_list.json, init.sh, commit
+- [ ] Prompt inclui constraints anti-stub
+- [ ] Prompt referencia PRD e research.md
+- [ ] Prompt has clear output format expectations
+- [ ] Testes passam
+
+#### Arquivos Envolvidos
+- `src/utils/prompts/initializer-agent.ts` - criar
+- `tests/utils/prompts/initializer-agent.test.ts` - criar
+
+---
+
+### Task 2.3: Implementar Coding Agent Prompt
+
+**Tipo:** Feature
+**Estimativa:** M (2-4h)
+**Dependencias:** Task 2.1
+**Prioridade:** HIGH - Main implementation agent
+
+#### Objetivo
+Create the prompt template for the Coding Agent that handles ongoing implementation.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Create `src/utils/prompts/coding-agent.ts` with:
+   ```typescript
+   interface CodingContext {
+     featureName: string
+     coreState: CoreState
+     featureList: FeatureList
+     sessionNotes?: string
+     recentDecisions?: Decision[]
+   }
+
+   function generateCodingAgentPrompt(context: CodingContext): string
+   ```
+
+2. Prompt must include:
+   - **Mission**: Continue implementation from where left off
+   - **Current state injection**: Core state, current task
+   - **Implementation loop**: Select task → Implement → Test → Update → Commit
+   - **Anti-stub constraints**: Complete implementations only
+   - **TDD enforcement**: Write test first, then implementation
+
+3. Prompt sections:
+   ```
+   ## CURRENT STATE (INJECTED)
+   [Core state JSON]
+
+   ## MISSION
+   You are a senior developer continuing implementation...
+
+   ## CONSTRAINTS (MANDATORY)
+   - NO stubs
+   - Read before write
+   - One file, one step
+   - TDD required
+
+   ## IMPLEMENTATION LOOP
+   1. Read feature_list.json
+   2. Select next pending test
+   3. Implement with TDD
+   4. Run verification (type-check, tests, lint)
+   5. Update feature_list.json status
+   6. Commit changes
+   7. REPEAT until 100% passing
+
+   ## WHEN BLOCKED
+   - STOP and explain blocker
+   - DO NOT create stubs
+   ```
+
+**O que NAO FAZER:**
+- QA integrado (Task 3.4)
+- Claude execution
+
+#### Criterios de Aceite
+- [ ] Arquivo `src/utils/prompts/coding-agent.ts` existe e compila
+- [ ] generateCodingAgentPrompt() retorna string com prompt completo
+- [ ] Prompt inclui loop de implementacao
+- [ ] Prompt inclui constraints anti-stub
+- [ ] Prompt injeta core-state atual
+- [ ] Has clear TDD instructions
+- [ ] Testes passam
+
+#### Arquivos Envolvidos
+- `src/utils/prompts/coding-agent.ts` - criar
+- `tests/utils/prompts/coding-agent.test.ts` - criar
+
+---
+
+### Task 2.4: Implementar QA Agent Prompt
+
+**Tipo:** Feature
+**Estimativa:** M (2-4h)
+**Dependencias:** Task 2.1
+**Prioridade:** HIGH - Quality assurance layer
+
+#### Objetivo
+Create the QA Agent prompt for task-level and feature-level quality validation.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Create `src/utils/prompts/qa-agent.ts` with:
+   ```typescript
+   type QAMode = 'task' | 'feature'
+
+   interface QAContext {
+     featureName: string
+     mode: QAMode
+     taskId?: string
+     featureList: FeatureList
+     modifiedFiles: string[]
+   }
+
+   interface QAIssue {
+     type: 'stub' | 'test' | 'type' | 'lint' | 'logic'
+     severity: 'high' | 'medium' | 'low'
+     file: string
+     line?: number
+     description: string
+     suggestion?: string
+   }
+
+   function generateQAPrompt(context: QAContext): string
+   ```
+
+2. Prompt must include:
+   - **Verification checklist**:
+     - [ ] No stub patterns (throw new Error, TODO, FIXME)
+     - [ ] Type-check passes
+     - [ ] Tests pass
+     - [ ] Lint passes
+     - [ ] Logic is complete (not partial)
+   - **Output format**: Structured QA result
+   - **Mode handling**: Task (single task) vs Feature (all tasks)
+
+3. QA Result format:
+   ```json
+   {
+     "status": "pass" | "fail",
+     "issues": [QAIssue],
+     "summary": {
+       "total": 0,
+       "high": 0,
+       "medium": 0,
+       "low": 0
+     }
+   }
+   ```
+
+**O que NAO FAZER:**
+- Auto-correcao (Task 3.4)
+- Execution of QA checks
+
+#### Criterios de Aceite
+- [ ] Arquivo `src/utils/prompts/qa-agent.ts` existe e compila
+- [ ] generateQAPrompt() retorna prompt para QA task ou feature
+- [ ] Prompt inclui checklist de verificacao
+- [ ] Prompt define formato de output estruturado
+- [ ] Handles both 'task' and 'feature' modes
+- [ ] Testes passam
+
+#### Arquivos Envolvidos
+- `src/utils/prompts/qa-agent.ts` - criar
+- `tests/utils/prompts/qa-agent.test.ts` - criar
+
+---
+
+## Phase 3: Feature Commands v3
+
+### Goal
+Implement the unified command interface that replaces 7 separate commands.
+
+### Overview
+| Task | Effort | Dependencies | Files |
+|------|--------|--------------|-------|
+| 3.1 `adk3 feature work` | G (4-8h) | 1.4, 2.1, 2.2, 2.3 | `src/commands/feature-v3.ts`, `src/cli-v3.ts` |
+| 3.2 Memory Commands | M (2-4h) | 1.1-1.4 | `src/commands/memory.ts` |
+| 3.3 `adk3 feature autopilot` | G (4-8h) | 3.1 | `src/commands/feature-v3.ts` |
+| 3.4 QA Two-Layer System | G (4-8h) | 2.4, 3.3 | `src/utils/qa-runner.ts` |
+
+---
+
+### Task 3.1: Implementar Comando `adk3 feature work`
+
+**Tipo:** Feature
+**Estimativa:** G (4-8h)
+**Dependencias:** Task 1.4, 2.1, 2.2, 2.3
+**Prioridade:** CRITICAL - Core unified command
+
+#### Objetivo
+Implement the unified `feature work` command that automatically detects state and continues appropriately.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Expand `src/commands/feature-v3.ts` with method:
+   ```typescript
+   async work(name: string, options?: WorkOptions): Promise<void>
+   ```
+
+2. State detection flow:
+   ```
+   1. Check if feature exists
+   2. Check if feature_list.json exists
+      - NO → Run Initializer Agent
+      - YES → Check for resumable session
+        - YES → Resume with Coding Agent (--resume)
+        - NO → Start new Coding Agent session
+   ```
+
+3. Integration points:
+   - Use `SessionStore` for session tracking
+   - Use `CoreStateManager` for context loading
+   - Use `claude-v3.ts` for Claude execution
+   - Use prompts from Phase 2
+
+4. User interaction between phases:
+   - Research → Plan: Confirm before proceeding
+   - Plan → Implement: Confirm before proceeding
+   - Within Implement: Automatic loop
+
+5. Progress display:
+   - Use ora spinners for status
+   - Show current task being worked on
+   - Display summary on completion
+
+**O que NAO FAZER:**
+- Modo autopilot (Task 3.3)
+- QA automatico (Task 3.4)
+
+#### Criterios de Aceite
+- [ ] `adk3 feature work <name>` funciona para nova feature
+- [ ] `adk3 feature work <name>` retoma feature existente
+- [ ] Session ID e persistido e reutilizado com --resume
+- [ ] Core-state e carregado e injetado
+- [ ] Usuario e perguntado entre fases (Research→Plan, Plan→Implement)
+- [ ] Proper error handling with helpful messages
+- [ ] Testes de integracao passam
+
+#### Arquivos Envolvidos
+- `src/commands/feature-v3.ts` - modificar
+- `src/cli-v3.ts` - modificar (adicionar comando work)
+- `tests/commands/feature-v3.test.ts` - criar/modificar
+
+---
+
+### Task 3.2: Implementar Comandos de Memoria
+
+**Tipo:** Feature
+**Estimativa:** M (2-4h)
+**Dependencias:** Task 1.1, 1.2, 1.3, 1.4
+**Prioridade:** MEDIUM - Memory debugging and management
+
+#### Objetivo
+Create memory management commands for debugging and manual operations.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Create `src/commands/memory.ts` with class `MemoryCommand`:
+   ```typescript
+   class MemoryCommand {
+     async status(feature: string): Promise<void>
+     async checkpoint(feature: string): Promise<void>
+     async compact(feature: string, options?: CompactOptions): Promise<void>
+     async restore(feature: string, id?: string): Promise<void>
+   }
+   ```
+
+2. Subcommands:
+
+   **status** - Display memory health dashboard:
+   ```
+   Memory Status: my-feature
+   ─────────────────────────
+   Core State: Fresh (2min ago)
+   Current Task: 1.3 - Implementing X
+   Progress: 3/5 tasks (60%)
+
+   Session: Active (45min)
+   Decisions: 4 documented
+   Checkpoints: 3 available
+
+   Token Usage: ~45K (~35%)
+   ```
+
+   **checkpoint** - Create manual checkpoint:
+   - Save current core-state, session-notes, git status
+   - Store in checkpoints/ with timestamp
+
+   **compact** - Trigger context compaction:
+   - Use existing context-compactor.ts
+   - Create COMPACTED_STATE.md
+
+   **restore** - Restore from checkpoint:
+   - List available checkpoints if no ID
+   - Restore core-state and session context
+
+3. Register in cli-v3.ts:
+   ```typescript
+   program
+     .command('memory')
+     .description('Manage feature memory')
+     .addCommand(...)
+   ```
+
+**O que NAO FAZER:**
+- Compaction avancada (usar context-compactor.ts existente)
+- Automatic compaction triggers
+
+#### Criterios de Aceite
+- [ ] `adk3 memory status <feature>` exibe dashboard de memoria
+- [ ] `adk3 memory checkpoint <feature>` cria checkpoint
+- [ ] `adk3 memory compact <feature>` compacta sessao
+- [ ] `adk3 memory restore <feature> [id]` restaura checkpoint
+- [ ] Lists checkpoints when no ID provided
+- [ ] Testes passam
+
+#### Arquivos Envolvidos
+- `src/commands/memory.ts` - criar
+- `src/cli-v3.ts` - modificar
+- `tests/commands/memory.test.ts` - criar
+
+---
+
+### Task 3.3: Implementar Comando `adk3 feature autopilot`
+
+**Tipo:** Feature
+**Estimativa:** G (4-8h)
+**Dependencias:** Task 3.1
+**Prioridade:** HIGH - Autonomous execution mode
+
+#### Objetivo
+Implement fully automatic feature implementation with QA per task and escalation.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Add method to `src/commands/feature-v3.ts`:
+   ```typescript
+   async autopilot(name: string, options?: AutopilotOptions): Promise<void>
+   ```
+
+2. Autopilot flow:
+   ```
+   1. Run Research phase
+   2. PAUSE - Ask user: "Research complete. Continue to Plan?"
+   3. Run Plan phase
+   4. PAUSE - Ask user: "Plan complete. Continue to Implement?"
+   5. Run Implementation loop (AUTOMATIC):
+      For each task:
+        a. Implement task
+        b. Run QA on task
+        c. If failed: Auto-correct (max 3x)
+        d. If still failed: ESCALATE to human
+   6. Run Final QA
+   7. If failed: Auto-correct (max 3x)
+   8. If still failed: ESCALATE to human
+   ```
+
+3. Escalation handling:
+   - Preserve context in core-state
+   - Clear error message with what failed
+   - Suggestion for manual intervention
+   - Option to resume after fix
+
+4. Loop detection:
+   - Same error appearing 2x
+   - Same correction applied 3x
+   - 5 iterations without progress
+   - Token usage increasing without progress
+
+5. Progress tracking:
+   - Update core-state after each task
+   - Log to session-notes
+   - Display real-time progress
+
+**O que NAO FAZER:**
+- Multi-agent paralelo (Fase 2 do projeto completo)
+- Visual TUI (future enhancement)
+
+#### Criterios de Aceite
+- [ ] `adk3 feature autopilot <name>` executa loop automatico
+- [ ] Validacao manual ocorre entre fases (Research→Plan, Plan→Implement)
+- [ ] QA runs after each task
 - [ ] Auto-correction attempts up to 3 times
-- [ ] Human escalation works properly
-- [ ] All Phase 4 tests pass
+- [ ] Loop para apos 3 falhas consecutivas
+- [ ] Deteccao de loops infinitos funciona
+- [ ] Usuario e notificado para intervencao
+- [ ] Can resume after manual intervention
+- [ ] Testes passam
+
+#### Arquivos Envolvidos
+- `src/commands/feature-v3.ts` - modificar
+- `src/cli-v3.ts` - modificar
+- `tests/commands/feature-v3.test.ts` - modificar
 
 ---
 
-## Phase 5: Quality Hooks
+### Task 3.4: Implementar QA em Duas Camadas
 
-**Objective:** Implement hooks for context injection, validation, and checkpoints.
+**Tipo:** Feature
+**Estimativa:** G (4-8h)
+**Dependencias:** Task 2.4, 3.3
+**Prioridade:** HIGH - Quality enforcement
 
-**Dependencies:** Phase 2, Phase 4
-**Story Points:** 8 SP
+#### Objetivo
+Create the QA runner that executes QA prompts and handles auto-correction.
 
-### Files to Create
-- `.claude/hooks/inject-memory.sh` - PreToolUse context injection
-- `.claude/hooks/auto-checkpoint.sh` - Stop event checkpoint
-- `.claude/hooks/validate-no-stub.sh` - Write validation
-- `.claude/hooks/comprehension-check.sh` - PreToolUse verification
+#### Escopo Detalhado
 
-### Tasks
+**O que FAZER:**
+1. Create `src/utils/qa-runner.ts` with class `QARunner`:
+   ```typescript
+   interface QAResult {
+     passed: boolean
+     issues: QAIssue[]
+     attempts: number
+     correctionsMade: string[]
+   }
 
-#### Task 5.1: Implement inject-memory.sh Hook
-**Files:** `.claude/hooks/inject-memory.sh`
-**Tests:** Manual verification + integration test
-**Acceptance Criteria:**
-- [ ] Trigger: PreToolUse (any tool)
-- [ ] Read active-focus.md to get feature name
-- [ ] Load and inject core-state.json
-- [ ] Inject active constraints
-- [ ] Inject anti-stub reminder
-- [ ] Output as structured context block
-**Story Points:** 2 SP
+   class QARunner {
+     constructor(featureName: string)
 
-#### Task 5.2: Implement auto-checkpoint.sh Hook
-**Files:** `.claude/hooks/auto-checkpoint.sh`
-**Tests:** Manual verification
-**Acceptance Criteria:**
-- [ ] Trigger: Stop event
-- [ ] Create checkpoint JSON with timestamp
-- [ ] Save core state snapshot
-- [ ] Save git status snapshot
-- [ ] Create symlink to latest.json
-- [ ] Directory: `.claude/plans/features/{name}/checkpoints/`
-**Story Points:** 2 SP
+     async runTaskQA(taskId: string): Promise<QAResult>
+     async runFeatureQA(): Promise<QAResult>
+     async attemptAutoCorrection(issues: QAIssue[]): Promise<boolean>
+   }
+   ```
 
-#### Task 5.3: Implement validate-no-stub.sh Hook
-**Files:** `.claude/hooks/validate-no-stub.sh`
-**Tests:** `tests/hooks/validate-no-stub.test.ts`
-**Acceptance Criteria:**
-- [ ] Trigger: PreToolUse (Write)
-- [ ] Check content for stub patterns
-- [ ] Patterns: TODO, FIXME, NotImplementedError, throw.*Not implemented
-- [ ] Block write and output helpful message
-- [ ] Exit 1 on stub detection
-**Story Points:** 2 SP
+2. Task QA flow:
+   ```
+   1. Generate QA prompt for task
+   2. Execute QA agent
+   3. Parse structured result
+   4. If issues found:
+      a. Generate fix prompt based on issues
+      b. Execute fix
+      c. Re-run QA
+      d. Repeat up to 3 times
+   5. Return result
+   ```
 
-#### Task 5.4: Implement comprehension-check.sh Hook
-**Files:** `.claude/hooks/comprehension-check.sh`
-**Tests:** Manual verification
-**Acceptance Criteria:**
-- [ ] Trigger: PreToolUse (Write/Edit)
-- [ ] Load core-state.json
-- [ ] Output current task and modified files count
-- [ ] Remind to read if context doesn't match
-**Story Points:** 1 SP
+3. Feature QA flow:
+   ```
+   1. Generate QA prompt for entire feature
+   2. Execute comprehensive checks:
+      - All tests passing
+      - Type-check clean
+      - Lint clean
+      - No stub patterns
+   3. Handle failures same as task QA
+   ```
 
-#### Task 5.5: Update settings.json with v3 Hooks
-**Files:** `.claude/settings.json`
-**Tests:** Manual verification
-**Acceptance Criteria:**
-- [ ] Add inject-memory.sh to PreToolUse hooks
-- [ ] Add auto-checkpoint.sh to Stop hooks
-- [ ] Add validate-no-stub.sh to PreToolUse:Write hooks
-- [ ] Add comprehension-check.sh to PreToolUse:Write hooks
-- [ ] Document hook order dependencies
-**Story Points:** 1 SP
+4. Auto-correction:
+   - Generate specific fix prompt based on issue
+   - Target specific files/lines
+   - Re-verify after each fix
 
-### Phase 5 Checkpoint
-- [ ] Memory injection works on every tool call
-- [ ] Checkpoints created on session stop
-- [ ] Stub detection blocks invalid writes
-- [ ] Comprehension check reminds about context
-- [ ] All Phase 5 tests pass
+**O que NAO FAZER:**
+- Classificacao de severidade complexa (simplificar para pass/fail)
+- Visual reporting (just return structured data)
 
----
+#### Criterios de Aceite
+- [ ] QARunner.runTaskQA() executa QA apos task
+- [ ] QARunner.runFeatureQA() executa QA final
+- [ ] Auto-correcao tenta ate 3 vezes
+- [ ] Resultado retorna { passed, issues, attempts, correctionsMade }
+- [ ] Integracao com autopilot funciona
+- [ ] Fix prompts are specific and actionable
+- [ ] Testes passam
 
-## Phase 6: Parallel Execution
-
-**Objective:** Enhance parallel execution with shared state and proper isolation.
-
-**Dependencies:** Phase 4
-**Story Points:** 13 SP
-
-### Files to Create/Modify
-- `src/utils/parallel/shared-state.ts` - Tier 0 shared memory
-- `src/utils/parallel/worktree-manager.ts` - Enhanced worktree handling
-- `src/utils/parallel/aggregator.ts` - Result merge
-- `src/utils/parallel/file-ownership.ts` - File locking
-
-### Tasks
-
-#### Task 6.1: Create Parallel Directory Structure
-**Files:** `src/utils/parallel/index.ts`
-**Tests:** N/A (structure task)
-**Acceptance Criteria:**
-- [ ] Create `src/utils/parallel/` directory
-- [ ] Create index.ts with all exports
-- [ ] Define parallel execution constants
-**Story Points:** 1 SP
-
-#### Task 6.2: Implement Shared State Manager (Tier 0)
-**Files:** `src/utils/parallel/shared-state.ts`
-**Tests:** `tests/utils/parallel/shared-state.test.ts`
-**Acceptance Criteria:**
-- [ ] Create `SharedState` interface matching spec
-- [ ] `load(feature)` - Load shared-state.json
-- [ ] `save(feature, state)` - Atomic save
-- [ ] `registerAgent(feature, agentId)` - Register active agent
-- [ ] `unregisterAgent(feature, agentId)` - Mark agent completed
-- [ ] `addSharedDecision(feature, decision)` - Add cross-agent decision
-- [ ] `addCompletedTask(feature, taskId)` - Mark task done
-- [ ] `getFileOwnership(feature)` - Get current ownership map
-**Story Points:** 3 SP
-
-#### Task 6.3: Implement File Ownership Manager
-**Files:** `src/utils/parallel/file-ownership.ts`
-**Tests:** `tests/utils/parallel/file-ownership.test.ts`
-**Acceptance Criteria:**
-- [ ] `acquireLock(feature, agentId, file)` - Try to lock file
-- [ ] `releaseLock(feature, agentId, file)` - Release lock
-- [ ] `isLocked(feature, file)` - Check if file is locked
-- [ ] `getOwner(feature, file)` - Get current owner
-- [ ] Timeout-based lock expiration (30 min)
-**Story Points:** 2 SP
-
-#### Task 6.4: Enhance Worktree Manager
-**Files:** `src/utils/parallel/worktree-manager.ts`
-**Tests:** `tests/utils/parallel/worktree-manager.test.ts`
-**Acceptance Criteria:**
-- [ ] `createWorktree(feature, agentId)` - Create isolated worktree
-- [ ] `setupMemorySymlinks(worktree)` - Symlink .claude to main
-- [ ] `syncSharedState(worktree)` - Copy shared-state to worktree
-- [ ] `cleanupWorktree(worktree)` - Remove after completion
-- [ ] Support for N concurrent worktrees
-**Story Points:** 3 SP
-
-#### Task 6.5: Implement Result Aggregator
-**Files:** `src/utils/parallel/aggregator.ts`
-**Tests:** `tests/utils/parallel/aggregator.test.ts`
-**Acceptance Criteria:**
-- [ ] `aggregateResults(feature, results)` - Merge agent results
-- [ ] Merge session notes into unified timeline
-- [ ] Merge decisions from all agents
-- [ ] Detect and flag conflicts
-- [ ] Calculate aggregate metrics
-- [ ] Two-step merge: structure-first + auto-dedupe
-**Story Points:** 2 SP
-
-#### Task 6.6: Integrate Parallel with Autopilot
-**Files:** `src/utils/autopilot-loop.ts`
-**Tests:** `tests/utils/autopilot-loop.test.ts`
-**Acceptance Criteria:**
-- [ ] Add `--parallel` flag support
-- [ ] Add `--agents <n>` flag support (default 2, max 4)
-- [ ] Create wave schedule before execution
-- [ ] Execute wave with multiple agents
-- [ ] Aggregate results after each wave
-- [ ] Handle agent failures gracefully
-**Story Points:** 2 SP
-
-### Phase 6 Checkpoint
-- [ ] Shared state synchronizes between agents
-- [ ] File ownership prevents conflicts
-- [ ] Worktrees create and cleanup properly
-- [ ] Results aggregate without data loss
-- [ ] `adk3 feature autopilot test --parallel --agents 2` works
-- [ ] All Phase 6 tests pass
+#### Arquivos Envolvidos
+- `src/utils/qa-runner.ts` - criar
+- `src/commands/feature-v3.ts` - modificar (integrate QARunner)
+- `tests/utils/qa-runner.test.ts` - criar
 
 ---
 
-## Phase 7: Semantic Indexing
+## Phase 4: Hooks e Anti-Stub
 
-**Objective:** Implement codebase indexing for fast context retrieval.
+### Goal
+Enforce quality through hooks that prevent stub code and ensure context reading.
 
-**Dependencies:** Phase 4
-**Story Points:** 10 SP
-
-### Files to Create
-- `src/utils/indexer/parser.ts` - AST parsing
-- `src/utils/indexer/embedder.ts` - Embedding generation
-- `src/utils/indexer/searcher.ts` - Query engine
-- `src/utils/indexer/storage.ts` - SQLite storage
-
-### Tasks
-
-#### Task 7.1: Create Indexer Directory Structure
-**Files:** `src/utils/indexer/index.ts`
-**Tests:** N/A (structure task)
-**Acceptance Criteria:**
-- [ ] Create `src/utils/indexer/` directory
-- [ ] Create index.ts with all exports
-- [ ] Define index schema constants
-- [ ] Add better-sqlite3 dependency
-**Story Points:** 1 SP
-
-#### Task 7.2: Implement Symbol Parser
-**Files:** `src/utils/indexer/parser.ts`
-**Tests:** `tests/utils/indexer/parser.test.ts`
-**Acceptance Criteria:**
-- [ ] `parseFile(file)` - Parse TypeScript/JavaScript file
-- [ ] Extract functions, classes, interfaces
-- [ ] Extract imports and exports
-- [ ] Extract docstrings and comments
-- [ ] Calculate complexity score
-- [ ] Return `Symbol[]` array
-**Story Points:** 3 SP
-
-#### Task 7.3: Implement Index Storage
-**Files:** `src/utils/indexer/storage.ts`
-**Tests:** `tests/utils/indexer/storage.test.ts`
-**Acceptance Criteria:**
-- [ ] SQLite database at `.claude/index/embeddings.db`
-- [ ] Table: symbols (name, type, file, line, signature, embedding)
-- [ ] Table: dependencies (source, target, type)
-- [ ] Table: metadata (last_indexed, file_count)
-- [ ] CRUD operations for all tables
-**Story Points:** 2 SP
-
-#### Task 7.4: Implement Embedding Generator
-**Files:** `src/utils/indexer/embedder.ts`
-**Tests:** `tests/utils/indexer/embedder.test.ts`
-**Acceptance Criteria:**
-- [ ] Use local transformers.js for embeddings
-- [ ] `generateEmbedding(text)` - Generate vector
-- [ ] `batchGenerate(texts)` - Batch processing
-- [ ] Cache embeddings in SQLite
-- [ ] Incremental update on file change
-**Story Points:** 2 SP
-
-#### Task 7.5: Implement Search Engine
-**Files:** `src/utils/indexer/searcher.ts`
-**Tests:** `tests/utils/indexer/searcher.test.ts`
-**Acceptance Criteria:**
-- [ ] `search(query, limit)` - Semantic search
-- [ ] `findRelated(file)` - Find related files
-- [ ] `getContext(taskDescription)` - Get context for task
-- [ ] Rank by importance score
-- [ ] Filter by file type
-**Story Points:** 2 SP
-
-### Phase 7 Checkpoint
-- [ ] `adk index` creates index database
-- [ ] `adk search "query"` returns relevant files
-- [ ] `adk context "task"` suggests files for task
-- [ ] Incremental indexing works on file change
-- [ ] All Phase 7 tests pass
+### Overview
+| Task | Effort | Dependencies | Files |
+|------|--------|--------------|-------|
+| 4.1 Hook validate-no-stub | P (1-2h) | none | `.claude/hooks/validate-no-stub.sh` |
+| 4.2 Hook comprehension-check | P (1-2h) | 1.1 | `.claude/hooks/comprehension-check.sh` |
+| 4.3 Migracao v2 → v3 | M (2-4h) | 1.4, 2.1 | `src/utils/migration-v3.ts` |
 
 ---
 
-## Phase 8: Auto Memories
+### Task 4.1: Implementar Hook validate-no-stub
 
-**Objective:** Implement automatic capture and injection of project knowledge.
+**Tipo:** Feature
+**Estimativa:** P (1-2h)
+**Dependencias:** nenhuma
+**Prioridade:** HIGH - Anti-stub enforcement
 
-**Dependencies:** Phase 4
-**Story Points:** 8 SP
+#### Objetivo
+Create hook that blocks Write operations containing stub patterns.
 
-### Files to Create
-- `src/utils/memories/detector.ts` - Pattern detection
-- `src/utils/memories/storage.ts` - Memory persistence
-- `src/utils/memories/injector.ts` - Context injection
+#### Escopo Detalhado
 
-### Tasks
+**O que FAZER:**
+1. Create `.claude/hooks/validate-no-stub.sh`:
+   ```bash
+   #!/bin/bash
+   # Hook: PreToolUse (Write)
+   # Blocks stub patterns in code being written
 
-#### Task 8.1: Create Memories Directory Structure
-**Files:** `src/utils/memories/index.ts`
-**Tests:** N/A (structure task)
-**Acceptance Criteria:**
-- [ ] Create `src/utils/memories/` directory
-- [ ] Create index.ts with all exports
-- [ ] Define memory types and schemas
-**Story Points:** 1 SP
+   STUB_PATTERNS=(
+     "throw new Error.*Not implemented"
+     "throw new Error.*TODO"
+     "TODO:"
+     "FIXME:"
+     "// stub"
+     "/* stub */"
+     "pass  # stub"
+     "pass # TODO"
+     "NotImplementedError"
+     "raise NotImplementedError"
+   )
 
-#### Task 8.2: Implement Memory Storage
-**Files:** `src/utils/memories/storage.ts`
-**Tests:** `tests/utils/memories/storage.test.ts`
-**Acceptance Criteria:**
-- [ ] Store in `.claude/memories/`
-- [ ] `save(memory)` - Save new memory
-- [ ] `load()` - Load all memories
-- [ ] `search(query)` - Search by relevance
-- [ ] `prune(days)` - Remove unused memories
-- [ ] Track usage count per memory
-**Story Points:** 2 SP
+   # Read content from stdin or file
+   CONTENT=$(cat "$1" 2>/dev/null || cat)
 
-#### Task 8.3: Implement Pattern Detector
-**Files:** `src/utils/memories/detector.ts`
-**Tests:** `tests/utils/memories/detector.test.ts`
-**Acceptance Criteria:**
-- [ ] `detectDecision(text)` - Detect "I chose X because Y"
-- [ ] `detectPattern(text)` - Detect "This project uses X"
-- [ ] `detectConstraint(text)` - Detect "Cannot use X"
-- [ ] `detectErrorSolution(text)` - Detect error fix patterns
-- [ ] Return structured Memory objects
-**Story Points:** 2 SP
+   for pattern in "${STUB_PATTERNS[@]}"; do
+     if echo "$CONTENT" | grep -qE "$pattern"; then
+       echo "BLOCKED: Stub pattern detected"
+       echo "Pattern: $pattern"
+       echo ""
+       echo "You MUST implement real logic."
+       echo "If you cannot implement, STOP and explain the blocker."
+       exit 1
+     fi
+   done
 
-#### Task 8.4: Implement Memory Injector
-**Files:** `src/utils/memories/injector.ts`
-**Tests:** `tests/utils/memories/injector.test.ts`
-**Acceptance Criteria:**
-- [ ] `getRelevant(taskDescription)` - Get relevant memories
-- [ ] `formatForInjection(memories)` - Format as context
-- [ ] Filter by confidence (>0.7)
-- [ ] Sort by usage count
-- [ ] Limit to 5 memories per injection
-**Story Points:** 2 SP
+   exit 0
+   ```
 
-#### Task 8.5: Implement Memory Commands
-**Files:** `src/cli-v3.ts`, `src/commands/memory-v3.ts`
-**Tests:** `tests/commands/memory-v3.test.ts`
-**Acceptance Criteria:**
-- [ ] `adk memory list` - List all memories
-- [ ] `adk memory add "..." --type decision` - Add manually
-- [ ] `adk memory search "..."` - Search memories
-- [ ] `adk memory export` - Export as JSON
-- [ ] `adk memory prune --unused-days 30` - Clean old
-**Story Points:** 1 SP
+2. Make executable: `chmod +x`
 
-### Phase 8 Checkpoint
-- [ ] Decisions auto-captured during sessions
-- [ ] Patterns detected and stored
-- [ ] Relevant memories injected into context
+3. Register in `.claude/settings.json`:
+   ```json
+   {
+     "hooks": {
+       "PreToolUse": [
+         {
+           "tool": "Write",
+           "command": "./.claude/hooks/validate-no-stub.sh"
+         }
+       ]
+     }
+   }
+   ```
+
+**O que NAO FAZER:**
+- Validacao de outros tipos de codigo (apenas stubs)
+- Complex pattern matching
+
+#### Criterios de Aceite
+- [ ] Hook `.claude/hooks/validate-no-stub.sh` existe e e executavel
+- [ ] Detecta todos os patterns de stub listados
+- [ ] Retorna exit code 1 para bloquear
+- [ ] Mensagem de erro e clara e util
+- [ ] Hook registrado em settings.json
+- [ ] Works with both TypeScript and Python patterns
+
+#### Arquivos Envolvidos
+- `.claude/hooks/validate-no-stub.sh` - criar
+- `.claude/settings.json` - modificar
+
+---
+
+### Task 4.2: Implementar Hook comprehension-check
+
+**Tipo:** Feature
+**Estimativa:** P (1-2h)
+**Dependencias:** Task 1.1
+**Prioridade:** MEDIUM - Context reminder
+
+#### Objetivo
+Create hook that reminds about current task and constraints before writes.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Create `.claude/hooks/comprehension-check.sh`:
+   ```bash
+   #!/bin/bash
+   # Hook: PreToolUse (Write)
+   # Reminds about context without blocking
+
+   FOCUS_FILE=".claude/active-focus.md"
+   if [ ! -f "$FOCUS_FILE" ]; then
+     exit 0
+   fi
+
+   FEATURE=$(grep "feature:" "$FOCUS_FILE" | cut -d' ' -f2)
+   if [ -z "$FEATURE" ]; then
+     exit 0
+   fi
+
+   CORE_STATE=".claude/plans/features/$FEATURE/memory/core-state.json"
+
+   if [ ! -f "$CORE_STATE" ]; then
+     exit 0
+   fi
+
+   CURRENT_TASK=$(jq -r '.currentTask.id // "none"' "$CORE_STATE" 2>/dev/null)
+   TASK_NAME=$(jq -r '.currentTask.name // "none"' "$CORE_STATE" 2>/dev/null)
+
+   echo "## CONTEXT REMINDER"
+   echo ""
+   echo "Current Task: $CURRENT_TASK - $TASK_NAME"
+   echo ""
+   echo "Constraints:"
+   echo "- NO stubs - implement real logic"
+   echo "- NO code outside task scope"
+   echo "- ALWAYS verify with type-check"
+   echo ""
+
+   # Always exit 0 - reminder only, no blocking
+   exit 0
+   ```
+
+2. Make executable
+
+3. Register in settings.json as additional PreToolUse hook
+
+**O que NAO FAZER:**
+- Bloquear operacoes (apenas reminder)
+- Complex state parsing
+
+#### Criterios de Aceite
+- [ ] Hook `.claude/hooks/comprehension-check.sh` existe e e executavel
+- [ ] Emite reminder com task atual e constraints
+- [ ] Retorna exit code 0 (nao bloqueia)
+- [ ] Hook registrado em settings.json
+- [ ] Gracefully handles missing files
+
+#### Arquivos Envolvidos
+- `.claude/hooks/comprehension-check.sh` - criar
+- `.claude/settings.json` - modificar
+
+---
+
+### Task 4.3: Implementar Migracao v2 → v3
+
+**Tipo:** Feature
+**Estimativa:** M (2-4h)
+**Dependencias:** Task 1.4, 2.1
+**Prioridade:** MEDIUM - Backwards compatibility
+
+#### Objetivo
+Enable v3 commands to work with existing v2 features by migrating artifacts.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Create `src/utils/migration-v3.ts`:
+   ```typescript
+   interface MigrationResult {
+     success: boolean
+     migratedArtifacts: string[]
+     errors: string[]
+     rollbackPath?: string
+   }
+
+   async function migrateFeatureToV3(featureName: string): Promise<MigrationResult>
+   async function canMigrate(featureName: string): Promise<boolean>
+   async function rollbackMigration(featureName: string): Promise<boolean>
+   ```
+
+2. Migration flow:
+   ```
+   1. Detect v2 feature:
+      - Has tasks.md
+      - No feature_list.json
+      - Has prd.md or progress.md
+
+   2. Create backup:
+      - Save snapshot in .snapshots/pre-v3-migration/
+
+   3. Convert artifacts:
+      - Parse tasks.md
+      - Generate feature_list.json from tasks
+      - Preserve task status (completed → passing)
+
+   4. Create memory structure:
+      - Initialize memory/ directory
+      - Create initial core-state.json
+
+   5. Preserve v2 artifacts:
+      - Keep prd.md, research.md, progress.md
+      - Keep state.json (add v3 fields)
+   ```
+
+3. Task to FeatureTest conversion:
+   ```typescript
+   function convertTask(task: V2Task): FeatureTest {
+     return {
+       id: `test-${task.id}`,
+       description: task.name,
+       category: inferCategory(task),
+       steps: task.acceptanceCriteria || [task.name],
+       status: task.completed ? 'passing' : 'pending',
+       files: task.files || []
+     }
+   }
+   ```
+
+4. Rollback:
+   - Restore from .snapshots/
+   - Remove v3 artifacts
+
+**O que NAO FAZER:**
+- Migracao de sessions existentes
+- Automatic migration (user must trigger)
+
+#### Criterios de Aceite
+- [ ] migrateFeatureToV3() detecta feature v2 corretamente
+- [ ] Converte tasks.md para feature_list.json com status preservado
+- [ ] Cria estrutura memory/ com arquivos iniciais
+- [ ] Preserva todos os artefatos v2
+- [ ] Creates backup before migration
+- [ ] Rollback funciona se migracao falhar
+- [ ] Testes passam
+
+#### Arquivos Envolvidos
+- `src/utils/migration-v3.ts` - criar
+- `tests/utils/migration-v3.test.ts` - criar
+
+---
+
+## Phase 5: Integracao e CLI
+
+### Goal
+Complete the CLI integration and ensure all components work together.
+
+### Overview
+| Task | Effort | Dependencies | Files |
+|------|--------|--------------|-------|
+| 5.1 Expand CLI v3 | M (2-4h) | 3.1-3.3 | `src/cli-v3.ts` |
+| 5.2 Compaction v3 | M (2-4h) | 1.1, 1.2 | `src/utils/memory/compactor-v3.ts` |
+| 5.3 Init Script Generator | P (1-2h) | none | `src/utils/init-script.ts` |
+| 5.4 E2E Tests | G (4-8h) | ALL | `tests/e2e/` |
+
+---
+
+### Task 5.1: Expandir CLI v3 com Todos os Comandos
+
+**Tipo:** Feature
+**Estimativa:** M (2-4h)
+**Dependencias:** Task 3.1, 3.2, 3.3
+**Prioridade:** HIGH - Complete CLI interface
+
+#### Objetivo
+Finalize cli-v3.ts with all commands, flags, and help text.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Update `src/cli-v3.ts` with complete command structure:
+   ```typescript
+   program
+     .name('adk3')
+     .description('ADK v3 - Unified Agentic Development Kit')
+     .version('3.0.0')
+
+   // Feature commands
+   program
+     .command('feature')
+     .description('Feature development commands')
+     .addCommand(work)
+     .addCommand(autopilot)
+     .addCommand(status)
+
+   // Memory commands
+   program
+     .command('memory')
+     .description('Memory management commands')
+     .addCommand(memoryStatus)
+     .addCommand(checkpoint)
+     .addCommand(compact)
+     .addCommand(restore)
+   ```
+
+2. Global flags:
+   - `--verbose`: Enable detailed logging
+   - `--json`: Output in JSON format
+   - `--no-color`: Disable colored output
+
+3. Help text:
+   - Clear description for each command
+   - Examples for common use cases
+   - Link to documentation
+
+4. Argument validation:
+   - Feature name validation
+   - Required argument checks
+   - Helpful error messages
+
+**O que NAO FAZER:**
+- Migrar comandos v2 (sao separados)
+- Add commands not yet implemented
+
+#### Criterios de Aceite
+- [ ] Todos os comandos registrados em cli-v3.ts
+- [ ] Help text completo para cada comando
+- [ ] Flags --verbose e --json funcionam
+- [ ] Validacao de argumentos com mensagens claras
+- [ ] `adk3 --help` exibe todos os comandos
+- [ ] `adk3 <command> --help` shows command details
+- [ ] Testes passam
+
+#### Arquivos Envolvidos
+- `src/cli-v3.ts` - modificar
+- `tests/cli-v3.test.ts` - criar
+
+---
+
+### Task 5.2: Implementar Compaction v3 com Two-Threshold
+
+**Tipo:** Feature
+**Estimativa:** M (2-4h)
+**Dependencias:** Task 1.1, 1.2
+**Prioridade:** MEDIUM - Context management
+
+#### Objetivo
+Implement structured compaction that preserves critical information.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Create `src/utils/memory/compactor-v3.ts`:
+   ```typescript
+   interface CompactionConfig {
+     maxThreshold: number  // 80% - trigger
+     targetThreshold: number  // 50% - post-compaction
+   }
+
+   class CompactorV3 {
+     constructor(featureName: string, config?: CompactionConfig)
+
+     async shouldCompact(): Promise<boolean>
+     async compact(): Promise<CompactionResult>
+     async estimateTokens(): Promise<number>
+   }
+   ```
+
+2. Two-threshold architecture:
+   - T_max (80%): Trigger compaction
+   - T_target (50%): Post-compaction target
+
+3. Preservation rules (NEVER compress):
+   - File paths (complete)
+   - Line numbers
+   - Function/variable names
+   - Commands that worked
+   - Specific error messages
+
+4. Compression rules (ALWAYS compress):
+   - Redundant explanations
+   - Already-processed tool outputs
+   - Failed attempts (keep only lesson)
+   - Clarification conversations (keep only decision)
+
+5. Output: COMPACTED_STATE.md with structured template
+
+**O que NAO FAZER:**
+- Compaction automatica (sera acionada manualmente ou via threshold)
+- Complex semantic analysis
+
+#### Criterios de Aceite
+- [ ] CompactorV3.shouldCompact() retorna true quando >80%
+- [ ] CompactorV3.compact() reduz para ~50%
+- [ ] Informacoes criticas sao preservadas
+- [ ] Template COMPACTED_STATE.md e gerado corretamente
+- [ ] Integration with token-counter.ts
+- [ ] Testes passam
+
+#### Arquivos Envolvidos
+- `src/utils/memory/compactor-v3.ts` - criar
+- `tests/utils/memory/compactor-v3.test.ts` - criar
+
+---
+
+### Task 5.3: Implementar Init Script Generator
+
+**Tipo:** Feature
+**Estimativa:** P (1-2h)
+**Dependencias:** nenhuma
+**Prioridade:** LOW - Convenience utility
+
+#### Objetivo
+Generate init.sh scripts that set up the development environment.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Create `src/utils/init-script.ts`:
+   ```typescript
+   interface InitContext {
+     featureName: string
+     projectStack: 'node' | 'python' | 'go' | 'unknown'
+     packageManager?: 'npm' | 'yarn' | 'pnpm'
+   }
+
+   function generateInitScript(context: InitContext): string
+   function detectProjectStack(basePath: string): Promise<InitContext['projectStack']>
+   ```
+
+2. Stack detection:
+   - Check for package.json → node
+   - Check for requirements.txt or pyproject.toml → python
+   - Check for go.mod → go
+
+3. Generated script includes:
+   ```bash
+   #!/bin/bash
+   # init.sh for feature: {name}
+
+   set -e
+
+   echo "Setting up environment..."
+
+   # Install dependencies
+   npm install  # or pip install, etc.
+
+   # Run type check
+   npm run type-check
+
+   # Run tests
+   npm test
+
+   echo "Environment ready!"
+   ```
+
+**O que NAO FAZER:**
+- Execucao do script (feito pelo agente)
+- Complex environment setup
+
+#### Criterios de Aceite
+- [ ] generateInitScript() gera init.sh valido
+- [ ] detectProjectStack() identifica stack corretamente
+- [ ] Script inclui verificacoes (install, type-check, test)
+- [ ] Script is executable (chmod +x compatible)
+- [ ] Testes passam
+
+#### Arquivos Envolvidos
+- `src/utils/init-script.ts` - criar
+- `tests/utils/init-script.test.ts` - criar
+
+---
+
+### Task 5.4: Testes de Integracao End-to-End
+
+**Tipo:** Test
+**Estimativa:** G (4-8h)
+**Dependencias:** Todas as tasks anteriores
+**Prioridade:** CRITICAL - Validation
+
+#### Objetivo
+Create comprehensive e2e test suite validating complete workflows.
+
+#### Escopo Detalhado
+
+**O que FAZER:**
+1. Create test suite in `tests/e2e/`:
+   ```
+   tests/e2e/
+   ├── feature-workflow.test.ts  # Full feature lifecycle
+   ├── migration.test.ts         # v2 → v3 migration
+   ├── recovery.test.ts          # Checkpoint/restore
+   ├── hooks.test.ts             # Anti-stub hooks
+   └── helpers/
+       ├── test-project.ts       # Test project setup
+       └── claude-mock.ts        # Mock Claude CLI
+   ```
+
+2. Test scenarios:
+
+   **Feature Workflow (feature-workflow.test.ts)**:
+   - New feature creation
+   - Feature resumption
+   - Phase transitions
+   - Completion flow
+
+   **Migration (migration.test.ts)**:
+   - Detect v2 feature
+   - Convert tasks.md
+   - Preserve artifacts
+   - Rollback on failure
+
+   **Recovery (recovery.test.ts)**:
+   - Checkpoint creation
+   - Checkpoint restoration
+   - Recovery after crash
+
+   **Hooks (hooks.test.ts)**:
+   - validate-no-stub blocks stubs
+   - comprehension-check emits reminder
+
+3. Test helpers:
+   - Create temporary project directories
+   - Mock Claude CLI responses
+   - Clean up after tests
+
+**O que NAO FAZER:**
+- Testes de performance (Fase 2)
+- Visual testing
+- Live Claude CLI tests
+
+#### Criterios de Aceite
+- [ ] Suite e2e existe em `tests/e2e/`
+- [ ] Fluxo completo de nova feature funciona
+- [ ] Migracao v2 → v3 funciona
+- [ ] Recovery de checkpoint funciona
+- [ ] Hooks anti-stub funcionam
+- [ ] All tests run in CI
+- [ ] Todos os testes e2e passam
+
+#### Arquivos Envolvidos
+- `tests/e2e/feature-workflow.test.ts` - criar
+- `tests/e2e/migration.test.ts` - criar
+- `tests/e2e/recovery.test.ts` - criar
+- `tests/e2e/hooks.test.ts` - criar
+- `tests/e2e/helpers/*.ts` - criar
+
+---
+
+## Dependency Graph
+
+```
+Phase 1 (Core Infrastructure):
+  1.1 Core State ──┐
+  1.2 Session Notes ┼──► 1.4 Memory Initializer
+  1.3 Decisions ────┘
+
+Phase 2 (Prompt System):
+  2.1 Feature List ──┬──► 2.2 Initializer Prompt
+                     ├──► 2.3 Coding Prompt
+                     └──► 2.4 QA Prompt
+
+Phase 3 (Commands):
+  1.4 + 2.1 + 2.2 + 2.3 ──► 3.1 feature work ──► 3.3 autopilot ──► 3.4 QA Runner
+  1.1 + 1.2 + 1.3 + 1.4 ──► 3.2 memory commands
+
+Phase 4 (Hooks):
+  (independent) ──► 4.1 validate-no-stub
+  1.1 ──► 4.2 comprehension-check
+  1.4 + 2.1 ──► 4.3 migration
+
+Phase 5 (Integration):
+  3.1 + 3.2 + 3.3 ──► 5.1 CLI v3
+  1.1 + 1.2 ──► 5.2 Compaction
+  (independent) ──► 5.3 Init Script
+  ALL ──► 5.4 E2E Tests
+```
+
+---
+
+## Recommended Execution Order
+
+### Wave 1 (Parallel - No Dependencies)
+| Task | Effort | Type |
+|------|--------|------|
+| 1.1 Core State Manager | G | Core |
+| 1.2 Session Notes Manager | M | Core |
+| 1.3 Decisions Manager | M | Core |
+| 2.1 Feature List Generator | M | Core |
+| 4.1 Hook validate-no-stub | P | Hook |
+| 5.3 Init Script Generator | P | Utility |
+
+**Estimated time:** 1-2 days (parallel execution)
+
+### Wave 2 (Depends on Wave 1)
+| Task | Effort | Depends On |
+|------|--------|------------|
+| 1.4 Memory Initializer | P | 1.1, 1.2, 1.3 |
+| 2.2 Initializer Agent Prompt | M | 2.1 |
+| 2.3 Coding Agent Prompt | M | 2.1 |
+| 2.4 QA Agent Prompt | M | 2.1 |
+| 4.2 Hook comprehension-check | P | 1.1 |
+
+**Estimated time:** 1 day (parallel execution)
+
+### Wave 3 (Depends on Wave 2)
+| Task | Effort | Depends On |
+|------|--------|------------|
+| 3.1 feature work command | G | 1.4, 2.1-2.3 |
+| 3.2 Memory Commands | M | 1.1-1.4 |
+| 4.3 Migration v2→v3 | M | 1.4, 2.1 |
+
+**Estimated time:** 1-2 days (partially parallel)
+
+### Wave 4 (Sequential)
+| Task | Effort | Depends On |
+|------|--------|------------|
+| 3.3 feature autopilot | G | 3.1 |
+| 5.1 CLI v3 Complete | M | 3.1-3.3 |
+| 5.2 Compaction v3 | M | 1.1, 1.2 |
+
+**Estimated time:** 1-2 days
+
+### Wave 5 (Sequential - Final)
+| Task | Effort | Depends On |
+|------|--------|------------|
+| 3.4 QA Two-Layer | G | 2.4, 3.3 |
+
+**Estimated time:** 1 day
+
+### Wave 6 (Final Validation)
+| Task | Effort | Depends On |
+|------|--------|------------|
+| 5.4 E2E Tests | G | ALL |
+
+**Estimated time:** 1-2 days
+
+---
+
+## Verification Points
+
+### After Phase 1
+- [ ] All memory managers work independently
+- [ ] Memory structure initializer creates complete directories
+- [ ] Unit tests pass
+
+### After Phase 2
+- [ ] All prompts generate valid output
+- [ ] Feature list CRUD operations work
+- [ ] Unit tests pass
+
+### After Phase 3
+- [ ] `adk3 feature work test` creates new feature
+- [ ] `adk3 feature work test` resumes existing feature
 - [ ] Memory commands work
-- [ ] All Phase 8 tests pass
+- [ ] Integration tests pass
 
----
+### After Phase 4
+- [ ] Stub patterns are blocked
+- [ ] Context reminders appear
+- [ ] v2 features can be migrated
+- [ ] Hook tests pass
 
-## Phase 9: Visual UI
-
-**Objective:** Implement rich terminal UI for progress visualization.
-
-**Dependencies:** Phase 4, Phase 6
-**Story Points:** 8 SP
-
-### Files to Create
-- `src/ui/dashboard.tsx` - Main Ink dashboard
-- `src/ui/progress.tsx` - Progress bar component
-- `src/ui/agent-panel.tsx` - Agent status display
-- `src/ui/activity-log.tsx` - Recent activity
-
-### Tasks
-
-#### Task 9.1: Setup Ink and React for Terminal
-**Files:** `package.json`, `tsconfig.json`
-**Tests:** N/A (setup task)
-**Acceptance Criteria:**
-- [ ] Add `ink` and `react` dependencies
-- [ ] Configure tsconfig for JSX
-- [ ] Create `src/ui/` directory
-- [ ] Verify basic Ink render works
-**Story Points:** 1 SP
-
-#### Task 9.2: Implement Progress Bar Component
-**Files:** `src/ui/progress.tsx`
-**Tests:** `tests/ui/progress.test.tsx`
-**Acceptance Criteria:**
-- [ ] Display progress bar with percentage
-- [ ] Show completed/total counts
-- [ ] Support different colors for states
-- [ ] Animate on updates
-**Story Points:** 1 SP
-
-#### Task 9.3: Implement Agent Panel Component
-**Files:** `src/ui/agent-panel.tsx`
-**Tests:** `tests/ui/agent-panel.test.tsx`
-**Acceptance Criteria:**
-- [ ] List active agents with status
-- [ ] Show current task per agent
-- [ ] Show individual progress per agent
-- [ ] Support up to 4 agents
-**Story Points:** 2 SP
-
-#### Task 9.4: Implement Activity Log Component
-**Files:** `src/ui/activity-log.tsx`
-**Tests:** `tests/ui/activity-log.test.tsx`
-**Acceptance Criteria:**
-- [ ] Display recent activity entries
-- [ ] Show timestamp, action, result
-- [ ] Scrollable with max 10 entries
-- [ ] Color-coded by type (modify, create, decision)
-**Story Points:** 1 SP
-
-#### Task 9.5: Implement Main Dashboard
-**Files:** `src/ui/dashboard.tsx`
-**Tests:** `tests/ui/dashboard.test.tsx`
-**Acceptance Criteria:**
-- [ ] Compose all components into dashboard
-- [ ] Show feature name and time
-- [ ] Overall progress bar
-- [ ] Agent panel (when parallel)
-- [ ] Current task details
-- [ ] Activity log
-- [ ] Footer with keyboard shortcuts
-**Story Points:** 2 SP
-
-#### Task 9.6: Implement Keyboard Shortcuts
-**Files:** `src/ui/dashboard.tsx`
-**Tests:** Manual verification
-**Acceptance Criteria:**
-- [ ] [p] pause execution
-- [ ] [r] resume execution
-- [ ] [l] toggle logs view
-- [ ] [d] show details
-- [ ] [q] quit with confirmation
-**Story Points:** 1 SP
-
-### Phase 9 Checkpoint
-- [ ] `adk3 feature autopilot test --ui` shows dashboard
-- [ ] Progress updates in real-time
-- [ ] Keyboard shortcuts work
-- [ ] Multi-agent view works with parallel
-- [ ] All Phase 9 tests pass
-
----
-
-## Phase 10: Integration & Testing
-
-**Objective:** Full integration testing and documentation.
-
-**Dependencies:** All previous phases
-**Story Points:** 8 SP
-
-### Tasks
-
-#### Task 10.1: Create E2E Test Suite
-**Files:** `tests/e2e/v3-full-cycle.test.ts`
-**Tests:** E2E test
-**Acceptance Criteria:**
-- [ ] Test: New feature creation flow
-- [ ] Test: Interactive mode with phase validation
-- [ ] Test: Autopilot mode with QA
-- [ ] Test: Session resume after interruption
-- [ ] Test: Parallel execution with 2 agents
-- [ ] All tests pass in CI environment
-**Story Points:** 3 SP
-
-#### Task 10.2: Create Migration Guide
-**Files:** `.claude/docs/v3-migration-guide.md`
-**Tests:** N/A (documentation)
-**Acceptance Criteria:**
-- [ ] Document v2 to v3 migration steps
-- [ ] Document coexistence strategy
-- [ ] Document breaking changes (none expected)
-- [ ] Include troubleshooting section
-**Story Points:** 1 SP
-
-#### Task 10.3: Update Main Documentation
-**Files:** `README.md`, `CLAUDE.md`
-**Tests:** N/A (documentation)
-**Acceptance Criteria:**
-- [ ] Add v3 quick start section
-- [ ] Document new commands
-- [ ] Document new flags
-- [ ] Update architecture diagrams
-**Story Points:** 1 SP
-
-#### Task 10.4: Performance Testing
-**Files:** `tests/performance/v3-benchmark.test.ts`
-**Tests:** Performance test
-**Acceptance Criteria:**
-- [ ] Measure token usage per task
-- [ ] Measure context loading time
-- [ ] Measure compaction efficiency
-- [ ] Compare with v2 baseline
-- [ ] Document results
-**Story Points:** 2 SP
-
-#### Task 10.5: Final Release Checklist
-**Files:** N/A (process)
-**Tests:** Manual verification
-**Acceptance Criteria:**
-- [ ] All tests passing (unit, integration, e2e)
-- [ ] Test coverage > 80%
-- [ ] No console errors or warnings
-- [ ] Documentation complete
-- [ ] Git tag v3.0.0 created
-- [ ] Merge to main branch
-**Story Points:** 1 SP
-
-### Phase 10 Checkpoint
+### After Phase 5
+- [ ] Full autopilot workflow completes
+- [ ] QA catches issues and auto-corrects
 - [ ] E2E tests pass
-- [ ] Documentation complete
-- [ ] Performance acceptable
-- [ ] v3.0.0 released
+- [ ] Documentation is complete
 
 ---
 
 ## Test Strategy
 
-### Unit Tests
-- Each module has corresponding test file in `tests/`
-- Use Jest with TypeScript
-- Mock external dependencies (Claude CLI, file system)
-- Target: 80% coverage
+### Unit Tests (Per Task)
+- Each manager class has dedicated test file
+- Mock file system for isolation
+- Cover happy path + edge cases
 
-### Integration Tests
-- Test module interactions
-- Use real file system (temp directories)
-- Test session persistence
-- Test memory loading
+### Integration Tests (Per Phase)
+- Test component interactions
+- Use temporary directories
+- Verify file creation/modification
 
-### E2E Tests
-- Full workflow tests
-- Use mock Claude responses
-- Test complete feature lifecycle
-- Test error scenarios
+### E2E Tests (Final)
+- Full workflow simulation
+- Mock Claude CLI responses
+- Validate complete feature lifecycle
 
-### Manual Tests
-- Hook verification
-- TUI interaction
-- Keyboard shortcuts
-- Error messages
+### Coverage Target
+- **Unit tests:** >90% per file
+- **Integration tests:** All major flows
+- **E2E tests:** Critical paths
 
 ---
 
 ## Risk Mitigation
 
-| Risk | Mitigation | Phase |
-|------|------------|-------|
-| Claude CLI flag changes | Early verification in Phase 1 | 1 |
-| Memory system complexity | Incremental implementation | 2 |
-| Stub generation continues | 5-layer guarantee system | 3, 5 |
-| Parallel conflicts | File ownership + conflict detection | 6 |
-| Performance degradation | Benchmark testing | 10 |
-| v2 compatibility break | Separate entry points, no v2 changes | All |
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| Claude CLI API changes | Medium | High | Verify flags before each sprint |
+| Context overflow in sessions | High | Medium | Two-threshold compaction |
+| Session resume failures | Medium | High | Frequent checkpoints |
+| Infinite QA loops | High | Medium | Max 3 attempts + pattern detection |
+| v2/v3 interference | Low | Critical | Separate CLI entry point (adk3) |
+| Multi-agent conflicts | Medium | High | File ownership in shared-state |
 
 ---
 
-## Success Criteria
+## Success Metrics
 
-| Metric | Target |
-|--------|--------|
-| Stub Rate | <5% |
-| First-Pass QA Success | >70% |
-| Context Drift | Minimal |
-| Sessions per Feature | 1-3 |
-| Test Coverage | >80% |
-| Recovery Success | >95% |
+### Quality Metrics (Target)
+| Metric | v2 Baseline | v3 Target |
+|--------|-------------|-----------|
+| Stub Rate | ~20% | <5% |
+| First-Pass QA Success | ~30% | >70% |
+| Rework Rate | ~30% | <15% |
 
----
-
-## Dependencies Between Phases
-
-```
-Phase 1 (Infrastructure)
-    │
-    ▼
-Phase 2 (Memory) ──────────────────────────────┐
-    │                                          │
-    ▼                                          │
-Phase 3 (Agent Logic)                          │
-    │                                          │
-    ├───────────────────┐                      │
-    ▼                   ▼                      ▼
-Phase 4 (Commands) ◄─── Phase 5 (Hooks)       Phase 7 (Indexing)
-    │                                          │
-    │                                          │
-    ├───────────────────┐                      │
-    ▼                   ▼                      ▼
-Phase 6 (Parallel)     Phase 8 (Memories) ◄───┘
-    │                   │
-    └───────┬───────────┘
-            │
-            ▼
-      Phase 9 (UI)
-            │
-            ▼
-     Phase 10 (Integration)
-```
-
----
-
-## Recommended Implementation Order
-
-1. **Phase 1** - Foundation (required for everything)
-2. **Phase 2** - Memory (critical for agent quality)
-3. **Phase 3** - Agent Logic (uses memory)
-4. **Phase 4** - Commands (uses agents)
-5. **Phase 5** - Hooks (enhances quality)
-6. **Phase 6** - Parallel (optional but valuable)
-7. **Phase 7** - Indexing (optional enhancement)
-8. **Phase 8** - Memories (optional enhancement)
-9. **Phase 9** - UI (polish)
-10. **Phase 10** - Integration (final)
-
-**Minimum Viable v3:** Phases 1-5 (52 SP)
-**Full v3:** All phases (89 SP)
+### Efficiency Metrics (Target)
+| Metric | v2 Baseline | v3 Target |
+|--------|-------------|-----------|
+| Sessions per feature | 7+ | 1-3 |
+| Context between phases | ~0% | >95% |
+| Premature completion | ~40% | <5% |
+| Crash recovery time | ~10min | <30s |
 
 ---
 
 *Implementation Plan generated: 2026-02-02*
-*Ready for implementation - NÃO IMPLEMENTE AINDA*
+*Methodology: Vertical Slicing with TDD*
+*Each task is a complete slice with test + implementation*
