@@ -9,8 +9,11 @@ import type { StreamEvent } from '../types/stream-events'
 import { logger } from './logger'
 import {
   disableMetricsCollection,
+  disableOutputCollection,
   enableMetricsCollection,
+  enableOutputCollection,
   getCollectedMetrics,
+  getCollectedOutput,
   parseAndDisplayStream,
 } from './stream-parser'
 
@@ -22,11 +25,13 @@ export interface ClaudeCommandOptions {
   collectMetrics?: boolean
   enableTokenStreaming?: boolean
   onEvent?: StreamEventCallback
+  disableHooks?: boolean
 }
 
 export interface HeadlessResult {
   success: boolean
   metrics?: CollectedMetrics
+  output?: string
 }
 
 const VALID_MODELS = new Set<string>([ModelType.OPUS, ModelType.SONNET, ModelType.HAIKU])
@@ -79,15 +84,26 @@ export async function executeHeadlessWithMetrics(
     ...(enableStreaming ? ['--include-partial-messages'] : []),
   ]
 
+  if (options.disableHooks) {
+    const parallelSettingsPath = path.join(process.cwd(), '.claude', 'settings.parallel.json')
+    if (fs.existsSync(parallelSettingsPath)) {
+      args.push('--settings', parallelSettingsPath)
+    }
+  }
+
   if (validatedModel) {
     args.push('--model', validatedModel)
   }
 
   const showProgress = options.showProgress !== false
   const collectMetrics = options.collectMetrics === true
+  const collectOutput = true
 
   if (collectMetrics) {
     enableMetricsCollection()
+  }
+  if (collectOutput) {
+    enableOutputCollection()
   }
 
   logger.debug(`Executing headless: claude ${args.join(' ')}`)
@@ -122,11 +138,15 @@ export async function executeHeadlessWithMetrics(
     child.on('close', (code) => {
       rl.close()
       const metrics = collectMetrics ? getCollectedMetrics() : undefined
+      const output = collectOutput ? getCollectedOutput() : undefined
       if (collectMetrics) {
         disableMetricsCollection()
       }
+      if (collectOutput) {
+        disableOutputCollection()
+      }
       if (code === 0) {
-        resolve({ success: true, metrics: metrics || undefined })
+        resolve({ success: true, metrics: metrics || undefined, output: output || undefined })
       } else {
         reject(new Error(`Claude exited with code ${code}`))
       }
@@ -136,6 +156,9 @@ export async function executeHeadlessWithMetrics(
       rl.close()
       if (collectMetrics) {
         disableMetricsCollection()
+      }
+      if (collectOutput) {
+        disableOutputCollection()
       }
       reject(new Error(`Failed to start Claude: ${err.message}`))
     })

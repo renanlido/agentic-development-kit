@@ -1,5 +1,5 @@
 # Foco Ativo
 
-feature: v3-version
-status: arquitetura pronta
-path: .claude/plans/features/v3-version/
+feature: v3-version-2
+status: não iniciada
+path: .claude/plans/features/v3-version-2/

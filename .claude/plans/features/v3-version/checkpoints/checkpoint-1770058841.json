@@ -1,6 +1,0 @@
-{
-  "timestamp": "2026-02-02T19:00:41Z",
-  "feature": "v3-version",
-  "coreState": null,
-  "gitStatus": " M .claude/plans/features/v3-version/progress.md| M .claude/plans/features/v3-version/tasks.md| M .claude/settings.json| M src/commands/feature.ts| M src/utils/claude.ts| M src/utils/wave-executor.ts| M src/utils/wave-progress.ts|?? .claude/hooks/auto-checkpoint.sh|?? .claude/hooks/inject-memory.sh|?? .claude/plans/features/gemini-integration/checkpoints/|?? .claude/plans/features/v3-version/checkpoints/|?? .claude/settings.backup-1770057164439.json|?? .claude/settings.backup-1770057164784.json|?? .claude/settings.backup-1770057165597.json|?? .claude/settings.backup-1770057165876.json|?? .claude/settings.backup-1770057166489.json|?? .claude/settings.backup-1770057167260.json|?? .claude/settings.backup-1770057168086.json|?? .claude/settings.backup-1770057168296.json|?? .claude/settings.backup-1770057168990.json"
-}

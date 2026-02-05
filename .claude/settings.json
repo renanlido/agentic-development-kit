@@ -62,6 +62,14 @@
           {
             "type": "command",
             "command": ".claude/hooks/validate-tdd.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/validate-no-stub.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/comprehension-check.sh"
           }
         ]
       },
@@ -71,6 +79,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/scope-check.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/validate-no-stub.sh"
           }
         ]
       }

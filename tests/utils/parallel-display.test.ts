@@ -1,5 +1,5 @@
-import { ParallelDisplayManager } from '../../src/utils/parallel-display'
 import type { StreamEvent } from '../../src/types/stream-events'
+import { ParallelDisplayManager } from '../../src/utils/parallel-display'
 
 describe('ParallelDisplayManager', () => {
   let originalStdout: typeof process.stdout.write
@@ -363,6 +363,13 @@ describe('ParallelDisplayManager', () => {
       const agentId = display.registerAgent('1.1', 'Test task')
 
       display.markFailed(agentId)
+    })
+
+    it('should mark agent as validating', () => {
+      const display = new ParallelDisplayManager()
+      const agentId = display.registerAgent('1.1', 'Test task')
+
+      display.markValidating(agentId)
     })
   })
 

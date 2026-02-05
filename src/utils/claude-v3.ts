@@ -4,6 +4,8 @@ import os from 'node:os'
 import path from 'node:path'
 import type { ClaudeV3Options, ClaudeV3Result, SessionInfoV3 } from '../types/session-v3.js'
 import { logger } from './logger.js'
+import { getAntiStubPrompt, validateOutput } from './memory/anti-stub.js'
+import { coreStateManager } from './memory/core-state.js'
 import { sessionStore } from './session-store.js'
 
 const SESSION_ID_PATTERN = /Session ID: ([a-f0-9-]+)/i
@@ -19,18 +21,6 @@ export function parseSessionId(output: string): string | null {
 
 /**
  * Executes Claude CLI command asynchronously with session ID capture.
- *
- * Features:
- * - Uses spawn (async) instead of spawnSync for better control
- * - Captures stdout/stderr while streaming to console
- * - Extracts session ID automatically via --print-session-id
- * - Supports session resume via --resume flag
- * - Configurable timeout (default 5 minutes)
- * - Streams output chunks to optional callback
- *
- * @param prompt - Text prompt to send to Claude
- * @param options - Execution options (model, resume, timeout, etc)
- * @returns Promise with output, sessionId, exitCode, and duration
  */
 export async function executeClaudeCommandV3(
   prompt: string,
@@ -54,6 +44,10 @@ export async function executeClaudeCommandV3(
 
     if (options.resume) {
       args.push('--resume', options.resume)
+    }
+
+    if (options.systemPrompt) {
+      args.push('--system-prompt', options.systemPrompt)
     }
 
     logger.debug(`Executing: claude ${args.join(' ')}`)
@@ -131,24 +125,33 @@ export function isClaudeInstalledV3(): boolean {
 }
 
 /**
+ * Generates the unified system prompt for ADK v3.
+ */
+async function generateSystemPrompt(feature: string): Promise<string> {
+  const coreState = await coreStateManager.get(feature)
+  const antiStub = getAntiStubPrompt()
+
+  let prompt = `${antiStub}\n\n`
+
+  if (coreState) {
+    prompt += `<core-state>\n${JSON.stringify(coreState, null, 2)}\n</core-state>\n\n`
+  }
+
+  prompt += `You are working on the feature: ${feature}.
+Always check the core-state for current task and constraints.
+If you make a decision, state it clearly so it can be captured.`
+
+  return prompt.trim()
+}
+
+/**
  * Executes Claude with automatic session tracking and resume.
- *
- * Behavior:
- * - Checks if existing session is resumable (< 24h)
- * - If resumable, automatically adds --resume flag
- * - Executes command and captures session ID
- * - Saves/updates session info in SessionStore
- * - Preserves session id and startedAt across resumes
- *
- * @param feature - Feature name for session storage
- * @param prompt - Text prompt to send to Claude
- * @param options - Execution options (merged with auto-resume)
- * @returns Promise with command result including session ID
  */
 export async function executeWithSessionTracking(
   feature: string,
   prompt: string,
-  options: ClaudeV3Options = {}
+  options: ClaudeV3Options = {},
+  maxRetries = 2
 ): Promise<ClaudeV3Result> {
   const existingSession = await sessionStore.get(feature)
   const isResumable = await sessionStore.isResumable(feature)
@@ -160,7 +163,29 @@ export async function executeWithSessionTracking(
     logger.info(`Resuming session ${sessionId}`)
   }
 
-  const result = await executeClaudeCommandV3(prompt, options)
+  // Inject system prompt if not provided
+  if (!options.systemPrompt) {
+    options.systemPrompt = await generateSystemPrompt(feature)
+  }
+
+  let result = await executeClaudeCommandV3(prompt, options)
+  let retryCount = 0
+
+  // Anti-Stub Self-Correction Loop
+  while (retryCount < maxRetries) {
+    const validation = validateOutput(result.output)
+    if (validation.valid) break
+
+    retryCount++
+    logger.warn(`Anti-Stub validation failed: ${validation.error}. Retrying (${retryCount}/${maxRetries})...`)
+
+    const retryPrompt = `Your previous response contained stub patterns: ${validation.matches?.join(', ')}. 
+Please provide the FULL implementation. Do not use placeholders or TODOs.`
+
+    // Update options to resume the session we just started/continued
+    const retryOptions = { ...options, resume: result.sessionId || options.resume }
+    result = await executeClaudeCommandV3(retryPrompt, retryOptions)
+  }
 
   const generateSessionId = (): string => {
     const timestamp = Date.now()

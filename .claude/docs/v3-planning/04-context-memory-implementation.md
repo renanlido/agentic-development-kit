@@ -19,7 +19,12 @@
 9. [Hooks de Injecao de Contexto](#9-hooks-de-injecao-de-contexto)
 10. [Metricas e KPIs](#10-metricas-e-kpis)
 11. [Implementacao no ADK](#11-implementacao-no-adk)
-12. [Referencias](#12-referencias)
+12. [Garantia de Leitura de Contexto](#12-garantia-de-leitura-de-contexto)
+13. [Multi-Agent Parallel Execution](#13-multi-agent-parallel-execution)
+14. [Codebase Indexing (Fast Context)](#14-codebase-indexing-fast-context)
+15. [Auto Memories (Captura Automatica)](#15-auto-memories-captura-automatica)
+16. [Visual Progress UI](#16-visual-progress-ui)
+17. [Referencias](#17-referencias)
 
 ---
 

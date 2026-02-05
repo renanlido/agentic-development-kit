@@ -33,6 +33,7 @@ import {
   saveProgress,
   updateStepStatus,
 } from '../utils/progress'
+import { QARunner } from '../utils/qa-runner'
 import { parseSpecFromMarkdown, validateSpec } from '../utils/spec-utils'
 import { printStreamHeader } from '../utils/stream-parser'
 import { SyncEngine } from '../utils/sync-engine'
@@ -2649,6 +2650,33 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
     return { completed, total, percentage, allDone }
   }
 
+  private async runAutopilotQA(name: string): Promise<boolean> {
+    console.log(chalk.cyan('\n🔍 Executando QA automático...'))
+    console.log(chalk.gray('Rodando validações: type-check, tests, lint...\n'))
+
+    const qaRunner = new QARunner(name)
+    const qaResult = await qaRunner.runFeatureQA()
+
+    if (qaResult.passed) {
+      console.log(chalk.green('\n✅ QA passou! Feature completa.'))
+      if (qaResult.correctionsMade.length > 0) {
+        console.log(chalk.gray('Correções aplicadas:'))
+        for (const correction of qaResult.correctionsMade) {
+          console.log(chalk.gray(`  - ${correction}`))
+        }
+      }
+      return true
+    }
+
+    console.log(chalk.yellow('\n⚠️  QA encontrou issues após auto-correção:'))
+    for (const issue of qaResult.issues) {
+      console.log(chalk.yellow(`  - [${issue.type}] ${issue.message}`))
+    }
+    console.log(chalk.gray(`\nTentativas: ${qaResult.attempts}`))
+    console.log(chalk.gray(`Execute manualmente: adk feature qa ${name}`))
+    return false
+  }
+
   private async autopilotLoop(name: string, _options: FeatureOptions): Promise<void> {
     const MAX_ITERATIONS = 50
     const COOLDOWN_MS = 3000
@@ -2780,7 +2808,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 
         if (taskStatus.allDone || implementDone) {
           console.log(chalk.green('\n✅ Implementação concluída!'))
-          console.log(chalk.gray(`Próximo passo: adk feature qa ${name}`))
+          await this.runAutopilotQA(name)
           return
         }
 
@@ -2825,7 +2853,7 @@ Plan: .claude/plans/features/${name}/implementation-plan.md
 
           if (updatedStatus.allDone || implementNowDone) {
             console.log(chalk.green('\n✅ Implementação concluída!'))
-            console.log(chalk.gray(`Próximo passo: adk feature qa ${name}`))
+            await this.runAutopilotQA(name)
             return
           }
         }
@@ -4857,8 +4885,7 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
           if (block.type === 'tool_result' && block.tool_use_id) {
             const agentId = toolUseIdToAgentId.get(block.tool_use_id)
             if (agentId) {
-              const metrics = agentMetrics.get(agentId)
-              displayManager.markCompleted(agentId, metrics?.toolCount, metrics?.tokenCount)
+              displayManager.markValidating(agentId)
               toolUseIdToAgentId.delete(block.tool_use_id)
             }
           }
@@ -4873,20 +4900,29 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
         onEvent,
       })
 
+      const validatedResults = await this.validateTasksCompletion(
+        name,
+        wave.tasks,
+        taskIdToAgentId,
+        agentMetrics,
+        startTime
+      )
+
+      for (const result of validatedResults) {
+        const agentId = taskIdToAgentId.get(result.taskId)
+        if (agentId) {
+          const metrics = agentMetrics.get(agentId)
+          if (result.status === 'success') {
+            displayManager.markCompleted(agentId, metrics?.toolCount, metrics?.tokenCount)
+          } else {
+            displayManager.markFailed(agentId)
+          }
+        }
+      }
+
       displayManager.cleanup()
 
-      return wave.tasks.map((task) => {
-        const agentId = taskIdToAgentId.get(task.id)
-        const metrics = agentId ? agentMetrics.get(agentId) : undefined
-        return {
-          taskId: task.id,
-          taskTitle: task.title,
-          toolCount: metrics?.toolCount || 0,
-          tokenCount: metrics?.tokenCount || 0,
-          durationMs: Date.now() - startTime,
-          status: 'success' as const,
-        }
-      })
+      return validatedResults
     } catch {
       displayManager.cleanup()
 
@@ -4911,13 +4947,28 @@ Use Read para ler ${researchPath}, depois use Edit para adicionar a secao de des
     hooksDir: string,
     specContent?: string
   ): string {
+    const featurePath = `.claude/plans/features/${name}`
+    const tasksFilePath = `${featurePath}/tasks.md`
+
     const taskDescriptions = tasks
       .map(
         (task) => `
 ### Task ${task.id}: ${task.title}
-- Implementar seguindo TDD
-- Ao finalizar, marcar como completed:
-  ${hooksDir}/mark-task.sh ${name} "Task ${task.id}" completed
+`
+      )
+      .join('\n')
+
+    const taskPromptExamples = tasks
+      .map(
+        (task) => `
+**Para Task ${task.id}:**
+\`\`\`json
+{
+  "subagent_type": "feature-developer",
+  "description": "Implementar Task ${task.id}",
+  "prompt": "# Task ${task.id}: ${task.title}\\n\\n## CONTEXTO OBRIGATÓRIO\\n\\n1. PRIMEIRO, leia o arquivo ${tasksFilePath} e encontre a seção da Task ${task.id}\\n2. Leia os critérios de aceite e arquivos envolvidos\\n3. Leia os arquivos existentes mencionados antes de modificar\\n\\n## FLUXO TDD OBRIGATÓRIO\\n\\n1. Escreva o TESTE primeiro (arquivo em tests/)\\n2. Execute o teste - deve FALHAR\\n3. Implemente o código mínimo para passar\\n4. Execute o teste - deve PASSAR\\n5. Refatore se necessário\\n\\n## VALIDAÇÃO FINAL\\n\\n1. Execute: npm run build\\n2. Execute: npm test -- [arquivo de teste]\\n3. Todos os testes devem passar\\n\\n## MARCAR COMO COMPLETED\\n\\nAPÓS todos os testes passarem, execute:\\n${hooksDir}/mark-task.sh ${name} \\"Task ${task.id}\\" completed\\n\\n## IMPORTANTE\\n\\n- NÃO use stubs ou placeholders\\n- NÃO deixe TODO ou FIXME\\n- Implemente código COMPLETO e funcional"
+}
+\`\`\`
 `
       )
       .join('\n')
@@ -4932,14 +4983,9 @@ Execute as tasks abaixo **EM PARALELO** usando a ferramenta **Task**.
 Você DEVE usar a ferramenta Task para spawnar subagents.
 Faça TODAS as chamadas Task em uma ÚNICA mensagem para execução paralela.
 
-Exemplo de chamada Task:
-\`\`\`json
-{
-  "subagent_type": "feature-developer",
-  "description": "Implementar Task X.X",
-  "prompt": "Implemente a Task X.X: [descrição]. Siga TDD..."
-}
-\`\`\`
+## Tasks para Executar
+
+${taskDescriptions}
 
 ## Subagents Disponíveis
 
@@ -4949,25 +4995,60 @@ Exemplo de chamada Task:
 | unit-test-specialist | Criação de testes unitários |
 | e2e-test-specialist | Testes end-to-end |
 
-## Tasks para Executar
+## PROMPTS EXATOS PARA CADA TASK
 
-${taskDescriptions}
+Use EXATAMENTE os prompts abaixo para cada Task. Eles contêm instruções detalhadas para TDD e validação.
+
+${taskPromptExamples}
 
 ${specContent ? `## Especificação da Feature\n\n${specContent}` : ''}
 
-## Instruções para os Subagents
+## EXECUÇÃO
 
-Cada subagent deve:
-1. Ler o arquivo tasks.md para entender o contexto completo da task
-2. Implementar seguindo TDD (teste primeiro, depois código)
-3. Executar os testes para validar
-4. Marcar a task como completed usando mark-task.sh
-
-## Execução
-
-Agora, faça múltiplas chamadas da ferramenta Task em paralelo (uma para cada task acima).
-NÃO implemente diretamente - delegue para os subagents.
+Agora, faça múltiplas chamadas da ferramenta Task em paralelo.
+Use os prompts EXATOS listados acima - eles contêm todas as instruções necessárias.
+NÃO modifique os prompts. NÃO implemente diretamente - delegue para os subagents.
 `
+  }
+
+  private async validateTasksCompletion(
+    name: string,
+    tasks: Array<{ id: string; title: string }>,
+    taskIdToAgentId: Map<string, string>,
+    agentMetrics: Map<string, { toolCount: number; tokenCount: number }>,
+    startTime: number
+  ): Promise<AgentExecutionMetrics[]> {
+    const featurePath = path.join(process.cwd(), '.claude', 'plans', 'features', name)
+    const tasksFilePath = path.join(featurePath, 'tasks.md')
+
+    const completedTaskIds = new Set<string>()
+
+    try {
+      const tasksContent = await fs.readFile(tasksFilePath, 'utf-8')
+
+      for (const task of tasks) {
+        const escapedId = task.id.replace('.', '\\.')
+        const taskPattern = new RegExp(`- \\[x\\]\\s*\\*\\*Task ${escapedId}`, 'i')
+        if (taskPattern.test(tasksContent)) {
+          completedTaskIds.add(task.id)
+        }
+      }
+    } catch {}
+
+    return tasks.map((task) => {
+      const agentId = taskIdToAgentId.get(task.id)
+      const metrics = agentId ? agentMetrics.get(agentId) : undefined
+      const isCompleted = completedTaskIds.has(task.id)
+
+      return {
+        taskId: task.id,
+        taskTitle: task.title,
+        toolCount: metrics?.toolCount || 0,
+        tokenCount: metrics?.tokenCount || 0,
+        durationMs: Date.now() - startTime,
+        status: isCompleted ? ('success' as const) : ('error' as const),
+      }
+    })
   }
 
   private async executeWaveSequential(

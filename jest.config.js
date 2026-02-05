@@ -26,7 +26,7 @@ module.exports = {
     '^.+\\.js$': 'babel-jest',
   },
   transformIgnorePatterns: [
-    '/node_modules/(?!(chalk|ora|cli-spinners|log-symbols|is-unicode-supported|strip-ansi|ansi-regex|string-width|eastasianwidth|emoji-regex)/)',
+    '/node_modules/(?!(chalk|ora|cli-spinners|cli-cursor|restore-cursor|log-symbols|is-unicode-supported|strip-ansi|ansi-regex|string-width|eastasianwidth|emoji-regex|onetime|mimic-function|signal-exit)/)',
   ],
   moduleNameMapper: {
     '#ansi-styles': '<rootDir>/node_modules/chalk/source/vendor/ansi-styles/index.js',

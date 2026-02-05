@@ -14,6 +14,17 @@ feature
   .description('Show feature status including sessions')
   .action((name) => featureV3Command.status(name))
 
+feature
+  .command('prompt <name> <text>')
+  .description('Send a prompt to Claude with session tracking')
+  .option('-m, --model <model>', 'Model to use (sonnet, opus, haiku)')
+  .action((name, text, options) => featureV3Command.prompt(name, text, options))
+
+feature
+  .command('task <name> <task_id>')
+  .description('Set the current task in core state')
+  .action((name, taskId) => featureV3Command.setTask(name, taskId))
+
 program.on('command:*', () => {
   console.error(chalk.red('Invalid command: %s'), program.args.join(' '))
   process.exit(1)

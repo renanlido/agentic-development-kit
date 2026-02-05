@@ -300,7 +300,8 @@ const DEPENDENCY_REGEX = /^\*?\*?Depend[êe]ncias\*?\*?:\s*(.+)$/im
 const FILES_SECTION_REGEX = /^#{2,4}\s+Arquivos/i
 const TYPE_REGEX = /^\*?\*?Tipo\*?\*?:\s*(\w+)/im
 const ESTIMATE_REGEX = /^\*?\*?Estimativa\*?\*?:\s*\[?([PMG])\]?/im
-const STATUS_LINE_REGEX = /^\*?\*?Status\*?\*?:\s*(completed|done|conclu[íi]d[oa]|in_progress|em\s*andamento|pending|pendente)/i
+const STATUS_LINE_REGEX =
+  /^\*?\*?Status\*?\*?:\s*(completed|done|conclu[íi]d[oa]|in_progress|em\s*andamento|pending|pendente)/i
 
 export function parseTasksForParallel(content: string, featureName: string): ParallelTasksDocument {
   const lines = content.split('\n')
@@ -331,7 +332,7 @@ export function parseTasksForParallel(content: string, featureName: string): Par
       }
 
       const isCompleted = /\[x\]/i.test(trimmed) || /[✅✔️]/.test(trimmed)
-      const isInProgress = /\[~\]/i.test(trimmed) || /[🔄⏳]/.test(trimmed)
+      const isInProgress = /\[~\]/i.test(trimmed) || /[🔄⏳]/u.test(trimmed)
       headerHasCheckbox = isCompleted || isInProgress || /\[ \]/i.test(trimmed)
 
       currentTask = {
@@ -395,11 +396,7 @@ export function parseTasksForParallel(content: string, featureName: string): Par
     const statusMatch = trimmed.match(STATUS_LINE_REGEX)
     if (statusMatch) {
       const statusText = statusMatch[1].toLowerCase()
-      if (
-        statusText === 'completed' ||
-        statusText === 'done' ||
-        statusText.includes('conclu')
-      ) {
+      if (statusText === 'completed' || statusText === 'done' || statusText.includes('conclu')) {
         currentTask.status = 'completed'
         headerHasCheckbox = true
       } else if (statusText === 'in_progress' || statusText.includes('andamento')) {
@@ -609,7 +606,11 @@ export async function updateTaskStatusInFile(
 
     if (inTargetTask && trimmed.match(/^\*?\*?Status\*?\*?:/i)) {
       const statusText =
-        newStatus === 'completed' ? 'completed' : newStatus === 'in_progress' ? 'in_progress' : 'pending'
+        newStatus === 'completed'
+          ? 'completed'
+          : newStatus === 'in_progress'
+            ? 'in_progress'
+            : 'pending'
       result.push(line.replace(/:\s*.+$/, `: ${statusText}`))
       modified = true
       continue
