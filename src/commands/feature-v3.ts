@@ -39,7 +39,7 @@ class FeatureV3Command {
       
       const result = await executeWithSessionTracking(name, text, {
         model: options.model,
-        onOutput: (chunk) => {
+        onOutput: (_chunk) => {
           // stdout is already handled in executeClaudeCommandV3
         }
       })
